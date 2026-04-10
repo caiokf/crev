@@ -9,6 +9,8 @@ import { registerDoctorCommand } from "./commands/doctor.js"
 import { registerHelpCommand } from "./commands/help.js"
 import { registerSchemaInitCommand } from "./commands/schema-init.js"
 import { registerAgentInitCommand } from "./commands/agent-init.js"
+import { registerInitCommand } from "./commands/init.js"
+import { registerUpdateCommand } from "./commands/update.js"
 
 program
   .name("crev")
@@ -25,5 +27,7 @@ registerDoctorCommand(program)
 registerHelpCommand(program)
 registerSchemaInitCommand(program)
 registerAgentInitCommand(program)
+registerInitCommand(program)
+registerUpdateCommand(program)
 
 program.parse()
