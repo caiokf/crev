@@ -23,6 +23,7 @@ export function registerDoctorCommand(program: Command): void {
       // Collect which runtimes are used by which schemas
       const schemas = listSchemas(schemasDir)
       const runtimeUsage = new Map<string, string[]>()
+      const schemaLoadErrors = new Map<string, string>()
       for (const name of schemas) {
         try {
           const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
@@ -36,7 +37,9 @@ export function registerDoctorCommand(program: Command): void {
             if (!list.includes(name)) list.push(name)
             runtimeUsage.set(schema.triage.runtime, list)
           }
-        } catch {}
+        } catch (err) {
+          schemaLoadErrors.set(name, err instanceof Error ? err.message : String(err))
+        }
       }
 
       const config = loadConfig(crevDir)
@@ -109,8 +112,9 @@ export function registerDoctorCommand(program: Command): void {
             }
           }
           return { name, ready: issues.length === 0, issues }
-        } catch {
-          return { name, ready: false, issues: ["failed to load schema"] }
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err)
+          return { name, ready: false, issues: [`failed to load schema: ${reason}`] }
         }
       })
 

@@ -164,7 +164,9 @@ async function scaffold(
       try {
         const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
         for (const r of schema.reviewers) referencedRuntimes.add(r.runtime)
-      } catch {}
+      } catch (err) {
+        console.log(`  ${chalk.red("✗")} ${name}.yaml: ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
 
     // Check each referenced runtime
@@ -183,7 +185,9 @@ async function scaffold(
                 : chalk.yellow("? unknown")
           console.log(`  ${name.padEnd(16)} ${installed}  ${auth}`)
         }
-      } catch {}
+      } catch (err) {
+        console.log(`  ${name.padEnd(16)} ${chalk.red("✗ error:")} ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
 
     // Schema readiness
@@ -207,10 +211,12 @@ async function scaffold(
         } else {
           console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.red("✗ " + issues.join(", "))}`)
         }
-      } catch {}
+      } catch (err) {
+        console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.red("✗ load failed:")} ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
-  } catch {
-    // Health check failed, not critical
+  } catch (err) {
+    console.log(`  ${chalk.dim("Health check failed:")} ${err instanceof Error ? err.message : String(err)}`)
   }
 
   console.log()

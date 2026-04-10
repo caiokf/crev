@@ -186,10 +186,13 @@ export function createMultiSpinner(
       stopped = true
       clearInterval(interval)
       teardownKeyboard()
-      stopped = false
-      render()
-      stopped = true
-      stream.write(SHOW_CURSOR)
+      try {
+        stopped = false
+        render()
+      } finally {
+        stopped = true
+        stream.write(SHOW_CURSOR)
+      }
     },
 
     clear() {
