@@ -1,53 +1,103 @@
+import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir } from "../core/config.js"
-import { loadSchemaFile } from "../core/schema.js"
-import { getSchemasDir } from "../util/paths.js"
+import { findCrevDir, loadConfig, getOutputDir } from "../core/config.js"
+import type { ReviewResult } from "../core/types.js"
 
 export function registerShowCommand(program: Command): void {
   program
-    .command("show <schema>")
-    .description("Display schema details")
+    .command("show [file]")
+    .description("Pretty-print a review artifact (default: latest)")
     .option("--json", "Machine-readable JSON output")
-    .action((schemaName, opts) => {
+    .action((file, opts) => {
       const crevDir = findCrevDir()
-      const schemaPath = path.join(getSchemasDir(crevDir), `${schemaName}.yaml`)
+      const filePath = file ? path.resolve(file) : findLatestReview(crevDir)
+
+      if (!filePath) {
+        console.error("No review files found. Run a review first with: crev run --schema <name>")
+        process.exit(1)
+      }
+
+      if (!fs.existsSync(filePath)) {
+        console.error(`Error: File not found: ${filePath}`)
+        process.exit(1)
+      }
+
+      const content = fs.readFileSync(filePath, "utf-8")
+      let result: ReviewResult
 
       try {
-        const schema = loadSchemaFile(schemaPath)
+        result = JSON.parse(content) as ReviewResult
+      } catch {
+        console.error("Error: Invalid JSON file")
+        process.exit(1)
+      }
 
-        if (opts.json) {
-          console.log(JSON.stringify({ name: schemaName, ...schema }, null, 2))
-          return
-        }
+      if (opts.json) {
+        console.log(content)
+        return
+      }
 
-        console.log(`\n  ${chalk.bold(schemaName)}`)
-        if (schema.description) {
-          console.log(`  ${chalk.dim(schema.description)}`)
-        }
-        console.log()
-        console.log(`  ${chalk.bold("Reviewers")} (${schema.reviewers.length})`)
-        for (const r of schema.reviewers) {
-          const agent = r.agent ? chalk.dim(` → ${r.agent}`) : ""
-          console.log(`    ${chalk.cyan(r.name)} ${chalk.dim(`${r.runtime}/${r.model}`)}${agent}`)
-        }
+      const SEVERITY_COLORS: Record<string, (s: string) => string> = {
+        critical: chalk.red.bold,
+        high: chalk.red,
+        medium: chalk.yellow,
+        low: chalk.dim,
+      }
 
-        if (schema.triage) {
-          console.log()
-          console.log(`  ${chalk.bold("Triage")}`)
-          console.log(`    enabled: ${schema.triage.enabled ? chalk.green("yes") : chalk.dim("no")}`)
-          if (schema.triage.enabled) {
-            console.log(`    runtime: ${schema.triage.runtime}/${schema.triage.model}`)
-            if (schema.triage.context && schema.triage.context.length > 0) {
-              console.log(`    context: ${schema.triage.context.join(", ")}`)
+      console.log(`\n  ${chalk.bold("Review:")} ${result.metadata.slug}`)
+      console.log(`  ${chalk.dim("Schema:")} ${result.metadata.schema}`)
+      console.log(`  ${chalk.dim("Date:")} ${result.metadata.timestamp}`)
+      console.log(`  ${chalk.dim("Diff:")} ${result.metadata.diffType}${result.metadata.diffBase ? ` (base: ${result.metadata.diffBase})` : ""}`)
+      if (!file) {
+        console.log(`  ${chalk.dim("File:")} ${path.relative(process.cwd(), filePath)}`)
+      }
+      console.log()
+
+      for (const review of result.reviews) {
+        console.log(`  ${chalk.bold(review.reviewer)} ${chalk.dim(`${review.runtime}/${review.model}`)} ${chalk.dim(`(${(review.durationMs / 1000).toFixed(1)}s)`)}`)
+
+        if (review.issues.length === 0) {
+          console.log(`    ${chalk.green("No issues")}`)
+        } else {
+          for (const issue of review.issues) {
+            const colorize = SEVERITY_COLORS[issue.severity] ?? chalk.white
+            const location = issue.file ? chalk.dim(` ${issue.file}${issue.line ? `:${issue.line}` : ""}`) : ""
+            const status = issue.status !== "open" ? chalk.dim(` [${issue.status}]`) : ""
+            const triage = issue.triage ? chalk.dim(` (${issue.triage.verdict})`) : ""
+
+            console.log(`    ${colorize(`[${issue.severity}]`)} ${issue.title}${location}${status}${triage}`)
+            if (issue.description) {
+              console.log(`      ${chalk.dim(issue.description.slice(0, 120))}`)
             }
           }
         }
         console.log()
-      } catch (e) {
-        console.error(`Error: ${e instanceof Error ? e.message : String(e)}`)
-        process.exit(1)
       }
+
+      // Summary
+      console.log(`  ${chalk.bold("Summary:")} ${result.summary.totalIssues} issue${result.summary.totalIssues !== 1 ? "s" : ""}`)
+      if (result.summary.triage) {
+        console.log(
+          `    ${chalk.green(`${result.summary.triage.actionable} actionable`)}, ${chalk.yellow(`${result.summary.triage.deferred} deferred`)}, ${chalk.dim(`${result.summary.triage.dismissed} dismissed`)}`,
+        )
+      }
+      console.log()
     })
+}
+
+function findLatestReview(crevDir: string): string | null {
+  const config = loadConfig(crevDir)
+  const outputDir = getOutputDir(config, crevDir)
+
+  if (!fs.existsSync(outputDir)) return null
+
+  const files = fs.readdirSync(outputDir)
+    .filter((f) => f.endsWith(".json") && f !== ".gitkeep")
+    .sort()
+
+  if (files.length === 0) return null
+
+  return path.join(outputDir, files[files.length - 1])
 }

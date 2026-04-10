@@ -1,0 +1,148 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crev config",
+  "description": "Configuration for crev CLI (.crev/config.yaml)",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "defaults": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Default settings for crev commands",
+      "properties": {
+        "schema": {
+          "type": "string",
+          "default": "quick",
+          "description": "Default review schema to use"
+        },
+        "type": {
+          "type": "string",
+          "enum": ["all", "committed", "uncommitted"],
+          "default": "all",
+          "description": "Default diff type"
+        },
+        "base": {
+          "type": "string",
+          "default": "main",
+          "description": "Default base branch for diffs"
+        }
+      }
+    },
+    "runtimes": {
+      "type": "object",
+      "description": "Per-runtime configuration overrides",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "command": {
+            "type": "string",
+            "description": "Custom command to invoke this runtime"
+          },
+          "env": {
+            "type": "object",
+            "additionalProperties": { "type": "string" },
+            "default": {},
+            "description": "Environment variables to set when running this runtime"
+          },
+          "args": {
+            "type": "array",
+            "items": { "type": "string" },
+            "default": [],
+            "description": "Extra CLI arguments to pass to this runtime"
+          }
+        }
+      }
+    },
+    "aliases": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Model name aliases (e.g. opus -> claude-opus-4-6)"
+    },
+    "diff": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Diff generation settings",
+      "properties": {
+        "exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Glob patterns to exclude from diffs"
+        }
+      }
+    },
+    "output": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Review output settings",
+      "properties": {
+        "dir": {
+          "type": "string",
+          "default": ".crev/reviews",
+          "description": "Directory to write review output"
+        },
+        "format": {
+          "type": "string",
+          "enum": ["json", "markdown", "both"],
+          "default": "json",
+          "description": "Output format for reviews"
+        }
+      }
+    },
+    "normalizer": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Normalizer settings for deduplicating review findings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Whether to run the normalizer"
+        },
+        "runtime": {
+          "type": "string",
+          "default": "claude",
+          "description": "Runtime to use for normalization"
+        },
+        "model": {
+          "type": "string",
+          "default": "haiku",
+          "description": "Model to use for normalization"
+        }
+      }
+    },
+    "triage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Triage settings to filter review findings",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether to run triage"
+        },
+        "runtime": {
+          "type": "string",
+          "default": "claude",
+          "description": "Runtime to use for triage"
+        },
+        "model": {
+          "type": "string",
+          "default": "opus",
+          "description": "Model to use for triage"
+        },
+        "context": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional context files to include in triage"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Custom prompt for the triage step"
+        }
+      }
+    }
+  }
+}

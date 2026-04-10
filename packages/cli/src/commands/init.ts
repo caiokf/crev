@@ -8,12 +8,6 @@ import { configTemplate } from "../templates/config.js"
 import { quickSchema } from "../templates/schemas/quick.js"
 import { standardSchema } from "../templates/schemas/standard.js"
 import { thoroughSchema } from "../templates/schemas/thorough.js"
-import { engineerAgent } from "../templates/agents/engineer.js"
-import { securityAgent } from "../templates/agents/security.js"
-import { architectAgent } from "../templates/agents/architect.js"
-import { performanceAgent } from "../templates/agents/performance.js"
-import { testingAgent } from "../templates/agents/testing.js"
-import { documentationAgent } from "../templates/agents/documentation.js"
 import { claudeSkill } from "../templates/skills/claude.js"
 import { cursorSkill } from "../templates/skills/cursor.js"
 import { copilotPrompt } from "../templates/skills/copilot.js"
@@ -34,27 +28,17 @@ const SCHEMAS: Record<string, { label: string; content: string }> = {
   thorough: { label: "thorough    — Comprehensive (6 reviewers)", content: thoroughSchema },
 }
 
-const AGENTS: Record<string, { label: string; content: string }> = {
-  "engineer.md": { label: "engineer.md", content: engineerAgent },
-  "security.md": { label: "security.md", content: securityAgent },
-  "architect.md": { label: "architect.md", content: architectAgent },
-  "performance.md": { label: "performance.md", content: performanceAgent },
-  "testing.md": { label: "testing.md", content: testingAgent },
-  "documentation.md": { label: "documentation.md", content: documentationAgent },
-}
-
 export function registerInitCommand(program: Command): void {
   program
     .command("init [path]")
     .description("Interactive TUI setup")
     .option("--tools <list>", "Comma-separated tool IDs (all/none/claude,cursor,...)")
     .option("--schemas <list>", "Comma-separated schema names (all/quick,standard,...)")
-    .option("--agents <list>", "Comma-separated agent names (all/engineer.md,...)")
     .action(async (initPath, opts) => {
       const projectRoot = initPath ? path.resolve(initPath) : process.cwd()
       const crevDir = path.join(projectRoot, ".crev")
 
-      const isInteractive = !opts.tools && !opts.schemas && !opts.agents
+      const isInteractive = !opts.tools && !opts.schemas
 
       if (isInteractive) {
         await runInteractive(projectRoot, crevDir)
@@ -103,28 +87,14 @@ async function runInteractive(projectRoot: string, crevDir: string): Promise<voi
     })
   }
 
-  // Agent selection
-  const includeAgents = await confirm({ message: "Include starter agent personas?", default: true })
-  let selectedAgents: string[] = []
-  if (includeAgents) {
-    selectedAgents = await checkbox({
-      message: "Select agents:",
-      choices: Object.entries(AGENTS).map(([key, val]) => ({
-        name: val.label,
-        value: key,
-        checked: ["engineer.md", "security.md", "architect.md"].includes(key),
-      })),
-    })
-  }
-
   // Scaffold
-  await scaffold(projectRoot, crevDir, selectedSchemas, selectedAgents, selectedTools)
+  await scaffold(projectRoot, crevDir, selectedSchemas, selectedTools)
 }
 
 async function runNonInteractive(
   projectRoot: string,
   crevDir: string,
-  opts: { tools?: string; schemas?: string; agents?: string },
+  opts: { tools?: string; schemas?: string },
 ): Promise<void> {
   const tools = detectAITools(projectRoot)
 
@@ -144,25 +114,17 @@ async function runNonInteractive(
         ? opts.schemas.split(",").filter((s) => s in SCHEMAS)
         : ["quick", "standard"]
 
-  const selectedAgents =
-    opts.agents === "all"
-      ? Object.keys(AGENTS)
-      : opts.agents
-        ? opts.agents.split(",").filter((a) => a in AGENTS)
-        : ["engineer.md", "security.md", "architect.md"]
-
-  await scaffold(projectRoot, crevDir, selectedSchemas, selectedAgents, selectedTools)
+  await scaffold(projectRoot, crevDir, selectedSchemas, selectedTools)
 }
 
 async function scaffold(
   projectRoot: string,
   crevDir: string,
   schemas: string[],
-  agents: string[],
   tools: AITool[],
 ): Promise<void> {
   // Create directories
-  for (const dir of ["schemas", "agents", "diffs", "reviews"]) {
+  for (const dir of ["schemas", "diffs", "reviews"]) {
     fs.mkdirSync(path.join(crevDir, dir), { recursive: true })
   }
 
@@ -174,14 +136,6 @@ async function scaffold(
     const schema = SCHEMAS[name]
     if (schema) {
       writeIfNew(path.join(crevDir, "schemas", `${name}.yaml`), schema.content)
-    }
-  }
-
-  // Write agents
-  for (const name of agents) {
-    const agent = AGENTS[name]
-    if (agent) {
-      writeIfNew(path.join(crevDir, "agents", name), agent.content)
     }
   }
 

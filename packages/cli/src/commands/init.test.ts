@@ -17,12 +17,11 @@ describe("init scaffolding", () => {
 
   it("creates .crev directory structure", () => {
     const crevDir = path.join(tmpDir, ".crev")
-    for (const dir of ["schemas", "agents", "diffs", "reviews"]) {
+    for (const dir of ["schemas", "diffs", "reviews"]) {
       fs.mkdirSync(path.join(crevDir, dir), { recursive: true })
     }
 
     expect(fs.existsSync(path.join(crevDir, "schemas"))).toBe(true)
-    expect(fs.existsSync(path.join(crevDir, "agents"))).toBe(true)
     expect(fs.existsSync(path.join(crevDir, "diffs"))).toBe(true)
     expect(fs.existsSync(path.join(crevDir, "reviews"))).toBe(true)
   })

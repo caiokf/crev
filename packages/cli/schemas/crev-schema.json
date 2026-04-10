@@ -1,0 +1,287 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "crev review schema",
+  "description": "Configuration for crev code review schemas",
+  "type": "object",
+  "required": ["reviewers"],
+  "additionalProperties": false,
+  "properties": {
+    "description": {
+      "type": "string",
+      "description": "Human-readable description of this review schema"
+    },
+    "reviewers": {
+      "type": "array",
+      "minItems": 1,
+      "description": "List of reviewers to run for this schema",
+      "items": {
+        "$ref": "#/definitions/reviewer"
+      }
+    },
+    "triage": {
+      "$ref": "#/definitions/triage"
+    }
+  },
+  "definitions": {
+    "runtime": {
+      "type": "string",
+      "enum": [
+        "claude",
+        "codex",
+        "gemini",
+        "kimi",
+        "coderabbit",
+        "opencode",
+        "pi",
+        "droid",
+        "mastracode"
+      ],
+      "description": "AI runtime to use"
+    },
+    "reviewer": {
+      "type": "object",
+      "required": ["name", "runtime", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Unique display name for this reviewer"
+        },
+        "runtime": {
+          "$ref": "#/definitions/runtime"
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Model identifier for the chosen runtime"
+        },
+        "prompt": {
+          "type": "string",
+          "description": "Inline review prompt (mutually exclusive with agent)"
+        },
+        "agent": {
+          "type": "string",
+          "description": "Path to an external agent file (mutually exclusive with prompt)"
+        }
+      },
+      "not": {
+        "required": ["prompt", "agent"]
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": { "runtime": { "const": "coderabbit" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                { "required": ["prompt"] },
+                { "required": ["agent"] }
+              ]
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "claude" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": ["opus", "sonnet", "haiku"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "codex" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "gpt-5.4",
+                  "gpt-5.4-mini",
+                  "gpt-5.3-codex",
+                  "gpt-5.2-codex",
+                  "gpt-5.2",
+                  "gpt-5.1-codex-max",
+                  "gpt-5.1-codex-mini"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "gemini" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "gemini-2.5-pro",
+                  "gemini-2.5-flash",
+                  "gemini-3-pro-preview",
+                  "gemini-3-flash-preview"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "kimi" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "kimi-k2.5",
+                  "kimi-k2-0905-preview",
+                  "kimi-k2-turbo-preview"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "coderabbit" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": ["default"]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "opencode" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "zai-coding-plan/glm-5",
+                  "zai-coding-plan/glm-4.7",
+                  "zai-coding-plan/glm-4.7-flash",
+                  "zai/glm-5",
+                  "zai/glm-4.7",
+                  "zai/glm-4.7-flash",
+                  "openrouter/minimax/minimax-m2.7",
+                  "openrouter/minimax/minimax-m2.5",
+                  "openrouter/minimax/minimax-m2.1",
+                  "minimax-coding-plan/MiniMax-M2.7"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "pi" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "anthropic/claude-sonnet-4-6",
+                  "anthropic/claude-opus-4-6",
+                  "anthropic/claude-haiku-4-5-20251001",
+                  "google/gemini-2.5-pro",
+                  "google/gemini-2.5-flash",
+                  "openai/gpt-5",
+                  "openai/gpt-5-mini"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "droid" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "claude-opus-4-6",
+                  "claude-sonnet-4-6",
+                  "gpt-5",
+                  "gpt-5-mini",
+                  "gemini-2.5-pro"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": { "runtime": { "const": "mastracode" } },
+            "required": ["runtime"]
+          },
+          "then": {
+            "properties": {
+              "model": {
+                "enum": [
+                  "anthropic/claude-opus-4-6",
+                  "anthropic/claude-sonnet-4-6",
+                  "anthropic/claude-haiku-4-5-20251001",
+                  "openai/gpt-5",
+                  "openai/gpt-5-mini",
+                  "google/gemini-2.5-pro"
+                ]
+              }
+            }
+          }
+        }
+      ]
+    },
+    "triage": {
+      "type": "object",
+      "additionalProperties": false,
+      "description": "Optional triage step to filter files before review",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": false,
+          "description": "Whether triage is enabled"
+        },
+        "runtime": {
+          "$ref": "#/definitions/runtime"
+        },
+        "model": {
+          "type": "string",
+          "description": "Model to use for triage"
+        },
+        "context": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Additional context files to include in triage"
+        }
+      },
+      "if": {
+        "properties": { "enabled": { "const": true } },
+        "required": ["enabled"]
+      },
+      "then": {
+        "required": ["runtime", "model"]
+      }
+    }
+  }
+}

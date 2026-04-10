@@ -4,3 +4,4 @@ dist/
 .crev/diffs/
 .crev/reviews/
 coverage/
+.personal/

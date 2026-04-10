@@ -25,12 +25,14 @@ export type MultiSpinnerAction = "finalize" | "quit" | null
 export type UpdateOpts = {
   elapsed?: number
   resultText?: string
+  detail?: string
 }
 
 export type MultiSpinnerHandle = {
   addEntry(name: string, detail: string): void
   updateEntry(name: string, state: EntryState, opts?: UpdateOpts): void
   stop(): void
+  clear(): void
   onAction(callback: (action: MultiSpinnerAction) => void): void
 }
 
@@ -174,6 +176,7 @@ export function createMultiSpinner(
       entry.state = newState
       if (opts?.elapsed !== undefined) entry.finishedElapsed = opts.elapsed
       if (opts?.resultText !== undefined) entry.resultText = opts.resultText
+      if (opts?.detail !== undefined) entry.detail = opts.detail
     },
 
     stop() {
@@ -184,6 +187,21 @@ export function createMultiSpinner(
       stopped = false
       render()
       stopped = true
+      stream.write(SHOW_CURSOR)
+    },
+
+    clear() {
+      if (stopped) return
+      stopped = true
+      clearInterval(interval)
+      teardownKeyboard()
+      if (lineCount > 0) {
+        stream.write(`\x1B[${lineCount}A`)
+        for (let i = 0; i < lineCount; i++) {
+          stream.write(`${ERASE_LINE}\n`)
+        }
+        stream.write(`\x1B[${lineCount}A`)
+      }
       stream.write(SHOW_CURSOR)
     },
 
@@ -207,6 +225,7 @@ function createPlainSpinner(state: Entry[]): MultiSpinnerHandle {
       }
     },
     stop() {},
+    clear() {},
     onAction() {},
   }
 }

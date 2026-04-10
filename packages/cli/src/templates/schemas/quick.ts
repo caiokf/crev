@@ -3,5 +3,9 @@ reviewers:
   - name: Engineer
     runtime: claude
     model: sonnet
-    agent: engineer.md
+    prompt: >
+      You are a senior software engineer reviewing code changes.
+      Focus on correctness, error handling, edge cases, and readability.
+      Ignore style preferences, formatting, and import ordering.
+      Report only issues that could cause bugs or confusion for the next developer.
 `

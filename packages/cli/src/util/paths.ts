@@ -22,10 +22,6 @@ export function getSchemasDir(crevDir: string): string {
   return path.join(crevDir, "schemas")
 }
 
-export function getAgentsDir(crevDir: string): string {
-  return path.join(crevDir, "agents")
-}
-
 export function getReviewsDir(crevDir: string): string {
   return path.join(crevDir, "reviews")
 }

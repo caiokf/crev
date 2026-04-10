@@ -7,14 +7,11 @@ import { parseSchemaFile, validateAgentRefs, loadSchemaFile, listSchemas } from 
 describe("validate command logic", () => {
   let tmpDir: string
   let schemasDir: string
-  let agentsDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-validate-"))
     schemasDir = path.join(tmpDir, "schemas")
-    agentsDir = path.join(tmpDir, "agents")
     fs.mkdirSync(schemasDir, { recursive: true })
-    fs.mkdirSync(agentsDir, { recursive: true })
   })
 
   afterEach(() => {
@@ -65,10 +62,9 @@ reviewers:
   })
 
   it("reports missing agent files", async () => {
-    const missingPath = path.join(tmpDir, "agents", "missing.md")
     fs.writeFileSync(
       path.join(schemasDir, "test.yaml"),
-      `reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: ${missingPath}\n`,
+      "reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: /nonexistent/missing.md\n",
     )
 
     const schema = loadSchemaFile(path.join(schemasDir, "test.yaml"))
@@ -78,11 +74,11 @@ reviewers:
   })
 
   it("passes when agent file exists", async () => {
-    const agentPath = path.join(agentsDir, "engineer.md")
-    fs.writeFileSync(agentPath, "persona")
+    const agentFile = path.join(tmpDir, "engineer.md")
+    fs.writeFileSync(agentFile, "persona")
     fs.writeFileSync(
       path.join(schemasDir, "test.yaml"),
-      `reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: ${agentPath}\n`,
+      `reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: ${agentFile}\n`,
     )
 
     const schema = loadSchemaFile(path.join(schemasDir, "test.yaml"))

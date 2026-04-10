@@ -145,7 +145,6 @@ describe("validateAgentRefs", () => {
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
-    fs.mkdirSync(path.join(tmpDir, "agents"), { recursive: true })
   })
 
   afterEach(() => {
@@ -153,29 +152,28 @@ describe("validateAgentRefs", () => {
   })
 
   it("returns no issues when agent files exist", async () => {
-    const agentPath = path.join(tmpDir, "agents", "security.md")
-    fs.writeFileSync(agentPath, "persona")
+    const agentFile = path.join(tmpDir, "security.md")
+    fs.writeFileSync(agentFile, "persona")
 
-    const issues = await validateAgentRefs(
-      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentPath }] },
-    )
+    const issues = await validateAgentRefs({
+      reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentFile }],
+    })
     expect(issues).toHaveLength(0)
   })
 
   it("returns error for missing agent file", async () => {
-    const agentPath = path.join(tmpDir, "agents", "missing.md")
-    const issues = await validateAgentRefs(
-      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentPath }] },
-    )
+    const issues = await validateAgentRefs({
+      reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: "/nonexistent/missing.md" }],
+    })
     expect(issues).toHaveLength(1)
     expect(issues[0].severity).toBe("error")
     expect(issues[0].message).toContain("missing.md")
   })
 
   it("skips reviewers without agent", async () => {
-    const issues = await validateAgentRefs(
-      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet" }] },
-    )
+    const issues = await validateAgentRefs({
+      reviewers: [{ name: "Test", runtime: "claude", model: "sonnet" }],
+    })
     expect(issues).toHaveLength(0)
   })
 })

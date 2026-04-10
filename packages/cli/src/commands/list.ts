@@ -1,24 +1,22 @@
-import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { getAllRuntimes } from "@crev/runtimes"
 import { findCrevDir } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
-import { getAgentsDir, getSchemasDir } from "../util/paths.js"
+import { getSchemasDir } from "../util/paths.js"
 
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("Discover schemas, runtimes, and agents")
+    .description("Discover schemas and runtimes")
     .option("--schemas", "List schemas only")
     .option("--runtimes", "List runtimes only")
-    .option("--agents", "List agents only")
     .option("--json", "Machine-readable JSON output")
     .action((opts) => {
       const crevDir = findCrevDir()
       const jsonOutput = opts.json ?? false
-      const showAll = !opts.schemas && !opts.runtimes && !opts.agents
+      const showAll = !opts.schemas && !opts.runtimes
 
       const data: Record<string, unknown> = {}
 
@@ -68,32 +66,6 @@ export function registerListCommand(program: Command): void {
             console.log(
               `  ${chalk.cyan(rt.name)} (${rt.type}) - models: ${rt.models.join(", ")} ${chalk.dim(`[default: ${rt.defaultModel}]`)}`,
             )
-          }
-        }
-      }
-
-      if (showAll || opts.agents) {
-        const agentsDir = getAgentsDir(crevDir)
-        const agents: string[] = []
-        if (fs.existsSync(agentsDir)) {
-          agents.push(
-            ...fs
-              .readdirSync(agentsDir)
-              .filter((f) => f.endsWith(".md"))
-              .sort(),
-          )
-        }
-        data.agents = agents
-
-        if (!jsonOutput) {
-          if (!showAll || opts.agents) console.log()
-          console.log(chalk.bold("Agents"))
-          if (agents.length === 0) {
-            console.log("  No agents found in .crev/agents/")
-          } else {
-            for (const a of agents) {
-              console.log(`  ${chalk.cyan(a)}`)
-            }
           }
         }
       }

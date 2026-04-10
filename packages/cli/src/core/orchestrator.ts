@@ -243,7 +243,7 @@ async function runSingleReviewer(
   let prompt = reviewer.prompt ?? "Review the following code changes for issues."
 
   if (reviewer.agent) {
-    const persona = loadAgentPrompt(reviewer.agent, opts.crevDir)
+    const persona = loadAgentPrompt(reviewer.agent)
     if (persona) {
       prompt = `${persona}\n\n---\n\n${prompt}`
     }

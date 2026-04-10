@@ -10,7 +10,7 @@ import { copilotPrompt } from "../templates/skills/copilot.js"
 export function registerUpdateCommand(program: Command): void {
   program
     .command("update [path]")
-    .description("Regenerate AI tool skills (preserves schemas and agents)")
+    .description("Regenerate AI tool skills")
     .action(async (initPath) => {
       const projectRoot = initPath ? path.resolve(initPath) : process.cwd()
       const crevDir = path.join(projectRoot, ".crev")

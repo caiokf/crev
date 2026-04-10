@@ -1,19 +1,28 @@
-export const copilotPrompt = `# crev — AI Code Review
+export const copilotPrompt = `# crev
 
-You have access to the \`crev\` CLI for running multi-AI code reviews.
+Multi-AI code review CLI. Runs reviewers in parallel, normalizes findings, optionally triages.
 
 ## Commands
 
-- \`crev run --schema <name> --base main --json\` — Run a review
-- \`crev list --json\` — List available schemas
+- \`crev run --schema <name> --base main\` — Run review against branch
+- \`crev run --schema <name> --pr 42\` — Review a PR
+- \`crev run --schema <name> --type uncommitted\` — Review working tree
+- \`crev run --schema <name> --plain --json\` — CI mode
+- \`crev list --schemas\` — List available schemas
 - \`crev validate --all\` — Validate all schemas
+- \`crev doctor\` — Health check
+- \`crev init\` — Setup .crev/
 - \`crev help schema\` — Schema format reference
 
 ## Workflow
 
-1. Check available schemas with \`crev list --schemas\`
-2. Run review: \`crev run --schema quick --base main --json\`
-3. Read output from \`.crev/reviews/\`
-4. Fix issues or mark as wont-fix in the JSON file
+1. \`crev list --schemas\` to see available schemas
+2. \`crev run --schema <name> --base main\` to run
+3. Read output from \`.crev/reviews/<slug>.json\`
+4. Fix issues or mark as wont-fix in the JSON
 5. Re-run with \`--review-file\` to merge
+
+## Results
+
+Each issue: severity (critical/high/medium/low), category (bug/security/performance/style/compliance/architecture), status (open/fixed/wont-fix), optional triage verdict.
 `

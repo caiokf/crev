@@ -92,10 +92,10 @@ export function getOutputDir(config: Config, crevDir: string): string {
   return path.resolve(path.dirname(crevDir), config.output.dir)
 }
 
-export function loadAgentPrompt(agentName: string, crevDir: string): string | null {
-  const agentPath = path.join(crevDir, "agents", agentName)
-  if (!fs.existsSync(agentPath)) return null
-  return fs.readFileSync(agentPath, "utf-8").trim()
+export function loadAgentPrompt(agentPath: string): string | null {
+  const resolved = path.resolve(agentPath)
+  if (!fs.existsSync(resolved)) return null
+  return fs.readFileSync(resolved, "utf-8").trim()
 }
 
 export function getRuntimeConfig(config: Config, runtimeName: string): RuntimeConfig {

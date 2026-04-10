@@ -1,6 +1,5 @@
 import type { Command } from "commander"
 import chalk from "chalk"
-import { getAllRuntimes } from "@crev/runtimes"
 import { VALID_MODELS } from "../core/schema.js"
 
 export function registerHelpCommand(program: Command): void {
@@ -21,9 +20,6 @@ export function registerHelpCommand(program: Command): void {
         case "schema":
           printSchemaHelp()
           break
-        case "agents":
-          printAgentsHelp()
-          break
         default:
           printGeneralHelp()
       }
@@ -35,17 +31,16 @@ function printGeneralHelp(): void {
 
   const commands: [string, string][] = [
     ["crev run --schema <name>", "Execute a review"],
-    ["crev validate [file|--all]", "Validate schemas + agent refs"],
-    ["crev list [--schemas|--runtimes|--agents]", "Discover what's available"],
-    ["crev show <schema>", "Detail a schema's reviewers"],
-    ["crev review <file.json>", "Pretty-print a review artifact"],
+    ["crev show [file.json]", "Pretty-print a review (default: latest)"],
     ["crev diff [flags]", "Preview what diff would be reviewed"],
     ["crev doctor [--all] [--json]", "Health check"],
+    ["crev list [--schemas|--runtimes]", "Discover what's available"],
     ["crev schema init <name>", "Scaffold empty schema"],
-    ["crev agent init <name>", "Scaffold empty agent persona"],
+    ["crev schema show <name>", "Display schema details"],
+    ["crev schema validate [file|--all]", "Validate schemas"],
     ["crev init [path]", "Interactive setup"],
     ["crev update [path]", "Regenerate AI tool skills"],
-    ["crev help [run|schema|agents]", "Detailed help"],
+    ["crev help [run|schema]", "Detailed help"],
   ]
 
   const quickstart: [string, string][] = [
@@ -111,7 +106,7 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
 
   Optional fields per reviewer:
     prompt: string        # Inline prompt text
-    agent: string         # Path to agent persona file (relative to .crev/agents/)
+    agent: string         # Path to an external agent file (any path)
 
   Optional top-level fields:
     description: string   # What this schema reviews for
@@ -121,6 +116,11 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
       model: string
       context: string[]   # Paths to context files
 
+${chalk.bold("SCHEMA COMMANDS")}
+  crev schema init <name>          Create a new schema
+  crev schema show <name>          Display schema details
+  crev schema validate [file]      Validate a schema (or --all)
+
 ${chalk.bold("EXAMPLE")}
 
   # .crev/schemas/security.yaml
@@ -129,11 +129,13 @@ ${chalk.bold("EXAMPLE")}
     - name: Security Analyst
       runtime: claude
       model: opus
-      agent: security.md
+      prompt: >
+        You are a senior security engineer reviewing code changes.
+        Focus on injection vulnerabilities, auth flaws, and secrets exposure.
     - name: Dependency Auditor
       runtime: gemini
       model: gemini-2.5-pro
-      agent: dependency-audit.md
+      agent: ../.claude/agents/dependency-audit.md
   triage:
     enabled: true
     runtime: claude
@@ -147,52 +149,19 @@ ${chalk.bold("AVAILABLE RUNTIMES")}
   console.log()
 }
 
-function printAgentsHelp(): void {
-  console.log(`
-${chalk.bold("AGENT PERSONAS")}
-
-Agent files live in .crev/agents/ as markdown. They define the reviewer's perspective.
-
-  File: .crev/agents/<name>.md
-
-${chalk.bold("EXAMPLE")}
-
-  # .crev/agents/security.md
-  You are a senior security engineer reviewing code changes.
-
-  Focus on:
-  - Authentication and authorization flaws
-  - Injection vulnerabilities (SQL, XSS, command)
-  - Secrets and credential exposure
-  - Dependency vulnerabilities
-  - Data validation at trust boundaries
-
-  Ignore: style, naming, formatting.
-
-${chalk.bold("REFERENCE")}
-
-  Reference agents in schemas via the "agent" field:
-    reviewers:
-      - name: Security
-        runtime: claude
-        model: opus
-        agent: security.md
-`)
-}
-
 function getFullReference(): Record<string, unknown> {
   return {
     commands: [
       { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--pr", "--type", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
-      { name: "validate", description: "Validate schemas", flags: ["--all", "--json"] },
-      { name: "list", description: "List schemas/runtimes/agents", flags: ["--schemas", "--runtimes", "--agents", "--json"] },
-      { name: "show", description: "Show schema details", flags: ["--json"] },
-      { name: "review", description: "Pretty-print review artifact", flags: ["--json"] },
+      { name: "show", description: "Pretty-print review artifact (default: latest)", flags: ["--json"] },
       { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr"] },
       { name: "doctor", description: "Health check", flags: ["--all", "--json"] },
+      { name: "list", description: "List schemas/runtimes", flags: ["--schemas", "--runtimes", "--json"] },
       { name: "schema init", description: "Scaffold empty schema" },
-      { name: "agent init", description: "Scaffold empty agent" },
+      { name: "schema show", description: "Show schema details", flags: ["--json"] },
+      { name: "schema validate", description: "Validate schemas", flags: ["--all", "--json"] },
       { name: "init", description: "Interactive setup" },
+      { name: "update", description: "Regenerate AI tool skills" },
       { name: "help", description: "Show help", flags: ["--json"] },
     ],
     runtimes: Object.entries(VALID_MODELS).map(([name, models]) => ({ name, models })),

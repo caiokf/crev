@@ -8,17 +8,28 @@
 
 # crev
 
-AI-powered multi-reviewer code review CLI. Run parallel code reviews using multiple AI models and personas, then triage and merge the results.
+### Use your existing subscriptions
 
-## Features
+AI code review tools typically require separate API keys and per-token billing. You're already paying for Claude Code, Gemini CLI, Codex, or other AI coding subscriptions -- crev runs reviews through those CLI tools directly. No extra API keys. No extra billing.
 
-- **Multi-model reviews** — Run Claude, Codex, Gemini, Kimi, CodeRabbit, and OpenCode in parallel
-- **Reviewer personas** — Define agent personas (security expert, architect, etc.) with custom prompts
-- **Configurable schemas** — YAML-based review schemas with per-reviewer model/prompt/agent settings
-- **Triage pass** — Optional AI triage to deduplicate and prioritize findings
-- **Issue lifecycle** — Track issues across re-runs with merge support (preserves fixed/wont-fix)
-- **AI tool integration** — Auto-generates skills for Claude Code, Cursor, Windsurf, OpenCode, Copilot
-- **TUI spinners** — Animated multi-spinner with keyboard controls (f=finalize, q=quit)
+### Run multiple reviewers in parallel
+
+Define a review schema with multiple reviewers using different models and prompts, and crev executes them all simultaneously. A security expert on Claude, an architect on Gemini, and a performance reviewer on Codex -- all running at the same time, all finishing in the time it takes the slowest one to complete.
+
+### Configurable and reusable
+
+YAML schemas define your review pipeline. Inline prompts or external agent files shape what each reviewer focuses on. Run the same review across PRs, branches, or commits. Share schemas across your team.
+
+```bash
+# 1 reviewer, fast feedback
+crev run --schema quick --base main
+
+# 3 reviewers + triage pass
+crev run --schema standard --base main
+
+# 6 specialized reviewers + dedup triage
+crev run --schema thorough --base main
+```
 
 ## Install
 
@@ -42,9 +53,6 @@ crev init
 # Run a quick review against main branch
 crev run --schema quick --base main
 
-# Run with JSON output
-crev run --schema standard --base main --json
-
 # Review a specific PR
 crev run --schema quick --pr 42
 
@@ -52,79 +60,105 @@ crev run --schema quick --pr 42
 crev run --schema quick --commit abc1234
 ```
 
-## Commands
+## How It Works
 
-| Command | Description |
-|---|---|
-| `crev init` | Interactive setup TUI |
-| `crev run` | Execute a review |
-| `crev list` | List schemas, runtimes, agents |
-| `crev show <schema>` | Display schema details |
-| `crev validate` | Validate schemas |
-| `crev review <file>` | Pretty-print a review file |
-| `crev diff` | Preview diff that would be reviewed |
-| `crev doctor` | Check runtime health |
-| `crev update` | Regenerate AI tool skills |
-| `crev schema-init <name>` | Scaffold a new schema |
-| `crev agent-init <name>` | Scaffold a new agent persona |
-| `crev help <topic>` | Detailed help (run, schema, agents) |
-
-## Directory Structure
-
-After `crev init`, your project gets:
-
-```
-.crev/
-├── config.yaml          # Global defaults
-├── schemas/
-│   ├── quick.yaml       # 1 reviewer, fast
-│   ├── standard.yaml    # 3 reviewers + triage
-│   └── thorough.yaml    # 6 reviewers + triage
-├── agents/
-│   ├── engineer.md      # Correctness & edge cases
-│   ├── security.md      # OWASP & vulnerabilities
-│   └── architect.md     # Design & coupling
-├── diffs/               # Cached diffs
-└── reviews/             # Review output (JSON)
-```
-
-## Schema Format
-
-Schemas are YAML files that define how a review runs:
+1. **Define a schema** -- Pick which runtimes, models, and prompts to use
+2. **crev generates the diff** -- From your branch, PR, or commit
+3. **Reviewers run in parallel** -- Each runtime gets the diff and a structured prompt
+4. **Output is normalized** -- All results are merged into a single JSON review
+5. **Optional triage** -- An AI pass deduplicates and prioritizes findings
 
 ```yaml
-description: Quick single-reviewer check
+# .crev/schemas/standard.yaml
+description: Three-reviewer standard check
 reviewers:
   - name: Engineer
     runtime: claude
     model: sonnet
-    agent: engineer.md
+    prompt: >
+      You are a senior software engineer reviewing code changes.
+      Focus on correctness, error handling, edge cases, and readability.
+
+  - name: Security
+    runtime: gemini
+    model: gemini-2.5-pro
+    prompt: >
+      You are a senior security engineer reviewing code changes.
+      Focus on injection vulnerabilities, auth flaws, and secrets exposure.
+
+  - name: Architect
+    runtime: codex
+    model: o3
+    prompt: >
+      You are a senior software architect reviewing code changes.
+      Focus on coupling, abstraction quality, and scalability concerns.
 
 triage:
-  enabled: false
+  enabled: true
 ```
 
-See `crev help schema` for the full spec.
+Each reviewer can use either an inline `prompt` or an `agent` field pointing to any external file:
+
+```yaml
+reviewers:
+  - name: Security
+    runtime: claude
+    model: opus
+    agent: ../.claude/agents/security-reviewer.md
+```
 
 ## Supported Runtimes
 
 | Runtime | CLI | Auth |
 |---|---|---|
-| Claude | `claude` | `claude auth status` or `ANTHROPIC_API_KEY` |
+| Claude Code | `claude` | Subscription or `ANTHROPIC_API_KEY` |
 | Codex | `codex` | `OPENAI_API_KEY` |
-| Gemini | `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
+| Gemini CLI | `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 | Kimi | `kimi` | `MOONSHOT_API_KEY` |
 | CodeRabbit | `cr` | `cr auth status` |
 | OpenCode | `opencode` | `~/.opencode/config.json` |
+| Droid | `droid` | Subscription |
+| MastraCode | `mastracode` | Subscription |
+| Pi | `pi` | Subscription |
 
-Run `crev doctor` to check which runtimes are installed and authenticated.
+Run `crev doctor` to check which runtimes are available.
+
+## Commands
+
+| Command | Description |
+|---|---|
+| `crev init` | Interactive setup |
+| `crev run` | Execute a review |
+| `crev doctor` | Check runtime health |
+| `crev list` | List schemas and runtimes |
+| `crev show <schema>` | Display schema details |
+| `crev validate` | Validate schemas |
+| `crev review <file>` | Pretty-print a review file |
+| `crev diff` | Preview diff that would be reviewed |
+| `crev update` | Regenerate AI tool skills |
+| `crev schema init <name>` | Scaffold a new schema |
+| `crev help <topic>` | Detailed help (run, schema) |
+
+## Project Structure
+
+After `crev init`:
+
+```
+.crev/
+├── config.yaml          # Global config and model aliases
+├── schemas/
+│   ├── quick.yaml       # 1 reviewer, fast
+│   ├── standard.yaml    # 3 reviewers + triage
+│   └── thorough.yaml    # 6 reviewers + triage
+└── reviews/             # Review output (JSON)
+```
 
 ## Packages
 
 This is a monorepo with two packages:
 
-- **`crev`** — The CLI tool
-- **`@crev/runtimes`** — Standalone runtime adapter library (use in your own tools)
+- **`crev`** -- The CLI tool
+- **`@crev/runtimes`** -- Standalone runtime adapter library
 
 ```bash
 npm install @crev/runtimes
@@ -135,7 +169,6 @@ import { getRuntime, getAllRuntimes } from "@crev/runtimes"
 
 const claude = getRuntime("claude")
 const health = await claude.healthCheck()
-console.log(health) // { installed: true, authenticated: "yes" }
 ```
 
 ## License
