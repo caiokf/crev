@@ -2,11 +2,10 @@ import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { getAllRuntimes, getRuntime, type RuntimeHealth } from "@crev/runtimes"
+import { getAllRuntimes, type RuntimeHealth } from "@crev/runtimes"
 import { findCrevDir, loadConfig, getRuntimeConfig } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
-import { createMultiSpinner } from "../ui/multi-spinner.js"
 
 export function registerDoctorCommand(program: Command): void {
   program
@@ -18,6 +17,7 @@ export function registerDoctorCommand(program: Command): void {
       const crevDir = findCrevDir()
       const schemasDir = getSchemasDir(crevDir)
       const jsonOutput = opts.json ?? false
+      const cols = process.stdout.columns ?? 80
 
       // Collect which runtimes are used by which schemas
       const schemas = listSchemas(schemasDir)
@@ -38,33 +38,23 @@ export function registerDoctorCommand(program: Command): void {
         } catch {}
       }
 
-      // Always check all runtimes in parallel with spinner, filter display later
+      const config = loadConfig(crevDir)
+
+      // Check all runtimes in parallel with simple progress indicator
       const allRuntimes = getAllRuntimes()
       const allHealthResults: RuntimeHealth[] = new Array(allRuntimes.length)
 
-      const useSpinner = process.stdout.isTTY && !jsonOutput
-      const spinner = useSpinner
-        ? createMultiSpinner(
-            allRuntimes.map((r) => ({ name: r.name, detail: "checking…" })),
-            { runningLabel: "Checking runtimes", doneLabel: "All runtimes checked", showKeyHints: false },
-          )
-        : null
+      const isTTY = process.stdout.isTTY && !jsonOutput
+      let checked = 0
+
+      if (isTTY) {
+        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${allRuntimes.length}`)}`)
+      }
 
       await Promise.all(
         allRuntimes.map(async (runtime, i) => {
-          const start = performance.now()
           try {
-            const health = await runtime.healthCheck()
-            allHealthResults[i] = health
-            const elapsed = (performance.now() - start) / 1000
-            const resultText = health.installed
-              ? health.authenticated === "yes"
-                ? chalk.green("ok")
-                : health.authenticated === "no"
-                  ? chalk.red("no auth")
-                  : chalk.yellow("unknown auth")
-              : chalk.red("not found")
-            spinner?.updateEntry(runtime.name, "done", { elapsed, resultText })
+            allHealthResults[i] = await runtime.healthCheck()
           } catch (e) {
             allHealthResults[i] = {
               name: runtime.name,
@@ -75,13 +65,18 @@ export function registerDoctorCommand(program: Command): void {
               authDetail: String(e),
               error: String(e),
             }
-            const elapsed = (performance.now() - start) / 1000
-            spinner?.updateEntry(runtime.name, "failed", { elapsed })
+          }
+          checked++
+          if (isTTY) {
+            process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${allRuntimes.length}`)}`)
           }
         }),
       )
 
-      spinner?.stop()
+      // Clear progress line
+      if (isTTY) {
+        process.stdout.write("\r\x1B[2K")
+      }
 
       // By default show installed runtimes, --all shows everything
       const healthResults = opts.all
@@ -124,25 +119,26 @@ export function registerDoctorCommand(program: Command): void {
         return
       }
 
-      // Pretty print
-      const config = loadConfig(crevDir)
+      // --- Unified pretty print ---
 
+      // Pre-compute name column width for alignment
+      const nameColWidth = Math.max(
+        14,
+        ...healthResults.map((h) => {
+          const rtConfig = getRuntimeConfig(config, h.name)
+          const cmd = rtConfig.command ?? h.command ?? h.name
+          return cmd !== h.name && cmd !== h.command
+            ? h.name.length + cmd.length + 3 // "name (cmd)"
+            : h.name.length
+        }),
+      ) + 2 // padding
+
+      // Runtimes
       console.log(`\n  ${chalk.bold("Runtimes")}`)
-      console.log(`  ${"─".repeat(60)}`)
+      console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
 
       for (const health of healthResults) {
-        const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
-        const rtConfig = getRuntimeConfig(config, health.name)
-        const commandName = rtConfig.command ?? health.command ?? health.name
-        const command = chalk.dim(`(${commandName})`)
-        const auth =
-          health.authenticated === "yes"
-            ? chalk.green("✓ auth'd")
-            : health.authenticated === "no"
-              ? chalk.red("✗ no auth")
-              : chalk.yellow("? unknown")
-        const detail = health.authDetail ? chalk.dim(health.authDetail) : ""
-        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(22)}  ${auth}  ${detail}`)
+        console.log(formatRuntimeLine(health, config, cols, nameColWidth))
       }
 
       if (healthResults.length === 0) {
@@ -152,7 +148,7 @@ export function registerDoctorCommand(program: Command): void {
       // Schema readiness
       if (schemas.length > 0) {
         console.log(`\n  ${chalk.bold("Schemas")}`)
-        console.log(`  ${"─".repeat(60)}`)
+        console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
 
         for (const schema of schemaReadiness) {
           if (schema.ready) {
@@ -168,7 +164,7 @@ export function registerDoctorCommand(program: Command): void {
 
       // Project setup
       console.log(`\n  ${chalk.bold("Project Setup")}`)
-      console.log(`  ${"─".repeat(60)}`)
+      console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
       for (const check of projectChecks) {
         const icon = check.ok ? chalk.green("✓") : chalk.red("✗")
         console.log(`  ${check.name.padEnd(24)} ${icon} ${check.detail}`)
@@ -205,16 +201,6 @@ function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] 
     detail: schemaCount > 0 ? `${schemaCount} schema${schemaCount !== 1 ? "s" : ""}` : "empty",
   })
 
-  const agentsDir = path.join(crevDir, "agents")
-  const agentCount = fs.existsSync(agentsDir)
-    ? fs.readdirSync(agentsDir).filter((f) => f.endsWith(".md")).length
-    : 0
-  checks.push({
-    name: ".crev/agents/",
-    ok: agentCount > 0,
-    detail: agentCount > 0 ? `${agentCount} agent${agentCount !== 1 ? "s" : ""}` : "empty",
-  })
-
   checks.push({
     name: ".crev/reviews/",
     ok: fs.existsSync(path.join(crevDir, "reviews")),
@@ -228,4 +214,94 @@ function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] 
   })
 
   return checks
+}
+
+// eslint-disable-next-line no-control-regex
+const ANSI_RE = /\x1B\[[0-9;]*m/g
+
+function visibleLength(s: string): number {
+  return s.replace(ANSI_RE, "").length
+}
+
+function truncateVisible(s: string, maxLen: number): string {
+  const stripped = s.replace(ANSI_RE, "")
+  if (stripped.length <= maxLen) return s
+
+  // Walk through string tracking visible chars
+  let visible = 0
+  let i = 0
+  while (i < s.length && visible < maxLen - 1) {
+    if (s[i] === "\x1B") {
+      // Skip ANSI sequence
+      const end = s.indexOf("m", i)
+      if (end !== -1) {
+        i = end + 1
+        continue
+      }
+    }
+    visible++
+    i++
+  }
+  return s.slice(0, i) + chalk.reset("…")
+}
+
+/**
+ * Responsive runtime line — progressively adds detail based on terminal width.
+ *
+ * Narrow (< 60):  claude          ✓ installed  ✓ auth'd
+ * Medium (60-90): claude          ✓ installed  2.1.81   ✓ auth'd
+ * Wide   (> 90):  claude          ✓ installed  2.1.81   ✓ auth'd  env: ANTHROPIC_API_KEY
+ */
+function formatRuntimeLine(health: RuntimeHealth, config: ReturnType<typeof loadConfig>, cols: number, nameColWidth: number): string {
+  const rtConfig = getRuntimeConfig(config, health.name)
+  const commandName = rtConfig.command ?? health.command ?? health.name
+
+  // Name — show command override if different from runtime name
+  const hasOverride = commandName !== health.name && commandName !== health.command
+  const nameLabel = hasOverride
+    ? `${chalk.cyan(health.name)} ${chalk.dim(`(${commandName})`)}`
+    : chalk.cyan(health.name)
+
+  const installed = health.installed
+    ? chalk.green("✓ installed")
+    : chalk.red("✗ not found")
+
+  const auth =
+    health.authenticated === "yes"
+      ? chalk.green("✓ auth'd")
+      : health.authenticated === "no"
+        ? chalk.red("✗ no auth")
+        : chalk.yellow("? unknown")
+
+  // Build progressively based on width
+  const parts: string[] = []
+  parts.push(`  ${padVisible(nameLabel, nameColWidth)}`)
+  parts.push(installed)
+
+  // Version — add if medium width or wider
+  if (cols >= 60 && health.installed) {
+    const version = health.version ?? "–"
+    parts.push(version.padEnd(10))
+  }
+
+  parts.push(auth)
+
+  const line = parts.join("  ")
+
+  // Auth detail — add if wide and there's room
+  if (cols >= 90 && health.authDetail) {
+    const used = visibleLength(line) + 2
+    const remaining = cols - used
+    if (remaining > 10) {
+      const detail = chalk.dim(health.authDetail)
+      return `${line}  ${truncateVisible(detail, remaining)}`
+    }
+  }
+
+  return line
+}
+
+function padVisible(s: string, width: number): string {
+  const pad = width - visibleLength(s)
+  return pad > 0 ? s + " ".repeat(pad) : s
 }
