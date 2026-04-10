@@ -68,8 +68,11 @@ export function createDroidRuntime(): RuntimeAdapter {
         return { name, command: "droid", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
-      // droid is TUI-only, can't easily get version without TTY
-      const version: string | null = null
+      let version: string | null = null
+      try {
+        const result = await execAbortable("droid", ["--version"], { timeout: 5000 })
+        version = result.stdout.trim() || null
+      } catch {}
 
       let authenticated: "yes" | "no" | "unknown" = "no"
       let authDetail = ""

@@ -3,14 +3,10 @@ import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { getAllRuntimes, getRuntime, type RuntimeHealth } from "@crev/runtimes"
-import { findCrevDir } from "../core/config.js"
+import { findCrevDir, loadConfig, getRuntimeConfig } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
-
-const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
-const HIDE_CURSOR = "\x1B[?25l"
-const SHOW_CURSOR = "\x1B[?25h"
-const ERASE_LINE = "\x1B[2K"
+import { createMultiSpinner } from "../ui/multi-spinner.js"
 
 export function registerDoctorCommand(program: Command): void {
   program
@@ -42,47 +38,50 @@ export function registerDoctorCommand(program: Command): void {
         } catch {}
       }
 
-      // Always check all runtimes with spinner, filter display later
+      // Always check all runtimes in parallel with spinner, filter display later
       const allRuntimes = getAllRuntimes()
-      const allHealthResults: RuntimeHealth[] = []
-      const isTTY = process.stdout.isTTY
+      const allHealthResults: RuntimeHealth[] = new Array(allRuntimes.length)
 
-      // Spinner state
-      let frameIndex = 0
-      let spinnerInterval: ReturnType<typeof setInterval> | null = null
-      let checkedCount = 0
-      const totalCount = allRuntimes.length
+      const useSpinner = process.stdout.isTTY && !jsonOutput
+      const spinner = useSpinner
+        ? createMultiSpinner(
+            allRuntimes.map((r) => ({ name: r.name, detail: "checking…" })),
+            { runningLabel: "Checking runtimes", doneLabel: "All runtimes checked", showKeyHints: false },
+          )
+        : null
 
-      if (isTTY && !jsonOutput) {
-        process.stdout.write(HIDE_CURSOR)
-        spinnerInterval = setInterval(() => {
-          const spinner = chalk.cyan(BRAILLE_FRAMES[frameIndex++ % BRAILLE_FRAMES.length])
-          process.stdout.write(`${ERASE_LINE}\r  ${spinner} ${chalk.dim(`Checking runtimes… ${checkedCount}/${totalCount}`)}`)
-        }, 80)
-      }
+      await Promise.all(
+        allRuntimes.map(async (runtime, i) => {
+          const start = performance.now()
+          try {
+            const health = await runtime.healthCheck()
+            allHealthResults[i] = health
+            const elapsed = (performance.now() - start) / 1000
+            const resultText = health.installed
+              ? health.authenticated === "yes"
+                ? chalk.green("ok")
+                : health.authenticated === "no"
+                  ? chalk.red("no auth")
+                  : chalk.yellow("unknown auth")
+              : chalk.red("not found")
+            spinner?.updateEntry(runtime.name, "done", { elapsed, resultText })
+          } catch (e) {
+            allHealthResults[i] = {
+              name: runtime.name,
+              command: runtime.name,
+              installed: false,
+              version: null,
+              authenticated: "unknown",
+              authDetail: String(e),
+              error: String(e),
+            }
+            const elapsed = (performance.now() - start) / 1000
+            spinner?.updateEntry(runtime.name, "failed", { elapsed })
+          }
+        }),
+      )
 
-      for (const runtime of allRuntimes) {
-        try {
-          allHealthResults.push(await runtime.healthCheck())
-        } catch (e) {
-          allHealthResults.push({
-            name: runtime.name,
-            command: runtime.name,
-            installed: false,
-            version: null,
-            authenticated: "unknown",
-            authDetail: String(e),
-            error: String(e),
-          })
-        }
-        checkedCount++
-      }
-
-      if (spinnerInterval) {
-        clearInterval(spinnerInterval)
-        process.stdout.write(`${ERASE_LINE}\r`)
-        process.stdout.write(SHOW_CURSOR)
-      }
+      spinner?.stop()
 
       // By default show installed runtimes, --all shows everything
       const healthResults = opts.all
@@ -126,12 +125,16 @@ export function registerDoctorCommand(program: Command): void {
       }
 
       // Pretty print
+      const config = loadConfig(crevDir)
+
       console.log(`\n  ${chalk.bold("Runtimes")}`)
       console.log(`  ${"─".repeat(60)}`)
 
       for (const health of healthResults) {
         const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
-        const command = health.command ? chalk.dim(`(${health.command})`) : ""
+        const rtConfig = getRuntimeConfig(config, health.name)
+        const commandName = rtConfig.command ?? health.command ?? health.name
+        const command = chalk.dim(`(${commandName})`)
         const auth =
           health.authenticated === "yes"
             ? chalk.green("✓ auth'd")
@@ -139,7 +142,7 @@ export function registerDoctorCommand(program: Command): void {
               ? chalk.red("✗ no auth")
               : chalk.yellow("? unknown")
         const detail = health.authDetail ? chalk.dim(health.authDetail) : ""
-        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(20)} ${auth} ${detail}`)
+        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(22)}  ${auth}  ${detail}`)
       }
 
       if (healthResults.length === 0) {

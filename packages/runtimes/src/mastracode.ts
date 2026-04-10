@@ -66,8 +66,16 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
         return { name, command: "mastracode", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
-      // mastracode is TUI-only, version parsed from banner is fragile
-      const version: string | null = null
+      let version: string | null = null
+      try {
+        // mastracode has no headless --version; launch TUI briefly and parse banner
+        await execAbortable("mastracode", ["--version"], { timeout: 2000 })
+      } catch (e) {
+        // Timeout kills process but stdout may contain the banner with version
+        const err = e as { stdout?: string }
+        const vMatch = (err.stdout ?? "").match(/v(\d+\.\d+\.\d+)/)
+        version = vMatch ? vMatch[1] : null
+      }
 
       let authenticated: "yes" | "no" | "unknown" = "no"
       let authDetail = ""

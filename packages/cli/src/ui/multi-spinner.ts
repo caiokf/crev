@@ -34,9 +34,20 @@ export type MultiSpinnerHandle = {
   onAction(callback: (action: MultiSpinnerAction) => void): void
 }
 
+export type MultiSpinnerOptions = {
+  runningLabel?: string
+  doneLabel?: string
+  showKeyHints?: boolean
+}
+
 export function createMultiSpinner(
   entries: Array<{ name: string; detail: string; prefix?: string }>,
+  options?: MultiSpinnerOptions,
 ): MultiSpinnerHandle {
+  const runningLabel = options?.runningLabel ?? "Reviewing"
+  const doneLabel = options?.doneLabel ?? "All reviews complete"
+  const enableKeyHints = options?.showKeyHints ?? true
+
   const state: Entry[] = entries.map((e) => ({
     name: e.name,
     detail: e.detail,
@@ -49,7 +60,7 @@ export function createMultiSpinner(
   let frameIndex = 0
   let lineCount = 0
   let stopped = false
-  let showKeyHints = true
+  let showKeyHints = enableKeyHints
   const startTime = performance.now()
   let actionCallback: ((action: MultiSpinnerAction) => void) | null = null
 
@@ -113,10 +124,10 @@ export function createMultiSpinner(
 
     if (running > 0) {
       lines.push(
-        `${BAR}  ${spinner} ${chalk.bold("Reviewing")} ${chalk.dim(`${done}/${total} complete`)} ${chalk.dim(`(${totalElapsed})`)}`,
+        `${BAR}  ${spinner} ${chalk.bold(runningLabel)} ${chalk.dim(`${done}/${total} complete`)} ${chalk.dim(`(${totalElapsed})`)}`,
       )
     } else {
-      lines.push(`${BAR}  ${TICK} ${chalk.bold("All reviews complete")} ${chalk.dim(`(${totalElapsed})`)}`)
+      lines.push(`${BAR}  ${TICK} ${chalk.bold(doneLabel)} ${chalk.dim(`(${totalElapsed})`)}`)
     }
 
     const nameCol = maxNameWidth(state)
