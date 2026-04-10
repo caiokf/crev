@@ -18,6 +18,11 @@ export function registerDiffCommand(program: Command): void {
         process.exit(1)
       }
 
+      if (opts.type === "current-state" && (opts.base || opts.baseCommit || opts.pr)) {
+        console.error("Error: --type current-state cannot be combined with --base, --base-commit, or --pr")
+        process.exit(1)
+      }
+
       const crevDir = findCrevDir()
       const config = loadConfig(crevDir)
 

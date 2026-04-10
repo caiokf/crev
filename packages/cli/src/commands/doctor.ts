@@ -144,7 +144,7 @@ export function registerDoctorCommand(program: Command): void {
 
       // Runtimes
       console.log(`\n  ${chalk.bold("Runtimes")}`)
-      console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
+      console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
 
       for (const health of healthResults) {
         console.log(formatRuntimeLine(health, config, cols, nameColWidth))
@@ -157,7 +157,7 @@ export function registerDoctorCommand(program: Command): void {
       // Schema readiness
       if (schemas.length > 0) {
         console.log(`\n  ${chalk.bold("Schemas")}`)
-        console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
+        console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
 
         for (const schema of schemaReadiness) {
           if (schema.ready) {
@@ -173,7 +173,7 @@ export function registerDoctorCommand(program: Command): void {
 
       // Project setup
       console.log(`\n  ${chalk.bold("Project Setup")}`)
-      console.log(`  ${"─".repeat(Math.min(60, cols - 4))}`)
+      console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
       for (const check of projectChecks) {
         const icon = check.ok ? chalk.green("✓") : chalk.red("✗")
         console.log(`  ${check.name.padEnd(24)} ${icon} ${check.detail}`)
