@@ -191,12 +191,28 @@ async function runTriagePass(
   opts: OrchestrateOptions,
   spinner: MultiSpinnerHandle | null,
 ): Promise<TriageSummary | undefined> {
-  if (!opts.config.triage.enabled) return undefined
+  const schemaTriage = opts.schema.triage
+  const enabled = schemaTriage?.enabled ?? opts.config.triage.enabled
+  if (!enabled) return undefined
 
   const allIssues = reviews.flatMap((r) => r.issues)
   if (allIssues.length === 0) return undefined
 
-  const triageDetail = `${opts.config.triage.runtime}/${opts.config.triage.model}`
+  // Schema-level triage overrides global config
+  const effectiveConfig: OrchestrateOptions["config"] = schemaTriage
+    ? {
+        ...opts.config,
+        triage: {
+          ...opts.config.triage,
+          enabled: true,
+          runtime: schemaTriage.runtime ?? opts.config.triage.runtime,
+          model: schemaTriage.model ?? opts.config.triage.model,
+          context: schemaTriage.context ?? opts.config.triage.context,
+        },
+      }
+    : opts.config
+
+  const triageDetail = `${effectiveConfig.triage.runtime}/${effectiveConfig.triage.model}`
 
   if (spinner) {
     spinner.addEntry("Triage", triageDetail)
@@ -207,7 +223,7 @@ async function runTriagePass(
   const result = await runTriage({
     issues: allIssues,
     diffContent: opts.diff.diffContent,
-    config: opts.config,
+    config: effectiveConfig,
     crevDir: opts.crevDir,
   })
 

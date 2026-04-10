@@ -36,7 +36,7 @@ export function registerInitCommand(program: Command): void {
       const projectRoot = initPath ? path.resolve(initPath) : process.cwd()
       const crevDir = path.join(projectRoot, ".crev")
 
-      const isInteractive = !opts.tools && !opts.schemas
+      const isInteractive = !opts.tools && !opts.schemas && process.stdin.isTTY
 
       if (isInteractive) {
         await runInteractive(projectRoot, crevDir)
