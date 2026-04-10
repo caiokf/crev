@@ -15,12 +15,12 @@ export function registerDiffCommand(program: Command): void {
     .action(async (opts) => {
       const specified = [opts.pr, opts.base, opts.baseCommit].filter(Boolean).length
       if (specified > 1) {
-        console.error("Error: --pr, --base, and --base-commit are mutually exclusive")
+        console.error(chalk.red("Error: --pr, --base, and --base-commit are mutually exclusive"))
         process.exit(1)
       }
 
       if (opts.type === "current-state" && (opts.base || opts.baseCommit || opts.pr)) {
-        console.error("Error: --type current-state cannot be combined with --base, --base-commit, or --pr")
+        console.error(chalk.red("Error: --type current-state cannot be combined with --base, --base-commit, or --pr"))
         process.exit(1)
       }
 

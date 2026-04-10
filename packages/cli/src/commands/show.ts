@@ -16,12 +16,12 @@ export function registerShowCommand(program: Command): void {
       const filePath = file ? path.resolve(file) : findLatestReview(crevDir)
 
       if (!filePath) {
-        console.error("No review files found. Run a review first with: crev run --schema <name>")
+        console.error(chalk.red("No review files found.") + " Run a review first with: crev run --schema <name>")
         process.exit(1)
       }
 
       if (!fs.existsSync(filePath)) {
-        console.error(`Error: File not found: ${filePath}`)
+        console.error(chalk.red(`Error: File not found: ${filePath}`))
         process.exit(1)
       }
 
@@ -31,7 +31,7 @@ export function registerShowCommand(program: Command): void {
       try {
         result = JSON.parse(content) as ReviewResult
       } catch {
-        console.error("Error: Invalid JSON file")
+        console.error(chalk.red("Error: Invalid JSON file"))
         process.exit(1)
       }
 

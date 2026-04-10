@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest"
 import { getAllRuntimes, getRuntimeNames } from "./registry.js"
-import type { RuntimeAdapter } from "./types.js"
 
 const runtimes = getAllRuntimes()
 

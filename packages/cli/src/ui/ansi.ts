@@ -12,6 +12,9 @@ export function padVisible(s: string, width: number): string {
   return pad > 0 ? s + " ".repeat(pad) : s
 }
 
+// Matches any ANSI escape sequence (SGR, cursor, erase, etc.)
+const ANSI_ESCAPE_RE = /\x1B(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*\x07)/
+
 export function truncateVisible(s: string, maxLen: number): string {
   const stripped = s.replace(ANSI_RE, "")
   if (stripped.length <= maxLen) return s
@@ -20,9 +23,9 @@ export function truncateVisible(s: string, maxLen: number): string {
   let i = 0
   while (i < s.length && visible < maxLen - 1) {
     if (s[i] === "\x1B") {
-      const end = s.indexOf("m", i)
-      if (end !== -1) {
-        i = end + 1
+      const match = s.slice(i).match(ANSI_ESCAPE_RE)
+      if (match && s.slice(i).startsWith(match[0])) {
+        i += match[0].length
         continue
       }
     }

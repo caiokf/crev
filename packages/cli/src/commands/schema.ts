@@ -28,7 +28,7 @@ export function registerSchemaCommand(program: Command): void {
 
       const filePath = path.join(schemasDir, `${name}.yaml`)
       if (fs.existsSync(filePath)) {
-        console.error(`Error: Schema "${name}" already exists at ${filePath}`)
+        console.error(chalk.red(`Error: Schema "${name}" already exists at ${filePath}`))
         process.exit(1)
       }
 
@@ -77,7 +77,7 @@ export function registerSchemaCommand(program: Command): void {
         }
         console.log()
       } catch (e) {
-        console.error(`Error: ${e instanceof Error ? e.message : String(e)}`)
+        console.error(chalk.red(`Error: ${e instanceof Error ? e.message : String(e)}`))
         process.exit(1)
       }
     })
@@ -114,7 +114,7 @@ export function registerSchemaCommand(program: Command): void {
         const schemaPath = path.resolve(file)
         results.push(await validateSingleSchema(schemaPath))
       } else {
-        console.error("Specify a schema file or use --all")
+        console.error(chalk.red("Specify a schema file or use --all"))
         process.exit(1)
       }
 

@@ -1,5 +1,6 @@
 import { execSync } from "node:child_process"
 import type { Command } from "commander"
+import chalk from "chalk"
 import { findCrevDir, loadConfig } from "../core/config.js"
 import { resolveDiff } from "../core/diff.js"
 import { orchestrate } from "../core/orchestrator.js"
@@ -41,7 +42,7 @@ export function registerRunCommand(program: Command): void {
       })
 
       if (!parsed.success) {
-        console.error(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`)
+        console.error(chalk.red(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`))
         process.exit(1)
       }
 
