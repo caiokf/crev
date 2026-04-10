@@ -153,19 +153,19 @@ describe("validateAgentRefs", () => {
   })
 
   it("returns no issues when agent files exist", async () => {
-    fs.writeFileSync(path.join(tmpDir, "agents", "security.md"), "persona")
+    const agentPath = path.join(tmpDir, "agents", "security.md")
+    fs.writeFileSync(agentPath, "persona")
 
     const issues = await validateAgentRefs(
-      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: "security.md" }] },
-      tmpDir,
+      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentPath }] },
     )
     expect(issues).toHaveLength(0)
   })
 
   it("returns error for missing agent file", async () => {
+    const agentPath = path.join(tmpDir, "agents", "missing.md")
     const issues = await validateAgentRefs(
-      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: "missing.md" }] },
-      tmpDir,
+      { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentPath }] },
     )
     expect(issues).toHaveLength(1)
     expect(issues[0].severity).toBe("error")
@@ -175,7 +175,6 @@ describe("validateAgentRefs", () => {
   it("skips reviewers without agent", async () => {
     const issues = await validateAgentRefs(
       { reviewers: [{ name: "Test", runtime: "claude", model: "sonnet" }] },
-      tmpDir,
     )
     expect(issues).toHaveLength(0)
   })

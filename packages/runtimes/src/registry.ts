@@ -8,6 +8,7 @@ import { createOpenCodeRuntime } from "./opencode.js"
 import { createPiRuntime } from "./pi.js"
 import { createDroidRuntime } from "./droid.js"
 import { createMastraCodeRuntime } from "./mastracode.js"
+import { createCopilotRuntime } from "./copilot.js"
 
 const runtimes = new Map<string, () => RuntimeAdapter>([
   ["claude", () => createClaudeRuntime()],
@@ -19,6 +20,7 @@ const runtimes = new Map<string, () => RuntimeAdapter>([
   ["pi", () => createPiRuntime()],
   ["droid", () => createDroidRuntime()],
   ["mastracode", () => createMastraCodeRuntime()],
+  ["copilot", () => createCopilotRuntime()],
 ])
 
 export function getRuntime(name: string): RuntimeAdapter {

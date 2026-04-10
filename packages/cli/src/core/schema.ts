@@ -45,9 +45,16 @@ export const VALID_MODELS: Record<string, readonly string[]> = {
     "openai/gpt-5-mini",
     "google/gemini-2.5-pro",
   ],
+  copilot: [
+    "gpt-5.2",
+    "gpt-5.1",
+    "claude-sonnet-4-6",
+    "o4-mini",
+    "gemini-2.5-pro",
+  ],
 }
 
-export const RuntimeName = z.enum(["claude", "codex", "gemini", "kimi", "coderabbit", "opencode", "pi", "droid", "mastracode"])
+export const RuntimeName = z.enum(["claude", "codex", "gemini", "kimi", "coderabbit", "opencode", "pi", "droid", "mastracode", "copilot"])
 
 export const ReviewerSchema = z
   .object({
@@ -125,17 +132,16 @@ export function listSchemas(schemasDir: string): string[] {
 
 export async function validateAgentRefs(
   schema: SchemaFileType,
-  crevDir: string,
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = []
   for (const reviewer of schema.reviewers) {
     if (reviewer.agent) {
-      const agentPath = path.join(crevDir, "agents", reviewer.agent)
-      if (!fs.existsSync(agentPath)) {
+      const resolved = path.resolve(reviewer.agent)
+      if (!fs.existsSync(resolved)) {
         issues.push({
           severity: "error",
           reviewer: reviewer.name,
-          message: `Agent file not found: ${reviewer.agent} (expected at ${agentPath})`,
+          message: `Agent file not found: ${reviewer.agent} (resolved to ${resolved})`,
         })
       }
     }

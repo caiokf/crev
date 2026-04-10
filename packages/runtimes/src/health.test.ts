@@ -9,6 +9,7 @@ import { createOpenCodeRuntime } from "./opencode.js"
 import { createPiRuntime } from "./pi.js"
 import { createDroidRuntime } from "./droid.js"
 import { createMastraCodeRuntime } from "./mastracode.js"
+import { createCopilotRuntime } from "./copilot.js"
 
 const { execAbortableMock } = vi.hoisted(() => ({
   execAbortableMock: vi.fn(),
@@ -401,6 +402,71 @@ describe("healthCheck", () => {
 
       process.env.ANTHROPIC_API_KEY = origAnthro
       process.env.OPENAI_API_KEY = origOpenai
+    })
+  })
+
+  describe("copilot", () => {
+    it("returns not installed when gh is not found", async () => {
+      execAbortableMock.mockRejectedValue(new Error("not found"))
+
+      const runtime = createCopilotRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(false)
+    })
+
+    it("returns not installed when copilot CLI is not available", async () => {
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/opt/homebrew/bin/gh", stderr: "" }) // which gh
+        .mockRejectedValueOnce(new Error("copilot not found")) // gh copilot -- --version
+
+      const runtime = createCopilotRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(false)
+    })
+
+    it("returns authenticated via GH_TOKEN", async () => {
+      const origToken = process.env.GH_TOKEN
+      process.env.GH_TOKEN = "ghp_test123"
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/opt/homebrew/bin/gh", stderr: "" }) // which
+        .mockResolvedValueOnce({ stdout: "GitHub Copilot CLI 1.0.22", stderr: "" }) // --version
+
+      const runtime = createCopilotRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(true)
+      expect(health.version).toBe("1.0.22")
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("env: GH_TOKEN")
+
+      process.env.GH_TOKEN = origToken
+    })
+
+    it("returns authenticated via gh auth status", async () => {
+      const origCopilot = process.env.COPILOT_GITHUB_TOKEN
+      const origGH = process.env.GH_TOKEN
+      const origGithub = process.env.GITHUB_TOKEN
+      delete process.env.COPILOT_GITHUB_TOKEN
+      delete process.env.GH_TOKEN
+      delete process.env.GITHUB_TOKEN
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/opt/homebrew/bin/gh", stderr: "" }) // which
+        .mockResolvedValueOnce({ stdout: "GitHub Copilot CLI 1.0.22", stderr: "" }) // --version
+        .mockResolvedValueOnce({ stdout: "", stderr: "Logged in to github.com account user" }) // gh auth status
+
+      const runtime = createCopilotRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("gh auth")
+
+      process.env.COPILOT_GITHUB_TOKEN = origCopilot
+      process.env.GH_TOKEN = origGH
+      process.env.GITHUB_TOKEN = origGithub
     })
   })
 })

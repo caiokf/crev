@@ -65,26 +65,28 @@ reviewers:
   })
 
   it("reports missing agent files", async () => {
+    const missingPath = path.join(tmpDir, "agents", "missing.md")
     fs.writeFileSync(
       path.join(schemasDir, "test.yaml"),
-      "reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: missing.md\n",
+      `reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: ${missingPath}\n`,
     )
 
     const schema = loadSchemaFile(path.join(schemasDir, "test.yaml"))
-    const issues = await validateAgentRefs(schema, tmpDir)
+    const issues = await validateAgentRefs(schema)
     expect(issues).toHaveLength(1)
     expect(issues[0].message).toContain("missing.md")
   })
 
   it("passes when agent file exists", async () => {
-    fs.writeFileSync(path.join(agentsDir, "engineer.md"), "persona")
+    const agentPath = path.join(agentsDir, "engineer.md")
+    fs.writeFileSync(agentPath, "persona")
     fs.writeFileSync(
       path.join(schemasDir, "test.yaml"),
-      "reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: engineer.md\n",
+      `reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n    agent: ${agentPath}\n`,
     )
 
     const schema = loadSchemaFile(path.join(schemasDir, "test.yaml"))
-    const issues = await validateAgentRefs(schema, tmpDir)
+    const issues = await validateAgentRefs(schema)
     expect(issues).toHaveLength(0)
   })
 })
