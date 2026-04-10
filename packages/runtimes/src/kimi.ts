@@ -1,4 +1,6 @@
-import { readFileSync } from "node:fs"
+import fs, { readFileSync } from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
@@ -44,19 +46,37 @@ export function createKimiRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["kimi"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "kimi", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
       try {
         const result = await execAbortable("kimi", ["--version"], { timeout: 5000 })
-        version = result.stdout.trim()
+        const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/)
+        version = match ? match[1] : result.stdout.trim()
       } catch {}
 
-      const authenticated: "yes" | "no" | "unknown" = process.env.MOONSHOT_API_KEY ? "yes" : "no"
-      const authDetail = process.env.MOONSHOT_API_KEY ? "env: MOONSHOT_API_KEY" : "env: MOONSHOT_API_KEY missing"
+      let authenticated: "yes" | "no" | "unknown" = "no"
+      let authDetail = ""
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      if (process.env.MOONSHOT_API_KEY) {
+        authenticated = "yes"
+        authDetail = "env: MOONSHOT_API_KEY"
+      } else {
+        const credDir = path.join(os.homedir(), ".kimi", "credentials")
+        try {
+          if (fs.existsSync(credDir) && fs.readdirSync(credDir).length > 0) {
+            authenticated = "yes"
+            authDetail = "~/.kimi/credentials"
+          }
+        } catch {}
+      }
+
+      if (authenticated === "no") {
+        authDetail = "no MOONSHOT_API_KEY and no ~/.kimi/credentials"
+      }
+
+      return { name, command: "kimi", installed: true, version, authenticated, authDetail, error: null }
     },
   }
 }

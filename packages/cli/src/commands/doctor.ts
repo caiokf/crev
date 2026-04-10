@@ -51,6 +51,7 @@ export function registerDoctorCommand(program: Command): void {
         } catch (e) {
           healthResults.push({
             name,
+            command: name,
             installed: false,
             version: null,
             authenticated: "unknown",
@@ -103,19 +104,20 @@ export function registerDoctorCommand(program: Command): void {
 
       for (const health of healthResults) {
         const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
-        const version = health.version ?? "—"
+        const version = health.version ? chalk.white(health.version) : chalk.dim("—")
+        const command = health.command ? chalk.dim(`(${health.command})`) : ""
         const auth =
           health.authenticated === "yes"
-            ? chalk.green("✓ authenticated")
+            ? chalk.green("✓ auth'd")
             : health.authenticated === "no"
-              ? chalk.red("✗ not auth'd")
+              ? chalk.red("✗ no auth")
               : chalk.yellow("? unknown")
         const detail = health.authDetail ? chalk.dim(health.authDetail) : ""
         const usage = opts.all
           ? chalk.dim(`(${runtimeUsage.get(health.name)?.length ? `used in: ${runtimeUsage.get(health.name)!.join(", ")}` : "not used"})`)
           : ""
 
-        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed.padEnd(25)} ${version.padEnd(12)} ${auth} ${detail} ${usage}`)
+        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(20)} ${auth} ${detail} ${usage}`)
       }
 
       if (healthResults.length === 0) {

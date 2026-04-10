@@ -51,7 +51,7 @@ export function createCodeRabbitRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["cr"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "cr", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
@@ -77,7 +77,7 @@ export function createCodeRabbitRuntime(): RuntimeAdapter {
         authDetail = "could not determine auth status"
       }
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "cr", installed: true, version, authenticated, authDetail, error: null }
     },
   }
 }

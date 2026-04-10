@@ -70,7 +70,7 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["opencode"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "opencode", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
@@ -82,23 +82,22 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
       let authenticated: "yes" | "no" | "unknown" = "unknown"
       let authDetail = ""
       try {
-        const { readFileSync } = await import("node:fs")
+        const { existsSync } = await import("node:fs")
         const { homedir } = await import("node:os")
-        const configPath = `${homedir()}/.opencode/config.json`
-        const config = JSON.parse(readFileSync(configPath, "utf-8")) as Record<string, unknown>
-        if (config.apiKey || config.api_key) {
+        const authPath = `${homedir()}/.local/share/opencode/auth.json`
+        if (existsSync(authPath)) {
           authenticated = "yes"
-          authDetail = "config: ~/.opencode/config.json"
+          authDetail = "~/.local/share/opencode/auth.json"
         } else {
           authenticated = "no"
-          authDetail = "config: no API key in ~/.opencode/config.json"
+          authDetail = "no auth file at ~/.local/share/opencode/auth.json"
         }
       } catch {
         authenticated = "unknown"
-        authDetail = "could not read ~/.opencode/config.json"
+        authDetail = "could not check auth"
       }
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "opencode", installed: true, version, authenticated, authDetail, error: null }
     },
   }
 }

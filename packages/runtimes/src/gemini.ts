@@ -44,7 +44,7 @@ export function createGeminiRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["gemini"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "gemini", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
@@ -59,7 +59,7 @@ export function createGeminiRuntime(): RuntimeAdapter {
         ? `env: ${process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : "GOOGLE_API_KEY"}`
         : "env: GEMINI_API_KEY missing"
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "gemini", installed: true, version, authenticated, authDetail, error: null }
     },
   }
 }

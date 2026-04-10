@@ -57,13 +57,14 @@ export function createCodexRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["codex"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "codex", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
       try {
         const result = await execAbortable("codex", ["--version"], { timeout: 5000 })
-        version = result.stdout.trim()
+        const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/)
+        version = match ? match[1] : result.stdout.trim()
       } catch {}
 
       let authenticated: "yes" | "no" | "unknown" = "no"
@@ -86,7 +87,7 @@ export function createCodexRuntime(): RuntimeAdapter {
         authDetail = "no OPENAI_API_KEY and no ~/.codex/auth.json"
       }
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "codex", installed: true, version, authenticated, authDetail, error: null }
     },
   }
 }

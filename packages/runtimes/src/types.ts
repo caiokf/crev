@@ -26,6 +26,7 @@ export type RawExecutionOutput = {
 
 export type RuntimeHealth = {
   name: string
+  command: string
   installed: boolean
   version: string | null
   authenticated: "yes" | "no" | "unknown"

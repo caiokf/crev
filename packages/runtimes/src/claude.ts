@@ -42,13 +42,13 @@ export function createClaudeRuntime(): RuntimeAdapter {
       try {
         await execAbortable("which", ["claude"], { timeout: 5000 })
       } catch {
-        return { name, installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+        return { name, command: "claude", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
       }
 
       let version: string | null = null
       try {
         const result = await execAbortable("claude", ["--version"], { timeout: 5000 })
-        version = result.stdout.trim()
+        version = extractVersion(result.stdout.trim())
       } catch {}
 
       let authenticated: "yes" | "no" | "unknown" = "unknown"
@@ -73,9 +73,14 @@ export function createClaudeRuntime(): RuntimeAdapter {
         }
       }
 
-      return { name, installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "claude", installed: true, version, authenticated, authDetail, error: null }
     },
   }
+}
+
+function extractVersion(raw: string): string {
+  const match = raw.match(/(\d+\.\d+\.\d+)/)
+  return match ? match[1] : raw
 }
 
 function resolveModel(model: string): string {
