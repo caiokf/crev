@@ -7,7 +7,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
-    "crev": "tsx packages/cli/src/bin.ts"
+    "crev": "pnpm --filter @crev/runtimes build --silent && tsx packages/cli/src/bin.ts"
   },
   "devDependencies": {
     "@types/node": "25.5.2",
