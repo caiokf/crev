@@ -26,10 +26,14 @@ export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
       diffContent = await getCommitDiff(opts.source.baseCommit)
       break
     case "branch":
-      diffContent = await getBranchDiff(opts.source.base, opts.source.type)
+      diffContent = opts.source.type === "current-state"
+        ? await getCurrentStateDiff()
+        : await getBranchDiff(opts.source.base, opts.source.type)
       break
     case "local":
-      diffContent = await getTypeDiff(opts.source.type)
+      diffContent = opts.source.type === "current-state"
+        ? await getCurrentStateDiff()
+        : await getTypeDiff(opts.source.type)
       break
   }
 
@@ -95,6 +99,12 @@ async function getBranchDiff(base: string, type: "all" | "committed" | "uncommit
 
 async function getCommitDiff(baseCommit: string): Promise<string> {
   const { stdout } = await execFileAsync("git", ["diff", `${baseCommit}...HEAD`], { maxBuffer: MAX_BUFFER })
+  return stdout
+}
+
+async function getCurrentStateDiff(): Promise<string> {
+  const { stdout: emptyTree } = await execFileAsync("git", ["hash-object", "-t", "tree", "/dev/null"])
+  const { stdout } = await execFileAsync("git", ["diff", emptyTree.trim(), "HEAD"], { maxBuffer: MAX_BUFFER })
   return stdout
 }
 

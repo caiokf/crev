@@ -8,7 +8,7 @@ export type DiffSource =
   | { kind: "commit"; baseCommit: string; type: DiffType }
   | { kind: "local"; type: DiffType }
 
-export type DiffType = "all" | "committed" | "uncommitted"
+export type DiffType = "all" | "committed" | "uncommitted" | "current-state"
 
 // ── Output mode: mutually exclusive ──
 
@@ -42,7 +42,7 @@ export const RawRunFlags = z
     base: z.string().optional(),
     baseCommit: z.string().optional(),
     pr: z.coerce.number().positive().optional(),
-    type: z.enum(["all", "committed", "uncommitted"]).default("all"),
+    type: z.enum(["all", "committed", "uncommitted", "current-state"]).default("all"),
     reviewers: z.string().optional(),
     slug: z.string().optional(),
     description: z.string().optional(),
@@ -56,6 +56,9 @@ export const RawRunFlags = z
   })
   .refine((f) => !(f.pr && f.type === "uncommitted"), {
     message: "--type uncommitted is incompatible with --pr",
+  })
+  .refine((f) => !(f.type === "current-state" && (f.pr || f.base || f.baseCommit)), {
+    message: "--type current-state reviews the full codebase and cannot be combined with --pr, --base, or --base-commit",
   })
   .refine((f) => !(f.promptOnly && f.reviewFile), {
     message: "--prompt-only and --review-file are incompatible",

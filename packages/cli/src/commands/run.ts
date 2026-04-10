@@ -15,7 +15,7 @@ export function registerRunCommand(program: Command): void {
     .requiredOption("--schema <name>", "Which review schema to use")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
-    .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
+    .option("--type <type>", "Diff type: all, committed, uncommitted, current-state", "all")
     .option("--pr <number>", "GitHub PR number")
     .option("--reviewers <list>", "Comma-separated reviewer names")
     .option("--slug <name>", "Override artifact name")

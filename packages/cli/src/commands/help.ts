@@ -71,7 +71,7 @@ ${chalk.bold("FLAGS")}
   --schema <name>          Which review schema to use (from .crev/schemas/)
   --base <branch>          Git base branch for diff
   --base-commit <sha>      Specific commit hash
-  --type <type>            "all" | "committed" | "uncommitted"
+  --type <type>            "all" | "committed" | "uncommitted" | "current-state"
   --pr <number>            GitHub PR number
   --reviewers <list>       Comma-separated reviewer names to run
   --slug <name>            Override artifact name
@@ -85,6 +85,7 @@ ${chalk.bold("EXAMPLES")}
   crev run --schema quick --base main
   crev run --schema standard --pr 42
   crev run --schema security --reviewers "Security,Architect"
+  crev run --schema security --type current-state  # Full codebase review
   crev run --schema quick --plain --json  # CI mode
   crev run --schema quick --review-file .crev/reviews/existing.json
 `)

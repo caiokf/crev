@@ -9,7 +9,7 @@ export function registerDiffCommand(program: Command): void {
     .description("Preview what diff would be reviewed (dry-run)")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
-    .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
+    .option("--type <type>", "Diff type: all, committed, uncommitted, current-state", "all")
     .option("--pr <number>", "GitHub PR number")
     .action(async (opts) => {
       const specified = [opts.pr, opts.base, opts.baseCommit].filter(Boolean).length

@@ -14,6 +14,7 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Run a review                | \`crev run --schema <name> --base main\`                   |
 | Review a PR                 | \`crev run --schema <name> --pr 42\`                       |
 | Review uncommitted changes  | \`crev run --schema <name> --type uncommitted\`            |
+| Review entire codebase      | \`crev run --schema <name> --type current-state\`          |
 | CI mode (no TUI)            | \`crev run --schema <name> --plain --json\`                |
 | Subset of reviewers         | \`crev run --schema <name> --reviewers "Security,Arch"\`   |
 | Preview prompts only        | \`crev run --schema <name> --prompt-only\`                 |

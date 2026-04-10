@@ -5,7 +5,7 @@ export type DiffInput = {
   diffFile: string
   base?: string
   baseCommit?: string
-  type: "all" | "committed" | "uncommitted"
+  type: "all" | "committed" | "uncommitted" | "current-state"
 }
 
 export type RuntimeOverrides = {

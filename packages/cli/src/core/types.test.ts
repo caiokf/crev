@@ -28,6 +28,21 @@ describe("RawRunFlags validation", () => {
     expect(result.success).toBe(false)
   })
 
+  it("rejects --type current-state with --base", () => {
+    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", base: "main" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects --type current-state with --pr", () => {
+    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", pr: 42 })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects --type current-state with --base-commit", () => {
+    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", baseCommit: "abc123" })
+    expect(result.success).toBe(false)
+  })
+
   it("rejects --prompt-only with --review-file", () => {
     const result = RawRunFlags.safeParse({ ...valid, promptOnly: true, reviewFile: "file.json" })
     expect(result.success).toBe(false)
@@ -110,6 +125,11 @@ describe("RawRunFlags validation", () => {
   it("--reviewers parses comma-separated list", () => {
     const result = RawRunFlags.parse({ ...valid, reviewers: "Security, Architect" })
     expect(result.reviewers).toEqual(["Security", "Architect"])
+  })
+
+  it("--type current-state → DiffSource { kind: 'local', type: 'current-state' }", () => {
+    const result = RawRunFlags.parse({ ...valid, type: "current-state" })
+    expect(result.diff).toEqual({ kind: "local", type: "current-state" })
   })
 
   it("schema is required", () => {
