@@ -69,7 +69,7 @@ ${chalk.bold("crev run")} — Execute a review
 
 ${chalk.bold("FLAGS")}
   --schema <name>          Which review schema to use (from .crev/schemas/)
-  --base <branch>          Git base branch for diff (default: main)
+  --base <branch>          Git base branch for diff
   --base-commit <sha>      Specific commit hash
   --type <type>            "all" | "committed" | "uncommitted"
   --pr <number>            GitHub PR number

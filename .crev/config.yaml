@@ -6,7 +6,7 @@ defaults:
 
 runtimes:
   claude:
-    command: cc
+    command: claude
 
 aliases:
   opus: claude-opus-4-6

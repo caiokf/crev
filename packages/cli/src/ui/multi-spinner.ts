@@ -1,4 +1,5 @@
 import chalk from "chalk"
+import { visibleLength, padVisible } from "./ansi.js"
 
 const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 const BAR = "│"
@@ -154,6 +155,7 @@ export function createMultiSpinner(
   }
 
   stream.write(HIDE_CURSOR)
+  process.on("exit", () => stream.write(SHOW_CURSOR))
   setupKeyboard()
   render()
   const interval = setInterval(render, 80)
@@ -230,17 +232,6 @@ function createPlainSpinner(state: Entry[]): MultiSpinnerHandle {
   }
 }
 
-// eslint-disable-next-line no-control-regex
-const ANSI_RE = /\x1B\[[0-9;]*m/g
-
-function visibleLength(s: string): number {
-  return s.replace(ANSI_RE, "").length
-}
-
-function padTo(s: string, width: number): string {
-  const pad = width - visibleLength(s)
-  return pad > 0 ? s + " ".repeat(pad) : s
-}
 
 function maxNameWidth(entries: Entry[]): number {
   return entries.reduce((max, e) => {
@@ -260,29 +251,29 @@ function formatLabel(entry: Entry): string {
 function formatEntry(entry: Entry, frameIndex: number, nameCol: number): string {
   const label = formatLabel(entry)
   const detail = chalk.dim(entry.detail)
-  const nameAndDetail = padTo(`${label} ${detail}`, nameCol)
+  const nameAndDetail = padVisible(`${label} ${detail}`, nameCol)
   const ELAPSED_COL = 7
 
   switch (entry.state) {
     case "pending":
-      return `${chalk.dim("○")} ${padTo(`${chalk.dim(entry.name)} ${detail}`, nameCol)} ${chalk.dim("waiting")}`
+      return `${chalk.dim("○")} ${padVisible(`${chalk.dim(entry.name)} ${detail}`, nameCol)} ${chalk.dim("waiting")}`
     case "running": {
       const spinner = chalk.cyan(BRAILLE_FRAMES[frameIndex % BRAILLE_FRAMES.length])
       const liveElapsed = (performance.now() - entry.startedAt) / 1000
-      const elapsed = padTo(chalk.white(formatTime(liveElapsed)), ELAPSED_COL)
+      const elapsed = padVisible(chalk.white(formatTime(liveElapsed)), ELAPSED_COL)
       return `${spinner} ${nameAndDetail} ${elapsed}`
     }
     case "done": {
-      const elapsed = padTo(chalk.white(formatTime(entry.finishedElapsed)), ELAPSED_COL)
+      const elapsed = padVisible(chalk.white(formatTime(entry.finishedElapsed)), ELAPSED_COL)
       const result = entry.resultText ?? formatIssueCount(0)
       return `${TICK} ${nameAndDetail} ${elapsed} ${result}`
     }
     case "failed": {
-      const elapsed = padTo(chalk.white(formatTime(entry.finishedElapsed)), ELAPSED_COL)
+      const elapsed = padVisible(chalk.white(formatTime(entry.finishedElapsed)), ELAPSED_COL)
       return `${CROSS} ${nameAndDetail} ${elapsed} ${chalk.red("failed")}`
     }
     case "cancelled":
-      return `${chalk.yellow("■")} ${padTo(`${chalk.dim(entry.name)} ${detail}`, nameCol)} ${chalk.yellow("cancelled")}`
+      return `${chalk.yellow("■")} ${padVisible(`${chalk.dim(entry.name)} ${detail}`, nameCol)} ${chalk.yellow("cancelled")}`
   }
 }
 

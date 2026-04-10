@@ -37,13 +37,14 @@ export function registerListCommand(program: Command): void {
         data.schemas = schemas
 
         if (!jsonOutput) {
+          console.log()
           if (schemas.length === 0) {
             console.log("  No schemas found in .crev/schemas/")
           } else {
-            console.log(chalk.bold("Schemas"))
+            console.log(`  ${chalk.bold("Schemas")}`)
             for (const s of schemas) {
               console.log(
-                `  ${chalk.cyan(s.name)} - ${s.description || "No description"} (${s.reviewers} reviewer${s.reviewers !== 1 ? "s" : ""})`,
+                `    ${chalk.cyan(s.name)} - ${s.description || "No description"} (${s.reviewers} reviewer${s.reviewers !== 1 ? "s" : ""})`,
               )
             }
           }
@@ -60,11 +61,11 @@ export function registerListCommand(program: Command): void {
         data.runtimes = runtimes
 
         if (!jsonOutput) {
-          if (!showAll || (data.schemas as unknown[])?.length) console.log()
-          console.log(chalk.bold("Runtimes"))
+          console.log()
+          console.log(`  ${chalk.bold("Runtimes")}`)
           for (const rt of runtimes) {
             console.log(
-              `  ${chalk.cyan(rt.name)} (${rt.type}) - models: ${rt.models.join(", ")} ${chalk.dim(`[default: ${rt.defaultModel}]`)}`,
+              `    ${chalk.cyan(rt.name)} (${rt.type}) - models: ${rt.models.join(", ")} ${chalk.dim(`[default: ${rt.defaultModel}]`)}`,
             )
           }
         }
@@ -72,6 +73,8 @@ export function registerListCommand(program: Command): void {
 
       if (jsonOutput) {
         console.log(JSON.stringify(data, null, 2))
+      } else {
+        console.log()
       }
     })
 }

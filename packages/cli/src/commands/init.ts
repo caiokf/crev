@@ -3,14 +3,12 @@ import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { checkbox, confirm } from "@inquirer/prompts"
-import { detectAITools, type AITool } from "../util/detect-tools.js"
+import { detectAITools } from "../util/detect-tools.js"
+import { writeSkill } from "../util/skills.js"
 import { configTemplate } from "../templates/config.js"
 import { quickSchema } from "../templates/schemas/quick.js"
 import { standardSchema } from "../templates/schemas/standard.js"
 import { thoroughSchema } from "../templates/schemas/thorough.js"
-import { claudeSkill } from "../templates/skills/claude.js"
-import { cursorSkill } from "../templates/skills/cursor.js"
-import { copilotPrompt } from "../templates/skills/copilot.js"
 
 const BANNER = `
   ${chalk.cyan("██████")} ${chalk.cyan("████████")}  ${chalk.cyan("████████")} ${chalk.cyan("██")}     ${chalk.cyan("██")}
@@ -179,11 +177,11 @@ async function scaffold(
           const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
           const auth =
             health.authenticated === "yes"
-              ? chalk.green("✓ authenticated")
+              ? chalk.green("✓ auth'd")
               : health.authenticated === "no"
-                ? chalk.red("✗ not authenticated")
+                ? chalk.red("✗ no auth")
                 : chalk.yellow("? unknown")
-          console.log(`  ${name.padEnd(14)} ${installed}   ${auth}`)
+          console.log(`  ${name.padEnd(16)} ${installed}  ${auth}`)
         }
       } catch {}
     }
@@ -205,9 +203,9 @@ async function scaffold(
           }
         }
         if (issues.length === 0) {
-          console.log(`  ${name}.yaml${" ".repeat(16 - name.length)}${chalk.green("✓ ready")}`)
+          console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.green("✓ ready")}`)
         } else {
-          console.log(`  ${name}.yaml${" ".repeat(16 - name.length)}${chalk.red("✗ " + issues.join(", "))}`)
+          console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.red("✗ " + issues.join(", "))}`)
         }
       } catch {}
     }
@@ -224,39 +222,9 @@ async function scaffold(
 
 function writeIfNew(filePath: string, content: string): void {
   if (fs.existsSync(filePath) && fs.readFileSync(filePath, "utf-8").trim()) {
-    return // Don't overwrite existing non-empty files
+    return
   }
   fs.writeFileSync(filePath, content, "utf-8")
   const relative = path.relative(process.cwd(), filePath)
   console.log(`${chalk.green("✓")} Created ${relative}`)
-}
-
-function writeSkill(projectRoot: string, tool: AITool): void {
-  const skillContent = getSkillContent(tool.id)
-  if (!skillContent) return
-
-  if (tool.id === "claude" || tool.id === "cursor" || tool.id === "windsurf" || tool.id === "opencode") {
-    const skillDir = path.join(projectRoot, tool.skillPath)
-    fs.mkdirSync(skillDir, { recursive: true })
-    writeIfNew(path.join(skillDir, "SKILL.md"), skillContent)
-  } else if (tool.id === "copilot") {
-    const promptDir = path.join(projectRoot, tool.skillPath)
-    fs.mkdirSync(promptDir, { recursive: true })
-    writeIfNew(path.join(promptDir, "crev.prompt.md"), skillContent)
-  }
-}
-
-function getSkillContent(toolId: string): string | null {
-  switch (toolId) {
-    case "claude":
-      return claudeSkill
-    case "cursor":
-    case "windsurf":
-    case "opencode":
-      return cursorSkill
-    case "copilot":
-      return copilotPrompt
-    default:
-      return null
-  }
 }

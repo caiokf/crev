@@ -4,6 +4,7 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
+import { SEVERITY_COLORS } from "../ui/theme.js"
 
 export function registerShowCommand(program: Command): void {
   program
@@ -37,13 +38,6 @@ export function registerShowCommand(program: Command): void {
       if (opts.json) {
         console.log(content)
         return
-      }
-
-      const SEVERITY_COLORS: Record<string, (s: string) => string> = {
-        critical: chalk.red.bold,
-        high: chalk.red,
-        medium: chalk.yellow,
-        low: chalk.dim,
       }
 
       console.log(`\n  ${chalk.bold("Review:")} ${result.metadata.slug}`)

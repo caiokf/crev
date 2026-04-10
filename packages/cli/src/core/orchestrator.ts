@@ -1,4 +1,5 @@
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { getRuntime, type RuntimeExecutionRequest } from "@crev/runtimes"
 import chalk from "chalk"
@@ -10,6 +11,7 @@ import { runTriage } from "./triage.js"
 import type { NormalizedReview, ReviewIssue, ReviewResult } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
+import { SEVERITY_ORDER, SEVERITY_COLORS } from "../ui/theme.js"
 import type { DiffInput } from "@crev/runtimes"
 
 export type OrchestrateOptions = {
@@ -257,7 +259,7 @@ async function runSingleReviewer(
   ].join("\n")
 
   const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-  const promptFile = path.join(opts.crevDir, `.prompt-${slug}.txt`)
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}.txt`)
   fs.writeFileSync(promptFile, fullPrompt, "utf-8")
 
   const rtConfig = getRuntimeConfig(opts.config, reviewer.runtime)
@@ -276,9 +278,12 @@ async function runSingleReviewer(
     },
   }
 
-  const rawResult = await runtime.execute(request)
-
-  return normalizeOutput(reviewer.name, reviewer.runtime, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
+  try {
+    const rawResult = await runtime.execute(request)
+    return normalizeOutput(reviewer.name, reviewer.runtime, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
+  } finally {
+    try { fs.unlinkSync(promptFile) } catch {}
+  }
 }
 
 function buildDiffReference(diffFile: string): string {
@@ -429,13 +434,6 @@ function recomputeSummary(
   return { totalIssues: allIssues.length, bySeverity, byCategory, byStatus, byReviewer, triage }
 }
 
-const SEVERITY_ORDER = ["critical", "high", "medium", "low"] as const
-const SEVERITY_COLORS: Record<string, (s: string) => string> = {
-  critical: chalk.red.bold,
-  high: chalk.red,
-  medium: chalk.yellow,
-  low: chalk.dim,
-}
 
 function printSummary(result: ReviewResult, outputPath: string, plain?: boolean): void {
   const { summary } = result

@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { promisify } from "node:util"
 import { getRuntime } from "@crev/runtimes"
@@ -149,8 +150,7 @@ type RawTriageVerdict = {
 
 async function callTriageAgent(prompt: string, config: Config, crevDir: string): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
-  fs.mkdirSync(crevDir, { recursive: true })
-  const promptFile = path.join(crevDir, ".prompt-triage.txt")
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-triage-${process.pid}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {

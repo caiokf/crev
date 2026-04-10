@@ -6,6 +6,7 @@ import { getAllRuntimes, type RuntimeHealth } from "@crev/runtimes"
 import { findCrevDir, loadConfig, getRuntimeConfig } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
+import { visibleLength, padVisible, truncateVisible } from "../ui/ansi.js"
 
 export function registerDoctorCommand(program: Command): void {
   program
@@ -97,6 +98,14 @@ export function registerDoctorCommand(program: Command): void {
               issues.push(`${reviewer.runtime}: not installed — reviewer "${reviewer.name}" will fail`)
             } else if (health.authenticated === "no") {
               issues.push(`${reviewer.runtime}: not authenticated — reviewer "${reviewer.name}" will fail`)
+            }
+          }
+          if (schema.triage?.enabled && schema.triage.runtime) {
+            const health = allHealthResults.find((h) => h.name === schema.triage!.runtime)
+            if (!health || !health.installed) {
+              issues.push(`${schema.triage.runtime}: not installed — triage will fail`)
+            } else if (health.authenticated === "no") {
+              issues.push(`${schema.triage.runtime}: not authenticated — triage will fail`)
             }
           }
           return { name, ready: issues.length === 0, issues }
@@ -216,34 +225,6 @@ function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] 
   return checks
 }
 
-// eslint-disable-next-line no-control-regex
-const ANSI_RE = /\x1B\[[0-9;]*m/g
-
-function visibleLength(s: string): number {
-  return s.replace(ANSI_RE, "").length
-}
-
-function truncateVisible(s: string, maxLen: number): string {
-  const stripped = s.replace(ANSI_RE, "")
-  if (stripped.length <= maxLen) return s
-
-  // Walk through string tracking visible chars
-  let visible = 0
-  let i = 0
-  while (i < s.length && visible < maxLen - 1) {
-    if (s[i] === "\x1B") {
-      // Skip ANSI sequence
-      const end = s.indexOf("m", i)
-      if (end !== -1) {
-        i = end + 1
-        continue
-      }
-    }
-    visible++
-    i++
-  }
-  return s.slice(0, i) + chalk.reset("…")
-}
 
 /**
  * Responsive runtime line — progressively adds detail based on terminal width.
@@ -301,7 +282,3 @@ function formatRuntimeLine(health: RuntimeHealth, config: ReturnType<typeof load
   return line
 }
 
-function padVisible(s: string, width: number): string {
-  const pad = width - visibleLength(s)
-  return pad > 0 ? s + " ".repeat(pad) : s
-}

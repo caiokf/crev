@@ -12,6 +12,12 @@ export function registerDiffCommand(program: Command): void {
     .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
     .option("--pr <number>", "GitHub PR number")
     .action(async (opts) => {
+      const specified = [opts.pr, opts.base, opts.baseCommit].filter(Boolean).length
+      if (specified > 1) {
+        console.error("Error: --pr, --base, and --base-commit are mutually exclusive")
+        process.exit(1)
+      }
+
       const crevDir = findCrevDir()
       const config = loadConfig(crevDir)
 
