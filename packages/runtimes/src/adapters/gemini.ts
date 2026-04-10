@@ -1,7 +1,7 @@
 import { readFileSync } from "node:fs"
-import { withDefaults } from "./adapter-base.js"
-import { execAbortable } from "./exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { withDefaults } from "../adapter-base.js"
+import { execAbortable } from "../exec.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createGeminiRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -79,3 +79,5 @@ export function createGeminiRuntime(): RuntimeAdapter {
     },
   })
 }
+
+export const createAdapter = createGeminiRuntime

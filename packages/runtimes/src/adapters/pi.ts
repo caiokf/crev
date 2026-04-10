@@ -2,9 +2,9 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { readFileSync } from "node:fs"
-import { withDefaults } from "./adapter-base.js"
-import { execAbortable } from "./exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { withDefaults } from "../adapter-base.js"
+import { execAbortable } from "../exec.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createPiRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -93,7 +93,6 @@ export function createPiRuntime(): RuntimeAdapter {
       } catch {}
 
       if (authenticated === "no") {
-        // Check common env vars as fallback
         if (process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GOOGLE_API_KEY || process.env.GEMINI_API_KEY) {
           authenticated = "yes"
           authDetail = "env: API key detected"
@@ -106,3 +105,5 @@ export function createPiRuntime(): RuntimeAdapter {
     },
   })
 }
+
+export const createAdapter = createPiRuntime

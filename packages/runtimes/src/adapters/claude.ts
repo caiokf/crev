@@ -1,6 +1,6 @@
-import { execAbortable } from "./exec.js"
-import { withDefaults } from "./adapter-base.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { execAbortable } from "../exec.js"
+import { withDefaults } from "../adapter-base.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createClaudeRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -108,3 +108,5 @@ function resolveModel(model: string): string {
   }
   return map[model] ?? model
 }
+
+export const createAdapter = createClaudeRuntime

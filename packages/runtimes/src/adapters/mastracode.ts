@@ -1,6 +1,6 @@
-import { withDefaults } from "./adapter-base.js"
-import { execAbortable } from "./exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { withDefaults } from "../adapter-base.js"
+import { execAbortable } from "../exec.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createMastraCodeRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -80,10 +80,8 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
 
       let version: string | null = null
       try {
-        // mastracode has no headless --version; launch TUI briefly and parse banner
         await execAbortable("mastracode", ["--version"], { timeout: 2000 })
       } catch (e) {
-        // Timeout kills process but stdout may contain the banner with version
         const err = e as { stdout?: string }
         const vMatch = (err.stdout ?? "").match(/v(\d+\.\d+\.\d+)/)
         version = vMatch ? vMatch[1] : null
@@ -99,12 +97,9 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
         authenticated = "yes"
         authDetail = "env: OPENAI_API_KEY"
       } else {
-        // mastracode uses OAuth via /login — check for stored auth
         try {
           const { existsSync } = await import("node:fs")
           const { homedir } = await import("node:os")
-          // mastracode stores auth in its LibSQL database, hard to check directly
-          // Fall back to checking if common provider keys exist
           const dbPath = `${homedir()}/.mastracode`
           if (existsSync(dbPath)) {
             authenticated = "unknown"
@@ -125,3 +120,5 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
 function stripAnsi(str: string): string {
   return str.replace(/\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07]*\x07|\x1B\[[\?]?[0-9;]*[a-zA-Z]/g, "").replace(/\r/g, "")
 }
+
+export const createAdapter = createMastraCodeRuntime

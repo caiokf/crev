@@ -1,6 +1,6 @@
-import { execAbortable } from "./exec.js"
-import { withDefaults } from "./adapter-base.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { execAbortable } from "../exec.js"
+import { withDefaults } from "../adapter-base.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createOpenCodeRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -146,3 +146,5 @@ function parseOutput(stdout: string): ParsedOutput {
   }
   return { text: parts.join(""), error }
 }
+
+export const createAdapter = createOpenCodeRuntime

@@ -1,27 +1,17 @@
 import type { RuntimeAdapter } from "./types.js"
-import { createClaudeRuntime } from "./claude.js"
-import { createCodeRabbitRuntime } from "./coderabbit.js"
-import { createCodexRuntime } from "./codex.js"
-import { createGeminiRuntime } from "./gemini.js"
-import { createKimiRuntime } from "./kimi.js"
-import { createOpenCodeRuntime } from "./opencode.js"
-import { createPiRuntime } from "./pi.js"
-import { createDroidRuntime } from "./droid.js"
-import { createMastraCodeRuntime } from "./mastracode.js"
-import { createCopilotRuntime } from "./copilot.js"
+import * as adapters from "./adapters/index.js"
 
-const runtimes = new Map<string, () => RuntimeAdapter>([
-  ["claude", () => createClaudeRuntime()],
-  ["codex", () => createCodexRuntime()],
-  ["gemini", () => createGeminiRuntime()],
-  ["kimi", () => createKimiRuntime()],
-  ["coderabbit", () => createCodeRabbitRuntime()],
-  ["opencode", () => createOpenCodeRuntime()],
-  ["pi", () => createPiRuntime()],
-  ["droid", () => createDroidRuntime()],
-  ["mastracode", () => createMastraCodeRuntime()],
-  ["copilot", () => createCopilotRuntime()],
-])
+/**
+ * Auto-discovered runtime registry.
+ *
+ * Adding a new adapter file to adapters/ and re-exporting it from
+ * adapters/index.ts automatically registers it here — no other
+ * changes needed. It will appear in doctor, schema validation,
+ * contract tests, and smoke tests.
+ */
+const runtimes = new Map<string, () => RuntimeAdapter>(
+  Object.entries(adapters).map(([name, factory]) => [name, factory as () => RuntimeAdapter]),
+)
 
 export function getRuntime(name: string): RuntimeAdapter {
   const factory = runtimes.get(name)

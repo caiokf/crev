@@ -1,9 +1,9 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { withDefaults } from "./adapter-base.js"
-import { execAbortable } from "./exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { withDefaults } from "../adapter-base.js"
+import { execAbortable } from "../exec.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createCodexRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -110,3 +110,5 @@ export function createCodexRuntime(): RuntimeAdapter {
     },
   })
 }
+
+export const createAdapter = createCodexRuntime

@@ -2,9 +2,9 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { readFileSync } from "node:fs"
-import { execAbortable } from "./exec.js"
-import { withDefaults } from "./adapter-base.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
+import { execAbortable } from "../exec.js"
+import { withDefaults } from "../adapter-base.js"
+import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createCopilotRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -72,27 +72,24 @@ export function createCopilotRuntime(): RuntimeAdapter {
     async healthCheck(): Promise<RuntimeHealth> {
       const name = "copilot"
 
-      // Check if gh is available first
       try {
         await execAbortable("which", ["gh"], { timeout: 5000 })
       } catch {
-        return { name, command: "gh copilot", installed: false, version: null, authenticated: "unknown", authDetail: "gh CLI not installed", error: null }
+        return { name, command: "copilot", installed: false, version: null, authenticated: "unknown", authDetail: "gh CLI not installed", error: null }
       }
 
-      // Check if copilot extension/CLI is available
       let version: string | null = null
       try {
         const result = await execAbortable("gh", ["copilot", "--", "--version"], { timeout: 5000 })
         const vMatch = (result.stdout + result.stderr).match(/(\d+\.\d+\.\d+)/)
         version = vMatch ? vMatch[1] : null
       } catch {
-        return { name, command: "gh copilot", installed: false, version: null, authenticated: "unknown", authDetail: "copilot CLI not available (run: gh copilot)", error: null }
+        return { name, command: "copilot", installed: false, version: null, authenticated: "unknown", authDetail: "copilot CLI not available (run: gh copilot)", error: null }
       }
 
       let authenticated: "yes" | "no" | "unknown" = "no"
       let authDetail = ""
 
-      // Check env vars first (COPILOT_GITHUB_TOKEN, GH_TOKEN, GITHUB_TOKEN)
       if (process.env.COPILOT_GITHUB_TOKEN) {
         authenticated = "yes"
         authDetail = "env: COPILOT_GITHUB_TOKEN"
@@ -103,7 +100,6 @@ export function createCopilotRuntime(): RuntimeAdapter {
         authenticated = "yes"
         authDetail = "env: GITHUB_TOKEN"
       } else {
-        // Check gh auth status
         try {
           const result = await execAbortable("gh", ["auth", "status"], { timeout: 5000 })
           const output = result.stdout + result.stderr
@@ -113,7 +109,6 @@ export function createCopilotRuntime(): RuntimeAdapter {
           }
         } catch {}
 
-        // Check copilot config dir for stored credentials
         if (authenticated === "no") {
           const copilotDir = path.join(os.homedir(), ".copilot")
           try {
@@ -129,7 +124,9 @@ export function createCopilotRuntime(): RuntimeAdapter {
         authDetail = "not authenticated (run: gh copilot -- login)"
       }
 
-      return { name, command: "gh copilot", installed: true, version, authenticated, authDetail, error: null }
+      return { name, command: "copilot", installed: true, version, authenticated, authDetail, error: null }
     },
   })
 }
+
+export const createAdapter = createCopilotRuntime
