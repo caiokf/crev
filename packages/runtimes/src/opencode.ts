@@ -1,8 +1,9 @@
 import { execAbortable } from "./exec.js"
+import { withDefaults } from "./adapter-base.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createOpenCodeRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "opencode",
     models: [
@@ -19,6 +20,16 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
     ] as const,
     defaultModel: "zai-coding-plan/glm-5",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "opencode",
+      promptStrategy: "expect-script",
+      requiresPty: true,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "auth-file", path: "~/.local/share/opencode/auth.json", description: "OpenCode auth file" },
+      ],
+      relevantEnvVars: [],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -107,7 +118,7 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
 
       return { name, command: "opencode", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }
 
 type ParsedOutput = { text: string; error?: string }

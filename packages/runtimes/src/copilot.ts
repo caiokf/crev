@@ -3,10 +3,11 @@ import os from "node:os"
 import path from "node:path"
 import { readFileSync } from "node:fs"
 import { execAbortable } from "./exec.js"
+import { withDefaults } from "./adapter-base.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createCopilotRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "copilot",
     models: [
@@ -18,6 +19,18 @@ export function createCopilotRuntime(): RuntimeAdapter {
     ] as const,
     defaultModel: "gpt-5.2",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "gh",
+      promptStrategy: "stdin",
+      requiresPty: false,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "env", keys: ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"] },
+        { type: "auth-command", command: ["gh", "auth", "status"] },
+        { type: "auth-file", path: "~/.copilot", description: "Copilot config directory" },
+      ],
+      relevantEnvVars: ["COPILOT_GITHUB_TOKEN", "GH_TOKEN", "GITHUB_TOKEN"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -118,5 +131,5 @@ export function createCopilotRuntime(): RuntimeAdapter {
 
       return { name, command: "gh copilot", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }

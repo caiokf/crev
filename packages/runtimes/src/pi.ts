@@ -2,11 +2,12 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { readFileSync } from "node:fs"
+import { withDefaults } from "./adapter-base.js"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createPiRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "pi",
     models: [
@@ -20,6 +21,17 @@ export function createPiRuntime(): RuntimeAdapter {
     ] as const,
     defaultModel: "anthropic/claude-sonnet-4-6",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "pi",
+      promptStrategy: "stdin",
+      requiresPty: false,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "auth-file", path: "~/.pi/agent/auth.json", description: "Pi agent auth file" },
+        { type: "env", keys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"] },
+      ],
+      relevantEnvVars: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -92,5 +104,5 @@ export function createPiRuntime(): RuntimeAdapter {
 
       return { name, command: "pi", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }

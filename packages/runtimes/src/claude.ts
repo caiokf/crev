@@ -1,13 +1,25 @@
 import { execAbortable } from "./exec.js"
+import { withDefaults } from "./adapter-base.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createClaudeRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "claude",
     models: ["opus", "sonnet", "haiku"] as const,
     defaultModel: "sonnet",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "claude",
+      promptStrategy: "file-ref",
+      requiresPty: false,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "auth-command", command: ["claude", "auth", "status"] },
+        { type: "env", keys: ["ANTHROPIC_API_KEY"] },
+      ],
+      relevantEnvVars: ["ANTHROPIC_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -80,7 +92,7 @@ export function createClaudeRuntime(): RuntimeAdapter {
 
       return { name, command: "claude", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }
 
 function extractVersion(raw: string): string {

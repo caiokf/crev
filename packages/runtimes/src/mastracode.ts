@@ -1,8 +1,9 @@
+import { withDefaults } from "./adapter-base.js"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createMastraCodeRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "mastracode",
     models: [
@@ -15,6 +16,17 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
     ] as const,
     defaultModel: "anthropic/claude-sonnet-4-6",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "mastracode",
+      promptStrategy: "expect-script",
+      requiresPty: true,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "env", keys: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"] },
+        { type: "auth-file", path: "~/.mastracode", description: "MastraCode config directory" },
+      ],
+      relevantEnvVars: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -107,7 +119,7 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
 
       return { name, command: "mastracode", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }
 
 function stripAnsi(str: string): string {

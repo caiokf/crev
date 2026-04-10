@@ -1,13 +1,24 @@
 import { execAbortable } from "./exec.js"
+import { withDefaults } from "./adapter-base.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createCodeRabbitRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "coderabbit",
     models: ["default"] as const,
     defaultModel: "default",
     supportsCustomPrompt: false,
+    capabilities: {
+      command: "cr",
+      promptStrategy: "native-review",
+      requiresPty: false,
+      supportsModelSelection: false,
+      authMethods: [
+        { type: "auth-command", command: ["cr", "auth", "status"] },
+      ],
+      relevantEnvVars: [],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -86,5 +97,5 @@ export function createCodeRabbitRuntime(): RuntimeAdapter {
 
       return { name, command: "cr", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }

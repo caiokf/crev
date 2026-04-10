@@ -1,11 +1,12 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { withDefaults } from "./adapter-base.js"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createCodexRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "codex",
     models: [
@@ -19,6 +20,17 @@ export function createCodexRuntime(): RuntimeAdapter {
     ] as const,
     defaultModel: "gpt-5.3-codex",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "codex",
+      promptStrategy: "file-ref",
+      requiresPty: false,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "env", keys: ["OPENAI_API_KEY"] },
+        { type: "auth-file", path: "~/.codex/auth.json", description: "Codex CLI auth file" },
+      ],
+      relevantEnvVars: ["OPENAI_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -96,5 +108,5 @@ export function createCodexRuntime(): RuntimeAdapter {
 
       return { name, command: "codex", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }

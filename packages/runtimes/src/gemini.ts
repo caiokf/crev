@@ -1,14 +1,25 @@
 import { readFileSync } from "node:fs"
+import { withDefaults } from "./adapter-base.js"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createGeminiRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "gemini",
     models: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-3-pro-preview", "gemini-3-flash-preview"] as const,
     defaultModel: "gemini-2.5-pro",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "gemini",
+      promptStrategy: "stdin",
+      requiresPty: false,
+      supportsModelSelection: true,
+      authMethods: [
+        { type: "env", keys: ["GEMINI_API_KEY", "GOOGLE_API_KEY"] },
+      ],
+      relevantEnvVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -66,5 +77,5 @@ export function createGeminiRuntime(): RuntimeAdapter {
 
       return { name, command: "gemini", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }

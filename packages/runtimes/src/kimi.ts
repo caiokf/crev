@@ -1,16 +1,28 @@
 import fs, { readFileSync } from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { withDefaults } from "./adapter-base.js"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
 export function createKimiRuntime(): RuntimeAdapter {
-  return {
+  return withDefaults({
     type: "cli",
     name: "kimi",
     models: ["kimi-k2.5", "kimi-k2-0905-preview", "kimi-k2-turbo-preview"] as const,
     defaultModel: "kimi-k2.5",
     supportsCustomPrompt: true,
+    capabilities: {
+      command: "kimi",
+      promptStrategy: "stdin",
+      requiresPty: false,
+      supportsModelSelection: false,
+      authMethods: [
+        { type: "env", keys: ["MOONSHOT_API_KEY"] },
+        { type: "auth-file", path: "~/.kimi/credentials", description: "Kimi credentials directory" },
+      ],
+      relevantEnvVars: ["MOONSHOT_API_KEY"],
+    },
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
@@ -83,5 +95,5 @@ export function createKimiRuntime(): RuntimeAdapter {
 
       return { name, command: "kimi", installed: true, version, authenticated, authDetail, error: null }
     },
-  }
+  })
 }
