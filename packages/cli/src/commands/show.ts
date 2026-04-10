@@ -62,7 +62,8 @@ export function registerShowCommand(program: Command): void {
 
             console.log(`    ${colorize(`[${issue.severity}]`)} ${issue.title}${location}${triage}`)
             if (issue.description) {
-              console.log(`      ${chalk.dim(issue.description.slice(0, 120))}`)
+              const maxDescWidth = Math.max(40, (process.stdout.columns || 80) - 8)
+              console.log(`      ${chalk.dim(issue.description.slice(0, maxDescWidth))}`)
             }
           }
         }

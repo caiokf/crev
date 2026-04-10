@@ -1,4 +1,5 @@
 import type { Command } from "commander"
+import chalk from "chalk"
 import { findCrevDir, loadConfig } from "../core/config.js"
 import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
 import type { DiffSource } from "../core/types.js"
@@ -42,7 +43,7 @@ export function registerDiffCommand(program: Command): void {
       })
 
       const lines = diff.diffContent.split("\n").length
-      console.log(`Diff: ${lines} lines`)
+      console.log(chalk.bold(`Diff: ${lines} lines`))
       console.log()
       console.log(diff.diffContent)
 

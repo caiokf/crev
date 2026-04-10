@@ -160,14 +160,15 @@ export function registerDoctorCommand(program: Command): void {
 
       // Schema readiness
       if (schemas.length > 0) {
+        const schemaColWidth = Math.max(...schemaReadiness.map((s) => s.name.length)) + 2
         console.log(`\n  ${chalk.bold("Schemas")}`)
         console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
 
         for (const schema of schemaReadiness) {
           if (schema.ready) {
-            console.log(`  ${schema.name.padEnd(20)} ${chalk.green("✓ ready")}`)
+            console.log(`  ${schema.name.padEnd(schemaColWidth)} ${chalk.green("✓ ready")}`)
           } else {
-            console.log(`  ${schema.name.padEnd(20)} ${chalk.red("✗ not ready")}`)
+            console.log(`  ${schema.name.padEnd(schemaColWidth)} ${chalk.red("✗ not ready")}`)
             for (const issue of schema.issues) {
               console.log(`    ${chalk.dim(issue)}`)
             }
@@ -176,11 +177,12 @@ export function registerDoctorCommand(program: Command): void {
       }
 
       // Project setup
+      const checkColWidth = Math.max(...projectChecks.map((c) => c.name.length)) + 2
       console.log(`\n  ${chalk.bold("Project Setup")}`)
       console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
       for (const check of projectChecks) {
         const icon = check.ok ? chalk.green("✓") : chalk.red("✗")
-        console.log(`  ${check.name.padEnd(24)} ${icon} ${check.detail}`)
+        console.log(`  ${check.name.padEnd(checkColWidth)} ${icon} ${check.detail}`)
       }
 
       // Fix suggestions

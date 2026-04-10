@@ -27,8 +27,6 @@ export function registerHelpCommand(program: Command): void {
 }
 
 function printGeneralHelp(): void {
-  const COL = 46
-
   const commands: [string, string][] = [
     ["crev run --schema <name>", "Execute a review"],
     ["crev show [file.json]", "Pretty-print a review (default: latest)"],
@@ -49,8 +47,10 @@ function printGeneralHelp(): void {
     ["3. crev run --schema quick --base main", "Run your first review"],
   ]
 
-  const fmtRows = (rows: [string, string][]) =>
-    rows.map(([cmd, desc]) => `  ${cmd.padEnd(COL)}${desc}`).join("\n")
+  const fmtRows = (rows: [string, string][]) => {
+    const col = Math.max(...rows.map(([cmd]) => cmd.length)) + 4
+    return rows.map(([cmd, desc]) => `  ${cmd.padEnd(col)}${desc}`).join("\n")
+  }
 
   console.log(`
 ${chalk.bold("CREV")} — AI-powered multi-reviewer code review CLI
@@ -153,8 +153,10 @@ ${chalk.bold("EXAMPLE")}
 
 ${chalk.bold("AVAILABLE RUNTIMES")}
 `)
-  for (const [runtime, models] of Object.entries(VALID_MODELS)) {
-    console.log(`  ${runtime.padEnd(14)} Models: ${models.join(", ")}`)
+  const runtimeEntries = Object.entries(VALID_MODELS)
+  const runtimeColWidth = Math.max(...runtimeEntries.map(([name]) => name.length)) + 2
+  for (const [runtime, models] of runtimeEntries) {
+    console.log(`  ${runtime.padEnd(runtimeColWidth)} Models: ${models.join(", ")}`)
   }
   console.log()
 }

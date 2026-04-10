@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
-import chalk from "chalk"
 import type { AITool } from "./detect-tools.js"
+import { writeIfNew } from "./paths.js"
 import { claudeSkill } from "../templates/skills/claude.js"
 import { cursorSkill } from "../templates/skills/cursor.js"
 import { copilotPrompt } from "../templates/skills/copilot.js"
@@ -31,14 +31,6 @@ export function writeSkill(projectRoot: string, tool: AITool, overwrite = false)
       writeIfNew(filePath, skillContent)
     }
   }
-}
-
-function writeIfNew(filePath: string, content: string): void {
-  if (fs.existsSync(filePath) && fs.readFileSync(filePath, "utf-8").trim()) {
-    return
-  }
-  fs.writeFileSync(filePath, content, "utf-8")
-  console.log(`${chalk.green("✓")} Created ${path.relative(process.cwd(), filePath)}`)
 }
 
 function getSkillContent(toolId: string): string | null {

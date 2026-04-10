@@ -5,6 +5,7 @@ import chalk from "chalk"
 import { checkbox, confirm } from "@inquirer/prompts"
 import { detectAITools } from "../util/detect-tools.js"
 import { writeSkill } from "../util/skills.js"
+import { writeIfNew } from "../util/paths.js"
 import { configTemplate } from "../templates/config.js"
 import { quickSchema } from "../templates/schemas/quick.js"
 import { standardSchema } from "../templates/schemas/standard.js"
@@ -48,7 +49,7 @@ export function registerInitCommand(program: Command): void {
 
 async function runInteractive(projectRoot: string, crevDir: string): Promise<void> {
   console.log(BANNER)
-  console.log(chalk.dim("─".repeat(40)))
+  console.log(chalk.dim("─".repeat(Math.max(0, Math.min(60, (process.stdout.columns || 80) - 4)))))
   console.log()
 
   // Detect AI tools
@@ -220,17 +221,9 @@ async function scaffold(
   }
 
   console.log()
-  console.log(chalk.dim("─".repeat(40)))
+  console.log(chalk.dim("─".repeat(Math.max(0, Math.min(60, (process.stdout.columns || 80) - 4)))))
   console.log()
   console.log(`  Run ${chalk.cyan("crev run --schema quick")} to start your first review.`)
   console.log()
 }
 
-function writeIfNew(filePath: string, content: string): void {
-  if (fs.existsSync(filePath) && fs.readFileSync(filePath, "utf-8").trim()) {
-    return
-  }
-  fs.writeFileSync(filePath, content, "utf-8")
-  const relative = path.relative(process.cwd(), filePath)
-  console.log(`${chalk.green("✓")} Created ${relative}`)
-}

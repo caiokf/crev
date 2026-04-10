@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import chalk from "chalk"
 
 export function findProjectRoot(startDir?: string): string {
   let dir = startDir ?? process.cwd()
@@ -28,4 +29,12 @@ export function getReviewsDir(crevDir: string): string {
 
 export function getDiffsDir(crevDir: string): string {
   return path.join(crevDir, "diffs")
+}
+
+export function writeIfNew(filePath: string, content: string): void {
+  if (fs.existsSync(filePath) && fs.readFileSync(filePath, "utf-8").trim()) {
+    return
+  }
+  fs.writeFileSync(filePath, content, "utf-8")
+  console.log(`${chalk.green("✓")} Created ${path.relative(process.cwd(), filePath)}`)
 }
