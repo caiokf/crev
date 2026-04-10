@@ -1,3 +1,4 @@
+import fs from "node:fs"
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createClaudeRuntime } from "./claude.js"
 import { createCodexRuntime } from "./codex.js"
@@ -29,6 +30,19 @@ describe("healthCheck", () => {
       expect(health.name).toBe("claude")
       expect(health.installed).toBe(false)
       expect(health.authenticated).toBe("unknown")
+    })
+
+    it("returns authenticated when auth status returns JSON with loggedIn", async () => {
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/claude", stderr: "" }) // which
+        .mockResolvedValueOnce({ stdout: "1.0.93", stderr: "" }) // --version
+        .mockResolvedValueOnce({ stdout: '{"loggedIn": true, "email": "user@test.com"}', stderr: "" }) // auth status
+
+      const runtime = createClaudeRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(true)
+      expect(health.authenticated).toBe("yes")
     })
 
     it("returns installed and authenticated via auth status", async () => {
@@ -109,7 +123,7 @@ describe("healthCheck", () => {
       process.env.OPENAI_API_KEY = origKey
     })
 
-    it("returns not authenticated when OPENAI_API_KEY is missing", async () => {
+    it("returns not authenticated when OPENAI_API_KEY is missing and no auth file", async () => {
       const origKey = process.env.OPENAI_API_KEY
       delete process.env.OPENAI_API_KEY
 
@@ -117,11 +131,34 @@ describe("healthCheck", () => {
         .mockResolvedValueOnce({ stdout: "/usr/local/bin/codex", stderr: "" })
         .mockResolvedValueOnce({ stdout: "0.1.2", stderr: "" })
 
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(false)
+
       const runtime = createCodexRuntime()
       const health = await runtime.healthCheck()
 
       expect(health.authenticated).toBe("no")
 
+      existsSpy.mockRestore()
+      process.env.OPENAI_API_KEY = origKey
+    })
+
+    it("returns authenticated via ~/.codex/auth.json when no env var", async () => {
+      const origKey = process.env.OPENAI_API_KEY
+      delete process.env.OPENAI_API_KEY
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/codex", stderr: "" })
+        .mockResolvedValueOnce({ stdout: "0.1.2", stderr: "" })
+
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(true)
+
+      const runtime = createCodexRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("~/.codex/auth.json")
+
+      existsSpy.mockRestore()
       process.env.OPENAI_API_KEY = origKey
     })
   })

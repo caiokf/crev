@@ -56,7 +56,7 @@ export function createClaudeRuntime(): RuntimeAdapter {
       try {
         const authResult = await execAbortable("claude", ["auth", "status"], { timeout: 5000 })
         const output = authResult.stdout + authResult.stderr
-        if (/logged in|authenticated|active/i.test(output)) {
+        if (/logged.?in|loggedIn|authenticated|active|"loggedIn":\s*true/i.test(output)) {
           authenticated = "yes"
           authDetail = "claude auth status: authenticated"
         } else {

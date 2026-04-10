@@ -6,11 +6,13 @@
     "build": "pnpm -r build",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:coverage": "vitest run --coverage"
+    "test:coverage": "vitest run --coverage",
+    "crev": "tsx packages/cli/src/bin.ts"
   },
   "devDependencies": {
     "@types/node": "25.5.2",
     "tsup": "^8.4.0",
+    "tsx": "4.21.0",
     "typescript": "^5.8.3",
     "vitest": "^3.1.1"
   },

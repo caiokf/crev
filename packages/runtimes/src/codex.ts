@@ -1,3 +1,6 @@
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
 import { execAbortable } from "./exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "./types.js"
 
@@ -63,8 +66,25 @@ export function createCodexRuntime(): RuntimeAdapter {
         version = result.stdout.trim()
       } catch {}
 
-      const authenticated: "yes" | "no" | "unknown" = process.env.OPENAI_API_KEY ? "yes" : "no"
-      const authDetail = process.env.OPENAI_API_KEY ? "env: OPENAI_API_KEY" : "env: OPENAI_API_KEY missing"
+      let authenticated: "yes" | "no" | "unknown" = "no"
+      let authDetail = ""
+
+      if (process.env.OPENAI_API_KEY) {
+        authenticated = "yes"
+        authDetail = "env: OPENAI_API_KEY"
+      } else {
+        const authFile = path.join(os.homedir(), ".codex", "auth.json")
+        try {
+          if (fs.existsSync(authFile)) {
+            authenticated = "yes"
+            authDetail = "~/.codex/auth.json"
+          }
+        } catch {}
+      }
+
+      if (authenticated === "no") {
+        authDetail = "no OPENAI_API_KEY and no ~/.codex/auth.json"
+      }
 
       return { name, installed: true, version, authenticated, authDetail, error: null }
     },
