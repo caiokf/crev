@@ -31,26 +31,40 @@ export function registerHelpCommand(program: Command): void {
 }
 
 function printGeneralHelp(): void {
+  const COL = 46
+
+  const commands: [string, string][] = [
+    ["crev run --schema <name>", "Execute a review"],
+    ["crev validate [file|--all]", "Validate schemas + agent refs"],
+    ["crev list [--schemas|--runtimes|--agents]", "Discover what's available"],
+    ["crev show <schema>", "Detail a schema's reviewers"],
+    ["crev review <file.json>", "Pretty-print a review artifact"],
+    ["crev diff [flags]", "Preview what diff would be reviewed"],
+    ["crev doctor [--all] [--json]", "Health check"],
+    ["crev schema init <name>", "Scaffold empty schema"],
+    ["crev agent init <name>", "Scaffold empty agent persona"],
+    ["crev init [path]", "Interactive setup"],
+    ["crev update [path]", "Regenerate AI tool skills"],
+    ["crev help [run|schema|agents]", "Detailed help"],
+  ]
+
+  const quickstart: [string, string][] = [
+    ["1. crev init", "Set up .crev/ directory"],
+    ["2. crev doctor", "Check runtime health"],
+    ["3. crev run --schema quick --base main", "Run your first review"],
+  ]
+
+  const fmtRows = (rows: [string, string][]) =>
+    rows.map(([cmd, desc]) => `  ${cmd.padEnd(COL)}${desc}`).join("\n")
+
   console.log(`
 ${chalk.bold("CREV")} — AI-powered multi-reviewer code review CLI
 
 ${chalk.bold("COMMANDS")}
-  crev run --schema <name>              Execute a review
-  crev validate [file|--all]            Validate schemas + agent refs
-  crev list [--schemas|--runtimes|--agents]  Discover what's available
-  crev show <schema>                    Detail a schema's reviewers
-  crev review <file.json>               Pretty-print a review artifact
-  crev diff [flags]                     Preview what diff would be reviewed
-  crev doctor [--all] [--json]          Health check
-  crev schema init <name>               Scaffold empty schema
-  crev agent init <name>                Scaffold empty agent persona
-  crev init [path]                      Interactive setup
-  crev help [run|schema|agents]         Detailed help
+${fmtRows(commands)}
 
 ${chalk.bold("QUICK START")}
-  1. crev init                          Set up .crev/ directory
-  2. crev doctor                        Check runtime health
-  3. crev run --schema quick --base main  Run your first review
+${fmtRows(quickstart)}
 `)
 }
 
