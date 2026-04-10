@@ -2,59 +2,16 @@ import fs from "node:fs"
 import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
+import { getAllRuntimes, getRuntimeNames } from "@crev/runtimes"
 
-export const VALID_MODELS: Record<string, readonly string[]> = {
-  claude: ["opus", "sonnet", "haiku"],
-  codex: ["gpt-5.4", "gpt-5.4-mini", "gpt-5.3-codex", "gpt-5.2-codex", "gpt-5.2", "gpt-5.1-codex-max", "gpt-5.1-codex-mini"],
-  gemini: ["gemini-2.5-pro", "gemini-2.5-flash", "gemini-3-pro-preview", "gemini-3-flash-preview"],
-  kimi: ["kimi-k2.5", "kimi-k2-0905-preview", "kimi-k2-turbo-preview"],
-  coderabbit: ["default"],
-  opencode: [
-    "zai-coding-plan/glm-5",
-    "zai-coding-plan/glm-4.7",
-    "zai-coding-plan/glm-4.7-flash",
-    "zai/glm-5",
-    "zai/glm-4.7",
-    "zai/glm-4.7-flash",
-    "openrouter/minimax/minimax-m2.7",
-    "openrouter/minimax/minimax-m2.5",
-    "openrouter/minimax/minimax-m2.1",
-    "minimax-coding-plan/MiniMax-M2.7",
-  ],
-  pi: [
-    "anthropic/claude-sonnet-4-6",
-    "anthropic/claude-opus-4-6",
-    "anthropic/claude-haiku-4-5-20251001",
-    "google/gemini-2.5-pro",
-    "google/gemini-2.5-flash",
-    "openai/gpt-5",
-    "openai/gpt-5-mini",
-  ],
-  droid: [
-    "claude-opus-4-6",
-    "claude-sonnet-4-6",
-    "gpt-5",
-    "gpt-5-mini",
-    "gemini-2.5-pro",
-  ],
-  mastracode: [
-    "anthropic/claude-opus-4-6",
-    "anthropic/claude-sonnet-4-6",
-    "anthropic/claude-haiku-4-5-20251001",
-    "openai/gpt-5",
-    "openai/gpt-5-mini",
-    "google/gemini-2.5-pro",
-  ],
-  copilot: [
-    "gpt-5.2",
-    "gpt-5.1",
-    "claude-sonnet-4-6",
-    "o4-mini",
-    "gemini-2.5-pro",
-  ],
-}
+// Single source of truth: derived from runtime adapters
+export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(
+  getAllRuntimes().map((r) => [r.name, r.models]),
+)
 
-export const RuntimeName = z.enum(["claude", "codex", "gemini", "kimi", "coderabbit", "opencode", "pi", "droid", "mastracode", "copilot"])
+// Derived from runtime registry — adding a runtime auto-registers it here
+const runtimeNames = getRuntimeNames() as [string, ...string[]]
+export const RuntimeName = z.enum(runtimeNames)
 
 export const ReviewerSchema = z
   .object({
