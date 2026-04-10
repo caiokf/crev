@@ -55,9 +55,10 @@ describe("RawRunFlags validation", () => {
 
   // ── Mutually exclusive output modes ──
 
-  it("rejects --plain with --json", () => {
-    const result = RawRunFlags.safeParse({ ...valid, plain: true, json: true })
-    expect(result.success).toBe(false)
+  it("allows --plain with --json (CI mode)", () => {
+    const result = RawRunFlags.parse({ ...valid, plain: true, json: true })
+    expect(result.output).toEqual({ kind: "json" })
+    expect(result.plain).toBe(true)
   })
 
   it("rejects --plain with --prompt-only", () => {

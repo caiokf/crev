@@ -76,7 +76,7 @@ export function registerRunCommand(program: Command): void {
         crevDir,
         description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
         reviewerFilter: cmd.reviewers,
-        plain: cmd.output.kind === "plain",
+        plain: cmd.plain || cmd.output.kind === "plain",
         promptOnly: cmd.output.kind === "prompt-only",
         reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
       })

@@ -32,6 +32,7 @@ export interface RunCommand {
   output: OutputMode
   target: ReviewTarget
   reviewers?: string[]
+  plain: boolean
 }
 
 // ── Zod validation: flat flags → discriminated unions ──
@@ -63,8 +64,8 @@ export const RawRunFlags = z
   .refine((f) => !(f.promptOnly && f.reviewFile), {
     message: "--prompt-only and --review-file are incompatible",
   })
-  .refine((f) => [f.plain, f.json, f.promptOnly].filter(Boolean).length <= 1, {
-    message: "--plain, --json, and --prompt-only are mutually exclusive",
+  .refine((f) => !(f.promptOnly && (f.plain || f.json)), {
+    message: "--prompt-only cannot be combined with --plain or --json",
   })
   .refine((f) => !(f.reviewFile && f.slug), {
     message: "--slug is incompatible with --review-file (slug comes from existing file)",
@@ -79,6 +80,7 @@ export const RawRunFlags = z
           : f.base
             ? { kind: "branch", base: f.base, type: f.type }
             : { kind: "local", type: f.type },
+      plain: f.plain ?? false,
       output: f.promptOnly
         ? { kind: "prompt-only", format: "json" }
         : f.json

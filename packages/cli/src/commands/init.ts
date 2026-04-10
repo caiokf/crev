@@ -54,7 +54,6 @@ async function runInteractive(projectRoot: string, crevDir: string): Promise<voi
 
   // Detect AI tools
   const tools = detectAITools(projectRoot)
-  const detectedTools = tools.filter((t) => t.detected)
 
   let selectedTools: AITool[] = []
   if (tools.length > 0) {

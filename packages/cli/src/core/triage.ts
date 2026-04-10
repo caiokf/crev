@@ -1,13 +1,10 @@
-import { execFile } from "node:child_process"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { promisify } from "node:util"
-import { getRuntime } from "@crev/runtimes"
+import { getRuntime, execAbortable } from "@crev/runtimes"
 import type { Config } from "./config.js"
-import type { ReviewIssue, TriageVerdict } from "./types.js"
-
-const execFileAsync = promisify(execFile)
+import { extractJsonObject } from "./json-extract.js"
+import type { ReviewIssue } from "./types.js"
 
 type TriageInput = {
   issues: ReviewIssue[]
@@ -164,9 +161,10 @@ async function callTriageAgent(prompt: string, config: Config, crevDir: string):
               ? "claude-haiku-4-5-20251001"
               : model
 
-      const { stdout } = await execFileAsync("claude", ["--print", "--model", modelId, "-p", prompt], {
+      const { stdout } = await execAbortable("claude", ["--print", "--model", modelId], {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 5 * 60 * 1000,
+        stdin: prompt,
       })
 
       return parseTriageResponse(stdout)
@@ -183,7 +181,8 @@ async function callTriageAgent(prompt: string, config: Config, crevDir: string):
     })
 
     return parseTriageResponse(result.raw)
-  } catch {
+  } catch (err) {
+    console.error(`Warning: Triage failed (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
     return []
   } finally {
     try {
@@ -195,11 +194,11 @@ async function callTriageAgent(prompt: string, config: Config, crevDir: string):
 }
 
 export function parseTriageResponse(raw: string): RawTriageVerdict[] {
-  const jsonMatch = raw.match(/\{[\s\S]*"triage"[\s\S]*\}/)
-  if (!jsonMatch) return []
+  const jsonStr = extractJsonObject(raw, "triage")
+  if (!jsonStr) return []
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]) as { triage?: unknown[] }
+    const parsed = JSON.parse(jsonStr) as { triage?: unknown[] }
     if (!Array.isArray(parsed.triage)) return []
 
     const validVerdicts = new Set(["actionable", "deferred", "dismissed"])

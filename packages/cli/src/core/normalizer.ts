@@ -1,5 +1,6 @@
 import { execAbortable } from "@crev/runtimes"
 import type { Config } from "./config.js"
+import { extractJsonObject } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 
 export async function normalizeOutput(
@@ -36,11 +37,11 @@ export async function normalizeOutput(
 export type ParseResult = { parsed: true; issues: ReviewIssue[] } | { parsed: false }
 
 export function tryParseIssues(raw: string, reviewer: string, runtime: string, model: string): ParseResult {
-  const jsonMatch = raw.match(/\{[\s\S]*"issues"[\s\S]*\}/)
-  if (!jsonMatch) return { parsed: false }
+  const jsonStr = extractJsonObject(raw, "issues")
+  if (!jsonStr) return { parsed: false }
 
   try {
-    const parsed = JSON.parse(jsonMatch[0]) as { issues?: unknown[] }
+    const parsed = JSON.parse(jsonStr) as { issues?: unknown[] }
     if (!Array.isArray(parsed.issues)) return { parsed: false }
 
     const issues = parsed.issues.map((issue, i) => {
@@ -137,7 +138,8 @@ ${raw.slice(0, 100_000)}`
     }
 
     return []
-  } catch {
+  } catch (err) {
+    console.error(`Warning: Normalizer failed for "${reviewer}" (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
     return []
   }
 }
