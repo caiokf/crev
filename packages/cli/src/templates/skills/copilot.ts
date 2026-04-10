@@ -10,7 +10,7 @@ Multi-AI code review CLI. Runs reviewers in parallel, normalizes findings, optio
 - \`crev run --schema <name> --type current-state\` — Review entire codebase
 - \`crev run --schema <name> --plain --json\` — CI mode
 - \`crev list --schemas\` — List available schemas
-- \`crev validate --all\` — Validate all schemas
+- \`crev schema validate --all\` — Validate all schemas
 - \`crev doctor\` — Health check
 - \`crev init\` — Setup .crev/
 - \`crev help schema\` — Schema format reference

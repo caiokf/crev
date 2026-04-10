@@ -20,15 +20,14 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Preview prompts only        | \`crev run --schema <name> --prompt-only\`                 |
 | Merge into existing review  | \`crev run --schema <name> --review-file <path>\`          |
 | List schemas/runtimes       | \`crev list --schemas\` / \`crev list --runtimes\`           |
-| Validate all schemas        | \`crev validate --all\`                                    |
-| Show schema details         | \`crev show <name>\`                                       |
+| Validate all schemas        | \`crev schema validate --all\`                             |
+| Show schema details         | \`crev schema show <name>\`                                |
 | Preview diff                | \`crev diff --base main\`                                  |
 | Health check                | \`crev doctor\`                                            |
 | Scaffold new schema         | \`crev schema init <name>\`                                |
-| Scaffold new agent          | \`crev agent init <name>\`                                 |
 | Full setup                  | \`crev init\`                                              |
 | Regenerate AI tool skills   | \`crev update\`                                            |
-| Detailed help               | \`crev help run\` / \`crev help schema\` / \`crev help agents\`|
+| Detailed help               | \`crev help run\` / \`crev help schema\`                     |
 
 ## Workflow
 

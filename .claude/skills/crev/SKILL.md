@@ -14,20 +14,20 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Run a review                | `crev run --schema <name> --base main`                   |
 | Review a PR                 | `crev run --schema <name> --pr 42`                       |
 | Review uncommitted changes  | `crev run --schema <name> --type uncommitted`            |
+| Review entire codebase      | `crev run --schema <name> --type current-state`          |
 | CI mode (no TUI)            | `crev run --schema <name> --plain --json`                |
 | Subset of reviewers         | `crev run --schema <name> --reviewers "Security,Arch"`   |
 | Preview prompts only        | `crev run --schema <name> --prompt-only`                 |
 | Merge into existing review  | `crev run --schema <name> --review-file <path>`          |
 | List schemas/runtimes       | `crev list --schemas` / `crev list --runtimes`           |
-| Validate all schemas        | `crev validate --all`                                    |
-| Show schema details         | `crev show <name>`                                       |
+| Validate all schemas        | `crev schema validate --all`                             |
+| Show schema details         | `crev schema show <name>`                                |
 | Preview diff                | `crev diff --base main`                                  |
 | Health check                | `crev doctor`                                            |
 | Scaffold new schema         | `crev schema init <name>`                                |
-| Scaffold new agent          | `crev agent init <name>`                                 |
 | Full setup                  | `crev init`                                              |
 | Regenerate AI tool skills   | `crev update`                                            |
-| Detailed help               | `crev help run` / `crev help schema` / `crev help agents`|
+| Detailed help               | `crev help run` / `crev help schema`                     |
 
 ## Workflow
 
@@ -68,13 +68,23 @@ reviewers:
     runtime: gemini
     model: gemini-2.5-flash
     prompt: "Focus on bugs and logic errors only."  # inline prompt
+  - name: Architecture
+    runtime: claude
+    model: opus
+    scope: codebase            # review full source files, not just diff
+    context:                   # extra files/globs included as context
+      - packages/cli/src/bin.ts
+      - packages/cli/src/commands/*.ts
 triage:
   enabled: true
   runtime: claude
   model: opus
 ```
 
-Rules: `prompt` and `agent` are mutually exclusive. CodeRabbit reviewers accept neither.
+Per-reviewer fields:
+- `prompt` / `agent`: mutually exclusive. CodeRabbit accepts neither.
+- `scope`: `diff` (default) reviews the diff only. `codebase` includes full source of changed files.
+- `context`: array of file paths or globs. Contents are appended to the prompt as additional context.
 
 ### Progress Updates
 

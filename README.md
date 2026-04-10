@@ -57,7 +57,7 @@ crev run --schema quick --base main
 crev run --schema quick --pr 42
 
 # Review a specific commit
-crev run --schema quick --commit abc1234
+crev run --schema quick --base-commit abc1234
 ```
 
 ## How It Works
@@ -131,9 +131,9 @@ Run `crev doctor` to check which runtimes are available.
 | `crev run` | Execute a review |
 | `crev doctor` | Check runtime health |
 | `crev list` | List schemas and runtimes |
-| `crev show <schema>` | Display schema details |
-| `crev validate` | Validate schemas |
-| `crev review <file>` | Pretty-print a review file |
+| `crev schema show <name>` | Display schema details |
+| `crev schema validate` | Validate schemas |
+| `crev show [file]` | Pretty-print a review file (default: latest) |
 | `crev diff` | Preview diff that would be reviewed |
 | `crev update` | Regenerate AI tool skills |
 | `crev schema init <name>` | Scaffold a new schema |
