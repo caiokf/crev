@@ -19,6 +19,12 @@ export function registerDiffCommand(program: Command): void {
         process.exit(1)
       }
 
+      const validTypes = ["all", "committed", "uncommitted", "current-state"]
+      if (!validTypes.includes(opts.type)) {
+        console.error(chalk.red(`Error: Invalid --type "${opts.type}". Must be one of: ${validTypes.join(", ")}`))
+        process.exit(1)
+      }
+
       if (opts.type === "current-state" && (opts.base || opts.baseCommit || opts.pr)) {
         console.error(chalk.red("Error: --type current-state cannot be combined with --base, --base-commit, or --pr"))
         process.exit(1)

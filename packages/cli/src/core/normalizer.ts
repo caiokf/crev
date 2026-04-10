@@ -82,7 +82,7 @@ export function prefixId(id: string, reviewer: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/-+$/, "")
-  if (id.startsWith(prefix)) return id
+  if (id.startsWith(`${prefix}--`)) return id
   return `${prefix}--${id}`
 }
 

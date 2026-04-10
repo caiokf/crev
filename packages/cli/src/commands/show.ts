@@ -16,7 +16,7 @@ export function registerShowCommand(program: Command): void {
       const filePath = file ? path.resolve(file) : findLatestReview(crevDir)
 
       if (!filePath) {
-        console.error(chalk.red("No review files found.") + " Run a review first with: crev run --schema <name>")
+        console.error(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
         process.exit(1)
       }
 
@@ -63,7 +63,10 @@ export function registerShowCommand(program: Command): void {
             console.log(`    ${colorize(`[${issue.severity}]`)} ${issue.title}${location}${triage}`)
             if (issue.description) {
               const maxDescWidth = Math.max(40, (process.stdout.columns || 80) - 8)
-              console.log(`      ${chalk.dim(issue.description.slice(0, maxDescWidth))}`)
+              const desc = issue.description.length > maxDescWidth
+                ? issue.description.slice(0, maxDescWidth - 1) + "…"
+                : issue.description
+              console.log(`      ${chalk.dim(desc)}`)
             }
           }
         }

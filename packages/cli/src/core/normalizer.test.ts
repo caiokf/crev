@@ -115,4 +115,8 @@ describe("prefixId", () => {
   it("normalizes reviewer name", () => {
     expect(prefixId("1", "Security Analyst")).toBe("security-analyst--1")
   })
+
+  it("does not match partial prefix from different reviewer", () => {
+    expect(prefixId("security-analyst--1", "Security")).toBe("security--security-analyst--1")
+  })
 })

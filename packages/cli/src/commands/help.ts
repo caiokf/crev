@@ -164,7 +164,7 @@ ${chalk.bold("AVAILABLE RUNTIMES")}
 function getFullReference(): Record<string, unknown> {
   return {
     commands: [
-      { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--pr", "--type", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
+      { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--base-commit", "--pr", "--type", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
       { name: "show", description: "Pretty-print review artifact (default: latest)", flags: ["--json"] },
       { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr"] },
       { name: "doctor", description: "Health check", flags: ["--all", "--json"] },

@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { withDefaults, executeViaStdin, checkInstalled } from "../adapter-base.js"
-import type { RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
+import type { RuntimeAdapter, RuntimeHealth } from "../types.js"
 
 export function createKimiRuntime(): RuntimeAdapter {
   return withDefaults({

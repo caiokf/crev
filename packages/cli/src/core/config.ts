@@ -78,7 +78,7 @@ export function loadConfig(crevDir: string): Config {
 
   const raw = fs.readFileSync(configPath, "utf-8")
   const parsed = YAML.parse(raw)
-  return configSchema.parse(parsed)
+  return configSchema.parse(parsed ?? {})
 }
 
 export function resolveModelAlias(config: Config, model: string): string {
