@@ -24,7 +24,13 @@ export function createClaudeRuntime(): RuntimeAdapter {
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
       const cmd = request.overrides?.command ?? "claude"
-      const args = ["--print", "--model", resolveModel(request.model), ...(request.overrides?.extraArgs ?? [])]
+      const args = [
+        "--model", resolveModel(request.model),
+        "--dangerously-skip-permissions",
+        "--output-format", "text",
+        "-p", `Read and follow the instructions in this file: ${request.promptFile}`,
+        ...(request.overrides?.extraArgs ?? []),
+      ]
       const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
         ? { ...process.env, ...request.overrides.env }
         : undefined
@@ -35,7 +41,6 @@ export function createClaudeRuntime(): RuntimeAdapter {
           maxBuffer: 50 * 1024 * 1024,
           timeout: 10 * 60 * 1000,
           signal: request.signal,
-          stdin: `Read and follow the instructions in this file: ${request.promptFile}`,
         })
 
         return {

@@ -20,6 +20,8 @@ export const ReviewerSchema = z
     model: z.string().min(1, "Model is required"),
     prompt: z.string().optional(),
     agent: z.string().optional(),
+    context: z.array(z.string()).optional(),
+    scope: z.enum(["diff", "codebase"]).default("diff"),
   })
   .refine((r) => !(r.prompt && r.agent), {
     message: "Specify either prompt or agent, not both",

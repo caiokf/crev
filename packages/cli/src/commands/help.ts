@@ -107,6 +107,8 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
   Optional fields per reviewer:
     prompt: string        # Inline prompt text
     agent: string         # Path to an external agent file (any path)
+    context: string[]     # Extra files/globs to include as context
+    scope: diff|codebase  # What to review: diff (default) or full codebase
 
   Optional top-level fields:
     description: string   # What this schema reviews for
@@ -136,6 +138,13 @@ ${chalk.bold("EXAMPLE")}
       runtime: gemini
       model: gemini-2.5-pro
       agent: ../.claude/agents/dependency-audit.md
+    - name: Architecture
+      runtime: claude
+      model: opus
+      scope: codebase
+      context:
+        - packages/cli/src/bin.ts
+        - packages/cli/src/commands/*.ts
   triage:
     enabled: true
     runtime: claude
@@ -167,7 +176,7 @@ function getFullReference(): Record<string, unknown> {
     runtimes: Object.entries(VALID_MODELS).map(([name, models]) => ({ name, models })),
     schemaFormat: {
       required: ["reviewers"],
-      reviewerFields: ["name", "runtime", "model", "prompt?", "agent?"],
+      reviewerFields: ["name", "runtime", "model", "prompt?", "agent?", "context?", "scope?"],
       triageFields: ["enabled", "runtime", "model", "context?"],
     },
   }

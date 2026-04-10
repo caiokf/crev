@@ -28,6 +28,10 @@ Multi-AI code review CLI. Runs reviewers in parallel, normalizes findings, optio
 4. Fix issues or mark as \`wont-fix\` in the JSON
 5. Re-run with \`--review-file\` to merge updated statuses
 
+## Schema Fields
+
+Per-reviewer: \`name\`, \`runtime\`, \`model\` (required). Optional: \`prompt\`, \`agent\` (mutually exclusive), \`scope\` (diff|codebase, default: diff), \`context\` (file paths/globs for extra context).
+
 ## Results
 
 Each issue: \`severity\` (critical/high/medium/low), \`category\` (bug/security/performance/style/compliance/architecture), \`status\` (open/fixed/wont-fix), optional \`triage.verdict\`.

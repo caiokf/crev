@@ -49,9 +49,9 @@ describe("runtime adapters", () => {
 
     expect(execAbortableMock).toHaveBeenCalledWith(
       "claude",
-      ["--print", "--model", "claude-opus-4-6"],
+      ["--model", "claude-opus-4-6", "--dangerously-skip-permissions", "--output-format", "text", "-p", "Read and follow the instructions in this file: /tmp/prompt.txt"],
       expect.objectContaining({
-        stdin: "Read and follow the instructions in this file: /tmp/prompt.txt",
+        maxBuffer: 50 * 1024 * 1024,
       }),
     )
     expect(result.raw).toBe("ok")

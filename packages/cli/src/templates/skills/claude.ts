@@ -68,13 +68,23 @@ reviewers:
     runtime: gemini
     model: gemini-2.5-flash
     prompt: "Focus on bugs and logic errors only."  # inline prompt
+  - name: Architecture
+    runtime: claude
+    model: opus
+    scope: codebase            # review full source files, not just diff
+    context:                   # extra files/globs included as context
+      - packages/cli/src/bin.ts
+      - packages/cli/src/commands/*.ts
 triage:
   enabled: true
   runtime: claude
   model: opus
 \\\`\\\`\\\`
 
-Rules: \`prompt\` and \`agent\` are mutually exclusive. CodeRabbit reviewers accept neither.
+Per-reviewer fields:
+- \`prompt\` / \`agent\`: mutually exclusive. CodeRabbit accepts neither.
+- \`scope\`: \`diff\` (default) reviews the diff only. \`codebase\` includes full source of changed files.
+- \`context\`: array of file paths or globs. Contents are appended to the prompt as additional context.
 
 ### Progress Updates
 
