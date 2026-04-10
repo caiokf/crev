@@ -58,10 +58,9 @@ export function registerShowCommand(program: Command): void {
           for (const issue of review.issues) {
             const colorize = SEVERITY_COLORS[issue.severity] ?? chalk.white
             const location = issue.file ? chalk.dim(` ${issue.file}${issue.line ? `:${issue.line}` : ""}`) : ""
-            const status = issue.status !== "open" ? chalk.dim(` [${issue.status}]`) : ""
             const triage = issue.triage ? chalk.dim(` (${issue.triage.verdict})`) : ""
 
-            console.log(`    ${colorize(`[${issue.severity}]`)} ${issue.title}${location}${status}${triage}`)
+            console.log(`    ${colorize(`[${issue.severity}]`)} ${issue.title}${location}${triage}`)
             if (issue.description) {
               console.log(`      ${chalk.dim(issue.description.slice(0, 120))}`)
             }

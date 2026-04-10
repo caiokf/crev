@@ -97,8 +97,6 @@ export type TriageVerdict = {
   reasoning: string
 }
 
-export type IssueStatus = "open" | "fixed" | "wont-fix"
-
 export type ReviewIssue = {
   id: string
   reviewer: string
@@ -111,7 +109,6 @@ export type ReviewIssue = {
   title: string
   description: string
   triage?: TriageVerdict
-  status: IssueStatus
 }
 
 export type NormalizedReview = {
@@ -138,7 +135,6 @@ export type ReviewResult = {
     totalIssues: number
     bySeverity: Record<string, number>
     byCategory: Record<string, number>
-    byStatus: Record<string, number>
     byReviewer: Record<string, number>
     triage?: {
       actionable: number

@@ -78,13 +78,7 @@ Done!`
     expect(issues[1].id).toBe("engineer--2")
   })
 
-  it("sets status to open", () => {
-    const json = JSON.stringify({
-      issues: [{ id: "1", title: "Test", severity: "low", category: "bug", description: "" }],
-    })
-    const issues = tryParseIssues(json, "Test", "claude", "sonnet")
-    expect(issues[0].status).toBe("open")
-  })
+
 })
 
 describe("prefixId", () => {

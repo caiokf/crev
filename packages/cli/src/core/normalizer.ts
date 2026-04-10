@@ -54,7 +54,6 @@ export function tryParseIssues(raw: string, reviewer: string, runtime: string, m
         category: normalizeCategory(String(item.category ?? "bug")),
         title: String(item.title ?? "Untitled issue"),
         description: String(item.description ?? ""),
-        status: "open" as const,
       }
     })
   } catch {

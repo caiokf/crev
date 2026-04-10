@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { glob } from "glob"
 import { getRuntime, type RuntimeExecutionRequest } from "@crev/runtimes"
 import chalk from "chalk"
 import type { Config } from "./config.js"
@@ -8,7 +9,7 @@ import { getOutputDir, loadAgentPrompt, resolveModelAlias, getRuntimeConfig, get
 import { cleanupDiffFile } from "./diff.js"
 import { normalizeOutput } from "./normalizer.js"
 import { runTriage } from "./triage.js"
-import type { NormalizedReview, ReviewIssue, ReviewResult } from "./types.js"
+import type { NormalizedReview, ReviewResult } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
 import { SEVERITY_ORDER, SEVERITY_COLORS } from "../ui/theme.js"
@@ -251,8 +252,20 @@ async function runSingleReviewer(
     }
   }
 
+  const scope = reviewer.scope ?? "diff"
+  const sourceSection = scope === "codebase"
+    ? buildCodebaseReference(opts.diff)
+    : buildDiffReference(opts.diff.diffFile)
+
+  const contextSection = await resolveContextFiles(reviewer.context)
+
+  const promptWithSource = prompt.includes("{{diff}}")
+    ? prompt.replaceAll("{{diff}}", sourceSection)
+    : `${prompt}\n\n${sourceSection}`
+
   const fullPrompt = [
-    prompt.replaceAll("{{diff}}", buildDiffReference(opts.diff.diffFile)),
+    promptWithSource,
+    ...(contextSection ? ["", "---", "", "Additional context files:", "", contextSection] : []),
     "",
     "Respond with valid JSON matching this schema:",
     outputFormat,
@@ -295,6 +308,63 @@ function buildDiffReference(diffFile: string): string {
   ].join("\n")
 }
 
+function buildCodebaseReference(diff: DiffInput): string {
+  const files = extractChangedFiles(diff.diffContent)
+  if (files.length === 0) {
+    return "No changed files detected in the diff."
+  }
+
+  const sections: string[] = [
+    "Review the full source of the following changed files:",
+    "",
+  ]
+
+  for (const file of files) {
+    const resolved = path.resolve(file)
+    if (fs.existsSync(resolved)) {
+      const content = fs.readFileSync(resolved, "utf-8")
+      sections.push(`--- ${file} ---`, content, "")
+    }
+  }
+
+  sections.push(
+    "The diff that triggered this review is at:",
+    diff.diffFile,
+  )
+
+  return sections.join("\n")
+}
+
+function extractChangedFiles(diffContent: string): string[] {
+  const files = new Set<string>()
+  for (const line of diffContent.split("\n")) {
+    if (line.startsWith("diff --git")) {
+      const match = line.match(/^diff --git a\/(.+?) b\//)
+      if (match) files.add(match[1])
+    }
+  }
+  return [...files]
+}
+
+async function resolveContextFiles(patterns?: string[]): Promise<string | null> {
+  if (!patterns || patterns.length === 0) return null
+
+  const sections: string[] = []
+
+  for (const pattern of patterns) {
+    const matches = await glob(pattern, { nodir: true })
+    for (const file of matches.sort()) {
+      const resolved = path.resolve(file)
+      if (fs.existsSync(resolved)) {
+        const content = fs.readFileSync(resolved, "utf-8")
+        sections.push(`--- ${file} ---`, content, "")
+      }
+    }
+  }
+
+  return sections.length > 0 ? sections.join("\n") : null
+}
+
 function buildResult(
   reviews: NormalizedReview[],
   opts: OrchestrateOptions,
@@ -305,13 +375,11 @@ function buildResult(
 
   const bySeverity: Record<string, number> = {}
   const byCategory: Record<string, number> = {}
-  const byStatus: Record<string, number> = {}
   const byReviewer: Record<string, number> = {}
 
   for (const issue of allIssues) {
     bySeverity[issue.severity] = (bySeverity[issue.severity] ?? 0) + 1
     byCategory[issue.category] = (byCategory[issue.category] ?? 0) + 1
-    byStatus[issue.status] = (byStatus[issue.status] ?? 0) + 1
     byReviewer[issue.reviewer] = (byReviewer[issue.reviewer] ?? 0) + 1
   }
 
@@ -329,7 +397,6 @@ function buildResult(
       totalIssues: allIssues.length,
       bySeverity,
       byCategory,
-      byStatus,
       byReviewer,
       triage: triageSummary,
     },
@@ -366,37 +433,12 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
 
   const existing = JSON.parse(fs.readFileSync(resolvedPath, "utf-8")) as ReviewResult
 
-  const existingIssueMap = new Map<string, ReviewIssue>()
-  for (const review of existing.reviews) {
-    for (const issue of review.issues) {
-      existingIssueMap.set(issue.id, issue)
-    }
-  }
-
-  for (const review of newResult.reviews) {
-    for (let i = 0; i < review.issues.length; i++) {
-      const newIssue = review.issues[i]
-      const existingIssue = existingIssueMap.get(newIssue.id)
-      if (existingIssue && existingIssue.status !== "open") {
-        review.issues[i] = { ...newIssue, status: existingIssue.status }
-      }
-    }
-  }
-
   const existingReviewerNames = new Set(existing.reviews.map((r) => r.reviewer))
   const mergedReviews: NormalizedReview[] = [
     ...existing.reviews.map((existingReview) => {
       const newReview = newResult.reviews.find((r) => r.reviewer === existingReview.reviewer)
       if (!newReview) return existingReview
-
-      const existingStatusMap = new Map(existingReview.issues.map((i) => [i.id, i.status]))
-      return {
-        ...newReview,
-        issues: newReview.issues.map((issue) => ({
-          ...issue,
-          status: existingStatusMap.get(issue.id) ?? issue.status,
-        })),
-      }
+      return newReview
     }),
     ...newResult.reviews.filter((r) => !existingReviewerNames.has(r.reviewer)),
   ]
@@ -421,17 +463,15 @@ function recomputeSummary(
   const allIssues = reviews.flatMap((r) => r.issues)
   const bySeverity: Record<string, number> = {}
   const byCategory: Record<string, number> = {}
-  const byStatus: Record<string, number> = {}
   const byReviewer: Record<string, number> = {}
 
   for (const issue of allIssues) {
     bySeverity[issue.severity] = (bySeverity[issue.severity] ?? 0) + 1
     byCategory[issue.category] = (byCategory[issue.category] ?? 0) + 1
-    byStatus[issue.status] = (byStatus[issue.status] ?? 0) + 1
     byReviewer[issue.reviewer] = (byReviewer[issue.reviewer] ?? 0) + 1
   }
 
-  return { totalIssues: allIssues.length, bySeverity, byCategory, byStatus, byReviewer, triage }
+  return { totalIssues: allIssues.length, bySeverity, byCategory, byReviewer, triage }
 }
 
 
