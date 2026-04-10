@@ -30,6 +30,11 @@ export function registerDiffCommand(program: Command): void {
         process.exit(1)
       }
 
+      if (opts.pr && opts.type !== "all") {
+        console.error(chalk.red("Error: --type cannot be used with --pr (PR diffs are fetched from GitHub)"))
+        process.exit(1)
+      }
+
       const crevDir = findCrevDir()
       const config = loadConfig(crevDir)
 

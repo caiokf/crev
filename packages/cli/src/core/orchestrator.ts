@@ -276,7 +276,7 @@ async function runSingleReviewer(
   const contextSection = await resolveContextFiles(reviewer.context)
 
   const promptWithSource = prompt.includes("{{diff}}")
-    ? prompt.replaceAll("{{diff}}", sourceSection)
+    ? prompt.replaceAll("{{diff}}", () => sourceSection)
     : `${prompt}\n\n${sourceSection}`
 
   const fullPrompt = [
