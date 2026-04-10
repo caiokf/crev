@@ -1,3 +1,4 @@
+# yaml-language-server: $schema=../packages/cli/schemas/crev-config.json
 defaults:
   schema: quick
   type: all
@@ -5,22 +6,7 @@ defaults:
 
 runtimes:
   claude:
-    # command: cc          # use a custom binary name / alias
-    env: {}
-    args: []
-  codex:
-    env: {}
-    args: []
-  gemini:
-    env: {}
-    args: []
-  # kimi:
-  #   env: {}
-  #   args: []
-  # opencode:
-  #   command: opencode
-  #   env: {}
-  #   args: []
+    command: cc
 
 aliases:
   opus: claude-opus-4-6
