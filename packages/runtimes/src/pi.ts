@@ -66,7 +66,7 @@ export function createPiRuntime(): RuntimeAdapter {
       let version: string | null = null
       try {
         const result = await execAbortable("pi", ["--version"], { timeout: 5000 })
-        version = result.stdout.trim()
+        version = (result.stdout || result.stderr).trim() || null
       } catch {}
 
       let authenticated: "yes" | "no" | "unknown" = "no"

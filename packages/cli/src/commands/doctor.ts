@@ -7,6 +7,11 @@ import { findCrevDir } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
 
+const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+const HIDE_CURSOR = "\x1B[?25l"
+const SHOW_CURSOR = "\x1B[?25h"
+const ERASE_LINE = "\x1B[2K"
+
 export function registerDoctorCommand(program: Command): void {
   program
     .command("doctor")
@@ -37,9 +42,26 @@ export function registerDoctorCommand(program: Command): void {
         } catch {}
       }
 
-      // Always check all runtimes, filter display later
+      // Always check all runtimes with spinner, filter display later
+      const allRuntimes = getAllRuntimes()
       const allHealthResults: RuntimeHealth[] = []
-      for (const runtime of getAllRuntimes()) {
+      const isTTY = process.stdout.isTTY
+
+      // Spinner state
+      let frameIndex = 0
+      let spinnerInterval: ReturnType<typeof setInterval> | null = null
+      let checkedCount = 0
+      const totalCount = allRuntimes.length
+
+      if (isTTY && !jsonOutput) {
+        process.stdout.write(HIDE_CURSOR)
+        spinnerInterval = setInterval(() => {
+          const spinner = chalk.cyan(BRAILLE_FRAMES[frameIndex++ % BRAILLE_FRAMES.length])
+          process.stdout.write(`${ERASE_LINE}\r  ${spinner} ${chalk.dim(`Checking runtimes… ${checkedCount}/${totalCount}`)}`)
+        }, 80)
+      }
+
+      for (const runtime of allRuntimes) {
         try {
           allHealthResults.push(await runtime.healthCheck())
         } catch (e) {
@@ -53,6 +75,13 @@ export function registerDoctorCommand(program: Command): void {
             error: String(e),
           })
         }
+        checkedCount++
+      }
+
+      if (spinnerInterval) {
+        clearInterval(spinnerInterval)
+        process.stdout.write(`${ERASE_LINE}\r`)
+        process.stdout.write(SHOW_CURSOR)
       }
 
       // By default show installed runtimes, --all shows everything
