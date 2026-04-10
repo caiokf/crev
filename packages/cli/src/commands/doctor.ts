@@ -37,21 +37,15 @@ export function registerDoctorCommand(program: Command): void {
         } catch {}
       }
 
-      // Determine which runtimes to check
-      const runtimeNames = opts.all
-        ? getAllRuntimes().map((r) => r.name)
-        : [...runtimeUsage.keys()]
-
-      // Run health checks
-      const healthResults: RuntimeHealth[] = []
-      for (const name of runtimeNames) {
+      // Always check all runtimes, filter display later
+      const allHealthResults: RuntimeHealth[] = []
+      for (const runtime of getAllRuntimes()) {
         try {
-          const runtime = getRuntime(name)
-          healthResults.push(await runtime.healthCheck())
+          allHealthResults.push(await runtime.healthCheck())
         } catch (e) {
-          healthResults.push({
-            name,
-            command: name,
+          allHealthResults.push({
+            name: runtime.name,
+            command: runtime.name,
             installed: false,
             version: null,
             authenticated: "unknown",
@@ -60,6 +54,11 @@ export function registerDoctorCommand(program: Command): void {
           })
         }
       }
+
+      // By default show installed runtimes, --all shows everything
+      const healthResults = opts.all
+        ? allHealthResults
+        : allHealthResults.filter((h) => h.installed)
 
       // Check project setup
       const projectChecks = checkProjectSetup(crevDir, schemasDir)
@@ -70,7 +69,7 @@ export function registerDoctorCommand(program: Command): void {
           const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
           const issues: string[] = []
           for (const reviewer of schema.reviewers) {
-            const health = healthResults.find((h) => h.name === reviewer.runtime)
+            const health = allHealthResults.find((h) => h.name === reviewer.runtime)
             if (!health || !health.installed) {
               issues.push(`${reviewer.runtime}: not installed — reviewer "${reviewer.name}" will fail`)
             } else if (health.authenticated === "no") {
@@ -98,13 +97,11 @@ export function registerDoctorCommand(program: Command): void {
       }
 
       // Pretty print
-      const title = opts.all ? "All Runtimes" : "Runtimes (referenced in your schemas)"
-      console.log(`\n  ${chalk.bold(title)}`)
+      console.log(`\n  ${chalk.bold("Runtimes")}`)
       console.log(`  ${"─".repeat(60)}`)
 
       for (const health of healthResults) {
         const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
-        const version = health.version ? chalk.white(health.version) : chalk.dim("—")
         const command = health.command ? chalk.dim(`(${health.command})`) : ""
         const auth =
           health.authenticated === "yes"
@@ -113,8 +110,9 @@ export function registerDoctorCommand(program: Command): void {
               ? chalk.red("✗ no auth")
               : chalk.yellow("? unknown")
         const detail = health.authDetail ? chalk.dim(health.authDetail) : ""
-        const usage = opts.all
-          ? chalk.dim(`(${runtimeUsage.get(health.name)?.length ? `used in: ${runtimeUsage.get(health.name)!.join(", ")}` : "not used"})`)
+        const schemaList = runtimeUsage.get(health.name)
+        const usage = schemaList?.length
+          ? chalk.dim(`[${[...new Set(schemaList)].join(", ")}]`)
           : ""
 
         console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(20)} ${auth} ${detail} ${usage}`)
