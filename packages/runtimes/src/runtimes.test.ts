@@ -2,9 +2,13 @@ import { beforeEach, describe, expect, it, vi } from "vitest"
 import { createClaudeRuntime } from "./claude.js"
 import { createCodeRabbitRuntime } from "./coderabbit.js"
 import { createCodexRuntime } from "./codex.js"
+import { createCopilotRuntime } from "./copilot.js"
+import { createDroidRuntime } from "./droid.js"
 import { createGeminiRuntime } from "./gemini.js"
 import { createKimiRuntime } from "./kimi.js"
+import { createMastraCodeRuntime } from "./mastracode.js"
 import { createOpenCodeRuntime } from "./opencode.js"
+import { createPiRuntime } from "./pi.js"
 import type { RuntimeExecutionRequest } from "./types.js"
 
 const { execAbortableMock, readFileSyncMock } = vi.hoisted(() => ({
@@ -179,5 +183,112 @@ describe("runtime adapters", () => {
 
     expect(result.raw).toBe("partial output")
     expect(result.exitCode).toBe(9)
+  })
+
+  it("passes prompt via stdin to pi with model flag", async () => {
+    readFileSyncMock.mockReturnValue("full prompt")
+    execAbortableMock.mockResolvedValue({ stdout: "pi-output", stderr: "" })
+
+    const runtime = createPiRuntime()
+    const result = await runtime.execute(buildRequest({ model: "anthropic/claude-sonnet-4-6" }))
+
+    expect(readFileSyncMock).toHaveBeenCalledWith("/tmp/prompt.txt", "utf-8")
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "pi",
+      ["-p", "--model", "anthropic/claude-sonnet-4-6"],
+      expect.objectContaining({ stdin: "full prompt" }),
+    )
+    expect(result.raw).toBe("pi-output")
+  })
+
+  it("builds expect script for droid with model", async () => {
+    execAbortableMock.mockResolvedValue({ stdout: "droid-output", stderr: "" })
+
+    const runtime = createDroidRuntime()
+    const result = await runtime.execute(buildRequest({ model: "claude-sonnet-4-6" }))
+
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "expect",
+      [
+        "-c",
+        'set f [open "/tmp/prompt.txt" r]; set prompt [read $f]; close $f; spawn droid -p --model claude-sonnet-4-6 $prompt; set timeout 600; expect eof',
+      ],
+      expect.any(Object),
+    )
+    expect(result.raw).toBe("droid-output")
+  })
+
+  it("builds expect script for mastracode with model", async () => {
+    execAbortableMock.mockResolvedValue({ stdout: "mastra-output", stderr: "" })
+
+    const runtime = createMastraCodeRuntime()
+    const result = await runtime.execute(buildRequest({ model: "anthropic/claude-sonnet-4-6" }))
+
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "expect",
+      [
+        "-c",
+        'set f [open "/tmp/prompt.txt" r]; set prompt [read $f]; close $f; spawn mastracode --model anthropic/claude-sonnet-4-6 -p $prompt; set timeout 600; expect eof',
+      ],
+      expect.any(Object),
+    )
+    expect(result.raw).toBe("mastra-output")
+  })
+
+  it("passes prompt to copilot via gh wrapper with safety flags", async () => {
+    readFileSyncMock.mockReturnValue("review this code")
+    execAbortableMock.mockResolvedValue({ stdout: "copilot-output", stderr: "" })
+
+    const runtime = createCopilotRuntime()
+    const result = await runtime.execute(buildRequest({ model: "gpt-5.2" }))
+
+    expect(readFileSyncMock).toHaveBeenCalledWith("/tmp/prompt.txt", "utf-8")
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "gh",
+      ["copilot", "--", "-p", "review this code", "--model", "gpt-5.2", "-s", "--allow-all-tools", "--deny-tool", "shell"],
+      expect.any(Object),
+    )
+    expect(result.raw).toBe("copilot-output")
+  })
+
+  it("copilot skips gh wrapper when command is overridden", async () => {
+    readFileSyncMock.mockReturnValue("review this code")
+    execAbortableMock.mockResolvedValue({ stdout: "copilot-output", stderr: "" })
+
+    const runtime = createCopilotRuntime()
+    await runtime.execute(buildRequest({ model: "gpt-5.2", overrides: { command: "copilot" } }))
+
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "copilot",
+      ["-p", "review this code", "--model", "gpt-5.2", "-s", "--allow-all-tools", "--deny-tool", "shell"],
+      expect.any(Object),
+    )
+  })
+
+  it("respects command overrides for all adapter types", async () => {
+    execAbortableMock.mockResolvedValue({ stdout: "ok", stderr: "" })
+
+    const runtime = createClaudeRuntime()
+    await runtime.execute(buildRequest({ model: "sonnet", overrides: { command: "cc" } }))
+
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "cc",
+      expect.any(Array),
+      expect.any(Object),
+    )
+  })
+
+  it("passes extra args through for stdin-based runtimes", async () => {
+    readFileSyncMock.mockReturnValue("prompt")
+    execAbortableMock.mockResolvedValue({ stdout: "ok", stderr: "" })
+
+    const runtime = createPiRuntime()
+    await runtime.execute(buildRequest({ model: "anthropic/claude-sonnet-4-6", overrides: { extraArgs: ["--verbose"] } }))
+
+    expect(execAbortableMock).toHaveBeenCalledWith(
+      "pi",
+      ["-p", "--model", "anthropic/claude-sonnet-4-6", "--verbose"],
+      expect.any(Object),
+    )
   })
 })
