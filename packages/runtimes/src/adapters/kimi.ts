@@ -1,9 +1,8 @@
-import fs, { readFileSync } from "node:fs"
+import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { withDefaults } from "../adapter-base.js"
-import { execAbortable } from "../exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
+import { withDefaults, executeViaStdin, checkInstalled } from "../adapter-base.js"
+import type { RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createKimiRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -24,54 +23,22 @@ export function createKimiRuntime(): RuntimeAdapter {
       relevantEnvVars: ["MOONSHOT_API_KEY"],
     },
 
-    async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
-      const start = performance.now()
+    async execute(request) {
       const cmd = request.overrides?.command ?? "kimi"
-      const prompt = readFileSync(request.promptFile, "utf-8")
       const args = ["--print", ...(request.overrides?.extraArgs ?? [])]
-      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
-        ? { ...process.env, ...request.overrides.env }
-        : undefined
-
-      try {
-        const { stdout } = await execAbortable(cmd, args, {
-          ...(env ? { env } : {}),
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 10 * 60 * 1000,
-          signal: request.signal,
-          stdin: prompt,
-        })
-
-        return {
-          raw: stdout,
-          exitCode: 0,
-          durationMs: performance.now() - start,
-        }
-      } catch (error) {
-        const err = error as { stdout?: string; code?: number }
-        return {
-          raw: err.stdout ?? String(error),
-          exitCode: err.code ?? 1,
-          durationMs: performance.now() - start,
-        }
-      }
+      return executeViaStdin(request, { cmd, args })
     },
 
     async healthCheck(): Promise<RuntimeHealth> {
-      const name = "kimi"
+      const check = await checkInstalled("kimi", "kimi")
+      if (!check.installed) return check.health
 
-      try {
-        await execAbortable("which", ["kimi"], { timeout: 5000 })
-      } catch {
-        return { name, command: "kimi", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
+      // Extract semver from version string
+      let version = check.version
+      if (version) {
+        const match = version.match(/(\d+\.\d+\.\d+)/)
+        version = match ? match[1] : version
       }
-
-      let version: string | null = null
-      try {
-        const result = await execAbortable("kimi", ["--version"], { timeout: 5000 })
-        const match = result.stdout.trim().match(/(\d+\.\d+\.\d+)/)
-        version = match ? match[1] : result.stdout.trim()
-      } catch {}
 
       let authenticated: "yes" | "no" | "unknown" = "no"
       let authDetail = ""
@@ -93,7 +60,7 @@ export function createKimiRuntime(): RuntimeAdapter {
         authDetail = "no MOONSHOT_API_KEY and no ~/.kimi/credentials"
       }
 
-      return { name, command: "kimi", installed: true, version, authenticated, authDetail, error: null }
+      return { name: "kimi", command: "kimi", installed: true, version, authenticated, authDetail, error: null }
     },
   })
 }

@@ -1,4 +1,4 @@
-import { withDefaults } from "../adapter-base.js"
+import { withDefaults, stripAnsi } from "../adapter-base.js"
 import { execAbortable } from "../exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
@@ -115,10 +115,6 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
       return { name, command: "mastracode", installed: true, version, authenticated, authDetail, error: null }
     },
   })
-}
-
-function stripAnsi(str: string): string {
-  return str.replace(/\x1B\[[0-9;]*[a-zA-Z]|\x1B\][^\x07]*\x07|\x1B\[[\?]?[0-9;]*[a-zA-Z]/g, "").replace(/\r/g, "")
 }
 
 export const createAdapter = createMastraCodeRuntime

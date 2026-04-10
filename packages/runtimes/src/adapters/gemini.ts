@@ -1,7 +1,5 @@
-import { readFileSync } from "node:fs"
-import { withDefaults } from "../adapter-base.js"
-import { execAbortable } from "../exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
+import { withDefaults, executeViaStdin, checkInstalled } from "../adapter-base.js"
+import type { RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createGeminiRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -21,53 +19,15 @@ export function createGeminiRuntime(): RuntimeAdapter {
       relevantEnvVars: ["GEMINI_API_KEY", "GOOGLE_API_KEY"],
     },
 
-    async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
-      const start = performance.now()
+    async execute(request) {
       const cmd = request.overrides?.command ?? "gemini"
-      const prompt = readFileSync(request.promptFile, "utf-8")
       const args = ["-m", request.model, ...(request.overrides?.extraArgs ?? [])]
-      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
-        ? { ...process.env, ...request.overrides.env }
-        : undefined
-
-      try {
-        const { stdout } = await execAbortable(cmd, args, {
-          ...(env ? { env } : {}),
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 10 * 60 * 1000,
-          signal: request.signal,
-          stdin: prompt,
-        })
-
-        return {
-          raw: stdout,
-          exitCode: 0,
-          durationMs: performance.now() - start,
-        }
-      } catch (error) {
-        const err = error as { stdout?: string; code?: number }
-        return {
-          raw: err.stdout ?? String(error),
-          exitCode: err.code ?? 1,
-          durationMs: performance.now() - start,
-        }
-      }
+      return executeViaStdin(request, { cmd, args })
     },
 
     async healthCheck(): Promise<RuntimeHealth> {
-      const name = "gemini"
-
-      try {
-        await execAbortable("which", ["gemini"], { timeout: 5000 })
-      } catch {
-        return { name, command: "gemini", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
-      }
-
-      let version: string | null = null
-      try {
-        const result = await execAbortable("gemini", ["--version"], { timeout: 5000 })
-        version = result.stdout.trim()
-      } catch {}
+      const check = await checkInstalled("gemini", "gemini")
+      if (!check.installed) return check.health
 
       const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY
       const authenticated: "yes" | "no" | "unknown" = apiKey ? "yes" : "no"
@@ -75,7 +35,7 @@ export function createGeminiRuntime(): RuntimeAdapter {
         ? `env: ${process.env.GEMINI_API_KEY ? "GEMINI_API_KEY" : "GOOGLE_API_KEY"}`
         : "env: GEMINI_API_KEY missing"
 
-      return { name, command: "gemini", installed: true, version, authenticated, authDetail, error: null }
+      return { name: "gemini", command: "gemini", installed: true, version: check.version, authenticated, authDetail, error: null }
     },
   })
 }

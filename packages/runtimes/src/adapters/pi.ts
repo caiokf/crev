@@ -1,10 +1,8 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { readFileSync } from "node:fs"
-import { withDefaults } from "../adapter-base.js"
-import { execAbortable } from "../exec.js"
-import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
+import { withDefaults, executeViaStdin, checkInstalled } from "../adapter-base.js"
+import type { RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createPiRuntime(): RuntimeAdapter {
   return withDefaults({
@@ -33,53 +31,15 @@ export function createPiRuntime(): RuntimeAdapter {
       relevantEnvVars: ["ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GOOGLE_API_KEY", "GEMINI_API_KEY"],
     },
 
-    async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
-      const start = performance.now()
+    async execute(request) {
       const cmd = request.overrides?.command ?? "pi"
-      const prompt = readFileSync(request.promptFile, "utf-8")
       const args = ["-p", "--model", request.model, ...(request.overrides?.extraArgs ?? [])]
-      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
-        ? { ...process.env, ...request.overrides.env }
-        : undefined
-
-      try {
-        const { stdout } = await execAbortable(cmd, args, {
-          ...(env ? { env } : {}),
-          maxBuffer: 50 * 1024 * 1024,
-          timeout: 10 * 60 * 1000,
-          signal: request.signal,
-          stdin: prompt,
-        })
-
-        return {
-          raw: stdout,
-          exitCode: 0,
-          durationMs: performance.now() - start,
-        }
-      } catch (error) {
-        const err = error as { stdout?: string; code?: number }
-        return {
-          raw: err.stdout ?? String(error),
-          exitCode: err.code ?? 1,
-          durationMs: performance.now() - start,
-        }
-      }
+      return executeViaStdin(request, { cmd, args })
     },
 
     async healthCheck(): Promise<RuntimeHealth> {
-      const name = "pi"
-
-      try {
-        await execAbortable("which", ["pi"], { timeout: 5000 })
-      } catch {
-        return { name, command: "pi", installed: false, version: null, authenticated: "unknown", authDetail: "not installed", error: null }
-      }
-
-      let version: string | null = null
-      try {
-        const result = await execAbortable("pi", ["--version"], { timeout: 5000 })
-        version = (result.stdout || result.stderr).trim() || null
-      } catch {}
+      const check = await checkInstalled("pi", "pi")
+      if (!check.installed) return check.health
 
       let authenticated: "yes" | "no" | "unknown" = "no"
       let authDetail = ""
@@ -101,7 +61,7 @@ export function createPiRuntime(): RuntimeAdapter {
         }
       }
 
-      return { name, command: "pi", installed: true, version, authenticated, authDetail, error: null }
+      return { name: "pi", command: "pi", installed: true, version: check.version, authenticated, authDetail, error: null }
     },
   })
 }
