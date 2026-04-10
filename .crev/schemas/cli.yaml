@@ -3,6 +3,7 @@ reviewers:
   - name: Bug Hunter
     runtime: claude
     model: opus
+    scope: codebase
     prompt: >
       You are a senior engineer specializing in finding runtime bugs and crash-prone code.
       Review the code changes focusing exclusively on:
@@ -17,6 +18,7 @@ reviewers:
   - name: CLI Conventions
     runtime: codex
     model: gpt-5.3-codex
+    scope: codebase
     prompt: >
       You are a CLI design expert who knows POSIX conventions, 12-factor CLI apps, and patterns
       from git, gh, docker, kubectl, and brew. Review the code changes focusing on:
@@ -31,6 +33,7 @@ reviewers:
   - name: TUI Quality
     runtime: claude
     model: opus
+    scope: codebase
     prompt: >
       You are a terminal UI specialist who builds polished CLI tools. Review the code changes
       focusing exclusively on:
@@ -46,6 +49,7 @@ reviewers:
   - name: Code Hygiene
     runtime: codex
     model: gpt-5.3-codex
+    scope: codebase
     prompt: >
       You are a pragmatic code reviewer focused on DRY violations and maintainability.
       Review the code changes focusing on:

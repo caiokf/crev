@@ -108,7 +108,7 @@ export function getOutputFormat(): string {
       issues: [
         {
           id: "unique-issue-id",
-          file: "path/to/file.ts",
+          file: "exact/path/from/source/headers.ts",
           line: 0,
           severity: "low | medium | high | critical",
           category: "bug | security | performance | style | compliance | architecture",
@@ -119,5 +119,5 @@ export function getOutputFormat(): string {
     },
     null,
     2,
-  )
+  ) + "\n\nIMPORTANT: For the \"file\" field, use the exact file paths as they appear in the source headers (e.g. \"--- packages/cli/src/commands/init.ts ---\"). Do NOT abbreviate or invent paths."
 }

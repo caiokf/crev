@@ -72,6 +72,100 @@ describeSmoke("smoke tests (real runtimes)", () => {
     }
   })
 
+  describe("review prompt returns parseable issues", () => {
+    const buggyCode = `--- src/auth.ts ---
+function login(user: string, pass: string): boolean {
+  const query = "SELECT * FROM users WHERE name='" + user + "' AND pass='" + pass + "'"
+  return db.exec(query).length > 0
+}
+`
+    const reviewPrompt = `You are a security reviewer. Review this code:
+
+${buggyCode}
+
+Respond with valid JSON matching this schema:
+{
+  "issues": [
+    {
+      "id": "unique-id",
+      "file": "src/auth.ts",
+      "severity": "low | medium | high | critical",
+      "category": "bug | security | performance | style",
+      "title": "Short title",
+      "description": "Description"
+    }
+  ]
+}
+
+IMPORTANT: Use exact file paths from the source headers. Do NOT abbreviate paths.`
+
+    // Only test runtimes that support custom prompts and are headless-friendly
+    const testableRuntimes = runtimes.filter(
+      (r) => r.supportsCustomPrompt && ["claude", "codex", "gemini", "kimi", "copilot"].includes(r.name),
+    )
+
+    for (const runtime of testableRuntimes) {
+      it(`${runtime.name}: finds issues in obviously buggy code`, async () => {
+        const health = await getHealth(runtime)
+
+        if (!health.installed || health.authenticated !== "yes") {
+          console.log(`  [skip] ${runtime.name}: not available`)
+          return
+        }
+
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-smoke-review-"))
+        const promptFile = path.join(tmpDir, "prompt.txt")
+        fs.writeFileSync(promptFile, reviewPrompt)
+
+        const controller = new AbortController()
+        const abortTimeout = setTimeout(() => controller.abort(), 120_000)
+
+        try {
+          const result = await runtime.execute({
+            taskName: "smoke-review",
+            model: runtime.defaultModel,
+            prompt: reviewPrompt,
+            promptFile,
+            signal: controller.signal,
+          })
+
+          if (result.exitCode !== 0) {
+            console.log(`  [skip] ${runtime.name}: non-zero exit (${result.exitCode})`)
+            return
+          }
+
+          expect(result.raw.length).toBeGreaterThan(14) // more than just {"issues": []}
+
+          // Should contain parseable JSON with at least one issue
+          const jsonMatch = result.raw.match(/\{[\s\S]*"issues"[\s\S]*\}/)
+          expect(jsonMatch).not.toBeNull()
+
+          let parsed: { issues: unknown[] }
+          try {
+            parsed = JSON.parse(jsonMatch![0]) as { issues: unknown[] }
+          } catch {
+            console.log(`  [skip] ${runtime.name}: returned non-parseable JSON`)
+            return
+          }
+
+          expect(Array.isArray(parsed.issues)).toBe(true)
+          expect(parsed.issues.length).toBeGreaterThan(0)
+
+          // The SQL injection should be found
+          const issueText = JSON.stringify(parsed.issues).toLowerCase()
+          expect(
+            issueText.includes("sql") || issueText.includes("injection") || issueText.includes("concatenat"),
+          ).toBe(true)
+
+          console.log(`  [pass] ${runtime.name}: found ${parsed.issues.length} issue(s) in ${(result.durationMs / 1000).toFixed(1)}s`)
+        } finally {
+          clearTimeout(abortTimeout)
+          fs.rmSync(tmpDir, { recursive: true, force: true })
+        }
+      }, 180_000)
+    }
+  })
+
   describe("trivial prompt execution", () => {
     for (const runtime of runtimes) {
       // Only test runtimes that are installed and authenticated

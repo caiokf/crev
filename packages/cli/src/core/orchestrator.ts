@@ -299,7 +299,7 @@ async function runSingleReviewer(
   }
 }
 
-function buildDiffReference(diffFile: string): string {
+export function buildDiffReference(diffFile: string): string {
   return [
     "Review the code changes in this diff file:",
     diffFile,
@@ -308,34 +308,34 @@ function buildDiffReference(diffFile: string): string {
   ].join("\n")
 }
 
-function buildCodebaseReference(diff: DiffInput): string {
+export function buildCodebaseReference(diff: DiffInput): string {
   const files = extractChangedFiles(diff.diffContent)
-  if (files.length === 0) {
-    return "No changed files detected in the diff."
-  }
 
   const sections: string[] = [
-    "Review the full source of the following changed files:",
+    "The diff that triggered this review is at:",
+    diff.diffFile,
+    "",
+    "Read the diff file above for the exact changes.",
     "",
   ]
 
-  for (const file of files) {
-    const resolved = path.resolve(file)
-    if (fs.existsSync(resolved)) {
-      const content = fs.readFileSync(resolved, "utf-8")
+  const sourceFiles = files.filter((f) => {
+    const resolved = path.resolve(f)
+    return fs.existsSync(resolved)
+  })
+
+  if (sourceFiles.length > 0) {
+    sections.push("Full source of the changed files:", "")
+    for (const file of sourceFiles) {
+      const content = fs.readFileSync(path.resolve(file), "utf-8")
       sections.push(`--- ${file} ---`, content, "")
     }
   }
 
-  sections.push(
-    "The diff that triggered this review is at:",
-    diff.diffFile,
-  )
-
   return sections.join("\n")
 }
 
-function extractChangedFiles(diffContent: string): string[] {
+export function extractChangedFiles(diffContent: string): string[] {
   const files = new Set<string>()
   for (const line of diffContent.split("\n")) {
     if (line.startsWith("diff --git")) {

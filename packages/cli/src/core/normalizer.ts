@@ -21,8 +21,8 @@ export async function normalizeOutput(
   }
 
   const directParse = tryParseIssues(raw, reviewerName, runtime, model)
-  if (directParse.length > 0) {
-    return { ...base, issues: directParse }
+  if (directParse.parsed) {
+    return { ...base, issues: directParse.issues }
   }
 
   if (config.normalizer.enabled) {
@@ -33,15 +33,17 @@ export async function normalizeOutput(
   return { ...base, issues: [] }
 }
 
-export function tryParseIssues(raw: string, reviewer: string, runtime: string, model: string): ReviewIssue[] {
+export type ParseResult = { parsed: true; issues: ReviewIssue[] } | { parsed: false }
+
+export function tryParseIssues(raw: string, reviewer: string, runtime: string, model: string): ParseResult {
   const jsonMatch = raw.match(/\{[\s\S]*"issues"[\s\S]*\}/)
-  if (!jsonMatch) return []
+  if (!jsonMatch) return { parsed: false }
 
   try {
     const parsed = JSON.parse(jsonMatch[0]) as { issues?: unknown[] }
-    if (!Array.isArray(parsed.issues)) return []
+    if (!Array.isArray(parsed.issues)) return { parsed: false }
 
-    return parsed.issues.map((issue, i) => {
+    const issues = parsed.issues.map((issue, i) => {
       const item = issue as Record<string, unknown>
       return {
         id: prefixId(String(item.id ?? `${i + 1}`), reviewer),
@@ -56,8 +58,9 @@ export function tryParseIssues(raw: string, reviewer: string, runtime: string, m
         description: String(item.description ?? ""),
       }
     })
+    return { parsed: true, issues }
   } catch {
-    return []
+    return { parsed: false }
   }
 }
 
@@ -129,7 +132,8 @@ ${raw.slice(0, 100_000)}`
         timeout: 2 * 60 * 1000,
         stdin: prompt,
       })
-      return tryParseIssues(stdout, reviewer, runtime, model)
+      const result = tryParseIssues(stdout, reviewer, runtime, model)
+      return result.parsed ? result.issues : []
     }
 
     return []
