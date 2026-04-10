@@ -1,5 +1,6 @@
 import fs from "node:fs"
 import path from "node:path"
+import chalk from "chalk"
 import type { AITool } from "./detect-tools.js"
 import { writeIfNew } from "./paths.js"
 import { claudeSkill } from "../templates/skills/claude.js"

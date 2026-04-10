@@ -454,7 +454,14 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
     ...existing.reviews.map((existingReview) => {
       const newReview = newResult.reviews.find((r) => r.reviewer === existingReview.reviewer)
       if (!newReview) return existingReview
-      return newReview
+      // Preserve user annotations (e.g., status: "wont-fix") from existing issues
+      const existingIssueMap = new Map(existingReview.issues.map((i) => [i.id, i]))
+      const mergedIssues = newReview.issues.map((newIssue) => {
+        const existing = existingIssueMap.get(newIssue.id)
+        if (existing?.status) return { ...newIssue, status: existing.status }
+        return newIssue
+      })
+      return { ...newReview, issues: mergedIssues }
     }),
     ...newResult.reviews.filter((r) => !existingReviewerNames.has(r.reviewer)),
   ]

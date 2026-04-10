@@ -13,6 +13,7 @@ export function extractJsonObject(raw: string, key: string): string | null {
       const candidate = raw.slice(bracePos)
       try {
         const end = findMatchingBrace(candidate)
+        if (end < 0) { bracePos = bracePos > 0 ? raw.lastIndexOf("{", bracePos - 1) : -1; continue }
         const parsed = JSON.parse(candidate.slice(0, end + 1))
         if (parsed && typeof parsed === "object" && key in parsed) {
           return JSON.stringify(parsed)
@@ -45,5 +46,5 @@ function findMatchingBrace(s: string): number {
     if (ch === "{") depth++
     if (ch === "}") { depth--; if (depth === 0) return i }
   }
-  return s.length - 1
+  return -1
 }
