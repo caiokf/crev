@@ -110,12 +110,7 @@ export function registerDoctorCommand(program: Command): void {
               ? chalk.red("✗ no auth")
               : chalk.yellow("? unknown")
         const detail = health.authDetail ? chalk.dim(health.authDetail) : ""
-        const schemaList = runtimeUsage.get(health.name)
-        const usage = schemaList?.length
-          ? chalk.dim(`[${[...new Set(schemaList)].join(", ")}]`)
-          : ""
-
-        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(20)} ${auth} ${detail} ${usage}`)
+        console.log(`  ${chalk.cyan(health.name.padEnd(14))} ${installed}  ${(health.version ?? "—").padEnd(10)} ${command.padEnd(20)} ${auth} ${detail}`)
       }
 
       if (healthResults.length === 0) {
