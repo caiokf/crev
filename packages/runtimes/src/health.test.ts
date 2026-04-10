@@ -6,6 +6,9 @@ import { createGeminiRuntime } from "./gemini.js"
 import { createKimiRuntime } from "./kimi.js"
 import { createCodeRabbitRuntime } from "./coderabbit.js"
 import { createOpenCodeRuntime } from "./opencode.js"
+import { createPiRuntime } from "./pi.js"
+import { createDroidRuntime } from "./droid.js"
+import { createMastraCodeRuntime } from "./mastracode.js"
 
 const { execAbortableMock } = vi.hoisted(() => ({
   execAbortableMock: vi.fn(),
@@ -243,6 +246,161 @@ describe("healthCheck", () => {
       const health = await runtime.healthCheck()
 
       expect(health.installed).toBe(false)
+    })
+  })
+
+  describe("pi", () => {
+    it("returns not installed when which fails", async () => {
+      execAbortableMock.mockRejectedValue(new Error("not found"))
+
+      const runtime = createPiRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(false)
+    })
+
+    it("returns authenticated via auth.json", async () => {
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/pi", stderr: "" }) // which
+        .mockResolvedValueOnce({ stdout: "0.5.0", stderr: "" }) // --version
+
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(true)
+
+      const runtime = createPiRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(true)
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("~/.pi/agent/auth.json")
+
+      existsSpy.mockRestore()
+    })
+
+    it("falls back to env var when no auth.json", async () => {
+      const origKey = process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY = "sk-test"
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/pi", stderr: "" }) // which
+        .mockResolvedValueOnce({ stdout: "0.5.0", stderr: "" }) // --version
+
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(false)
+
+      const runtime = createPiRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("env: API key detected")
+
+      existsSpy.mockRestore()
+      process.env.ANTHROPIC_API_KEY = origKey
+    })
+  })
+
+  describe("droid", () => {
+    it("returns not installed when which fails", async () => {
+      execAbortableMock.mockRejectedValue(new Error("not found"))
+
+      const runtime = createDroidRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(false)
+    })
+
+    it("returns authenticated via auth.encrypted", async () => {
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/droid", stderr: "" }) // which
+
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(true)
+
+      const runtime = createDroidRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(true)
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("~/.factory/auth.encrypted")
+
+      existsSpy.mockRestore()
+    })
+
+    it("returns no auth when auth.encrypted missing", async () => {
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/droid", stderr: "" }) // which
+
+      const existsSpy = vi.spyOn(fs, "existsSync").mockReturnValue(false)
+
+      const runtime = createDroidRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.authenticated).toBe("no")
+
+      existsSpy.mockRestore()
+    })
+  })
+
+  describe("mastracode", () => {
+    it("returns not installed when which fails", async () => {
+      execAbortableMock.mockRejectedValue(new Error("not found"))
+
+      const runtime = createMastraCodeRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(false)
+    })
+
+    it("returns authenticated via ANTHROPIC_API_KEY", async () => {
+      const origKey = process.env.ANTHROPIC_API_KEY
+      process.env.ANTHROPIC_API_KEY = "sk-test"
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/mastracode", stderr: "" }) // which
+
+      const runtime = createMastraCodeRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.installed).toBe(true)
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("env: ANTHROPIC_API_KEY")
+
+      process.env.ANTHROPIC_API_KEY = origKey
+    })
+
+    it("returns authenticated via OPENAI_API_KEY", async () => {
+      const origAnthro = process.env.ANTHROPIC_API_KEY
+      const origOpenai = process.env.OPENAI_API_KEY
+      delete process.env.ANTHROPIC_API_KEY
+      process.env.OPENAI_API_KEY = "sk-test"
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/mastracode", stderr: "" }) // which
+
+      const runtime = createMastraCodeRuntime()
+      const health = await runtime.healthCheck()
+
+      expect(health.authenticated).toBe("yes")
+      expect(health.authDetail).toBe("env: OPENAI_API_KEY")
+
+      process.env.ANTHROPIC_API_KEY = origAnthro
+      process.env.OPENAI_API_KEY = origOpenai
+    })
+
+    it("returns not yes when no env vars set", async () => {
+      const origAnthro = process.env.ANTHROPIC_API_KEY
+      const origOpenai = process.env.OPENAI_API_KEY
+      delete process.env.ANTHROPIC_API_KEY
+      delete process.env.OPENAI_API_KEY
+
+      execAbortableMock
+        .mockResolvedValueOnce({ stdout: "/usr/local/bin/mastracode", stderr: "" }) // which
+
+      const runtime = createMastraCodeRuntime()
+      const health = await runtime.healthCheck()
+
+      // Without env vars, auth is either "no" or "unknown" (if ~/.mastracode dir exists)
+      expect(health.authenticated).not.toBe("yes")
+
+      process.env.ANTHROPIC_API_KEY = origAnthro
+      process.env.OPENAI_API_KEY = origOpenai
     })
   })
 })

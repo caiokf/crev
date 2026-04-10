@@ -5,6 +5,9 @@ import { createCodexRuntime } from "./codex.js"
 import { createGeminiRuntime } from "./gemini.js"
 import { createKimiRuntime } from "./kimi.js"
 import { createOpenCodeRuntime } from "./opencode.js"
+import { createPiRuntime } from "./pi.js"
+import { createDroidRuntime } from "./droid.js"
+import { createMastraCodeRuntime } from "./mastracode.js"
 
 const runtimes = new Map<string, () => RuntimeAdapter>([
   ["claude", () => createClaudeRuntime()],
@@ -13,6 +16,9 @@ const runtimes = new Map<string, () => RuntimeAdapter>([
   ["kimi", () => createKimiRuntime()],
   ["coderabbit", () => createCodeRabbitRuntime()],
   ["opencode", () => createOpenCodeRuntime()],
+  ["pi", () => createPiRuntime()],
+  ["droid", () => createDroidRuntime()],
+  ["mastracode", () => createMastraCodeRuntime()],
 ])
 
 export function getRuntime(name: string): RuntimeAdapter {

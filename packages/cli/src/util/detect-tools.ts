@@ -63,6 +63,24 @@ const TOOL_DEFINITIONS: Array<{
     detectDir: ".gemini",
     skillDir: ".gemini/commands",
   },
+  {
+    name: "Pi",
+    id: "pi",
+    detectDir: ".pi",
+    skillDir: ".pi/skills/crev",
+  },
+  {
+    name: "Droid (Factory)",
+    id: "droid",
+    detectDir: ".factory",
+    skillDir: ".factory/skills/crev",
+  },
+  {
+    name: "Mastra Code",
+    id: "mastracode",
+    detectDir: ".mastracode",
+    skillDir: ".mastracode/skills/crev",
+  },
 ]
 
 export function detectAITools(projectRoot: string): AITool[] {

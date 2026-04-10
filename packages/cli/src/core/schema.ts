@@ -21,9 +21,33 @@ export const VALID_MODELS: Record<string, readonly string[]> = {
     "openrouter/minimax/minimax-m2.1",
     "minimax-coding-plan/MiniMax-M2.7",
   ],
+  pi: [
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-haiku-4-5-20251001",
+    "google/gemini-2.5-pro",
+    "google/gemini-2.5-flash",
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+  ],
+  droid: [
+    "claude-opus-4-6",
+    "claude-sonnet-4-6",
+    "gpt-5",
+    "gpt-5-mini",
+    "gemini-2.5-pro",
+  ],
+  mastracode: [
+    "anthropic/claude-opus-4-6",
+    "anthropic/claude-sonnet-4-6",
+    "anthropic/claude-haiku-4-5-20251001",
+    "openai/gpt-5",
+    "openai/gpt-5-mini",
+    "google/gemini-2.5-pro",
+  ],
 }
 
-export const RuntimeName = z.enum(["claude", "codex", "gemini", "kimi", "coderabbit", "opencode"])
+export const RuntimeName = z.enum(["claude", "codex", "gemini", "kimi", "coderabbit", "opencode", "pi", "droid", "mastracode"])
 
 export const ReviewerSchema = z
   .object({
