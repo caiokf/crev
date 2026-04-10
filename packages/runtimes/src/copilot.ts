@@ -24,9 +24,10 @@ export function createCopilotRuntime(): RuntimeAdapter {
       const cmd = request.overrides?.command ?? "gh"
       const prompt = readFileSync(request.promptFile, "utf-8")
 
+      const baseArgs = ["-p", prompt, "--model", request.model, "-s", "--allow-all-tools", "--deny-tool", "shell", ...(request.overrides?.extraArgs ?? [])]
       const args = cmd === "gh"
-        ? ["copilot", "--", "-p", prompt, "--model", request.model, "-s", "--allow-all-tools", ...(request.overrides?.extraArgs ?? [])]
-        : ["-p", prompt, "--model", request.model, "-s", "--allow-all-tools", ...(request.overrides?.extraArgs ?? [])]
+        ? ["copilot", "--", ...baseArgs]
+        : baseArgs
 
       const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
         ? { ...process.env, ...request.overrides.env }
