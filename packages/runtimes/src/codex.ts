@@ -22,14 +22,21 @@ export function createCodexRuntime(): RuntimeAdapter {
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
+      const cmd = request.overrides?.command ?? "codex"
       const args = ["exec", "--full-auto"]
 
       if (request.model !== "default") {
         args.push("-m", request.model)
       }
+      args.push(...(request.overrides?.extraArgs ?? []))
+
+      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
+        ? { ...process.env, ...request.overrides.env }
+        : undefined
 
       try {
-        const { stdout } = await execAbortable("codex", args, {
+        const { stdout } = await execAbortable(cmd, args, {
+          ...(env ? { env } : {}),
           maxBuffer: 50 * 1024 * 1024,
           timeout: 10 * 60 * 1000,
           signal: request.signal,

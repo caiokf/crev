@@ -3,6 +3,14 @@ import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
 
+const runtimeConfigSchema = z.object({
+  command: z.string().optional(),
+  env: z.record(z.string(), z.string()).default({}),
+  args: z.array(z.string()).default([]),
+})
+
+export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>
+
 const configSchema = z.object({
   defaults: z
     .object({
@@ -11,6 +19,7 @@ const configSchema = z.object({
       base: z.string().default("main"),
     })
     .default({}),
+  runtimes: z.record(z.string(), runtimeConfigSchema).default({}),
   aliases: z.record(z.string(), z.string()).default({}),
   diff: z
     .object({
@@ -87,6 +96,10 @@ export function loadAgentPrompt(agentName: string, crevDir: string): string | nu
   const agentPath = path.join(crevDir, "agents", agentName)
   if (!fs.existsSync(agentPath)) return null
   return fs.readFileSync(agentPath, "utf-8").trim()
+}
+
+export function getRuntimeConfig(config: Config, runtimeName: string): RuntimeConfig {
+  return config.runtimes[runtimeName] ?? { env: {}, args: [] }
 }
 
 export function getOutputFormat(): string {

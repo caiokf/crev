@@ -3,7 +3,7 @@ import path from "node:path"
 import { getRuntime, type RuntimeExecutionRequest } from "@crev/runtimes"
 import chalk from "chalk"
 import type { Config } from "./config.js"
-import { getOutputDir, loadAgentPrompt, resolveModelAlias, getOutputFormat } from "./config.js"
+import { getOutputDir, loadAgentPrompt, resolveModelAlias, getRuntimeConfig, getOutputFormat } from "./config.js"
 import { cleanupDiffFile } from "./diff.js"
 import { normalizeOutput } from "./normalizer.js"
 import { runTriage } from "./triage.js"
@@ -260,6 +260,7 @@ async function runSingleReviewer(
   const promptFile = path.join(opts.crevDir, `.prompt-${slug}.txt`)
   fs.writeFileSync(promptFile, fullPrompt, "utf-8")
 
+  const rtConfig = getRuntimeConfig(opts.config, reviewer.runtime)
   const request: RuntimeExecutionRequest = {
     taskName: reviewer.name,
     model,
@@ -268,6 +269,11 @@ async function runSingleReviewer(
     diff: opts.diff,
     outputFormat,
     signal,
+    overrides: {
+      command: rtConfig.command,
+      env: rtConfig.env,
+      extraArgs: rtConfig.args,
+    },
   }
 
   const rawResult = await runtime.execute(request)

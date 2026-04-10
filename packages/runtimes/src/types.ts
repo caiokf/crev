@@ -8,6 +8,12 @@ export type DiffInput = {
   type: "all" | "committed" | "uncommitted"
 }
 
+export type RuntimeOverrides = {
+  command?: string
+  env?: Record<string, string>
+  extraArgs?: string[]
+}
+
 export type RuntimeExecutionRequest = {
   taskName: string
   model: string
@@ -16,6 +22,7 @@ export type RuntimeExecutionRequest = {
   outputFormat?: string
   signal?: AbortSignal
   diff?: DiffInput
+  overrides?: RuntimeOverrides
 }
 
 export type RawExecutionOutput = {

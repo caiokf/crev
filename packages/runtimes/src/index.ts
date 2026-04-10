@@ -10,5 +10,6 @@ export type {
   RuntimeAdapter,
   RuntimeExecutionRequest,
   RuntimeHealth,
+  RuntimeOverrides,
   RuntimeType,
 } from "./types.js"

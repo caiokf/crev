@@ -14,11 +14,16 @@ export function createKimiRuntime(): RuntimeAdapter {
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
+      const cmd = request.overrides?.command ?? "kimi"
       const prompt = readFileSync(request.promptFile, "utf-8")
-      const args = ["--print"]
+      const args = ["--print", ...(request.overrides?.extraArgs ?? [])]
+      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
+        ? { ...process.env, ...request.overrides.env }
+        : undefined
 
       try {
-        const { stdout } = await execAbortable("kimi", args, {
+        const { stdout } = await execAbortable(cmd, args, {
+          ...(env ? { env } : {}),
           maxBuffer: 50 * 1024 * 1024,
           timeout: 10 * 60 * 1000,
           signal: request.signal,

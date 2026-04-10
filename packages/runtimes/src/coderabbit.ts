@@ -11,6 +11,7 @@ export function createCodeRabbitRuntime(): RuntimeAdapter {
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
+      const cmd = request.overrides?.command ?? "cr"
       const args = ["review", "--prompt-only"]
 
       if (request.diff?.type && request.diff.type !== "all") {
@@ -22,9 +23,15 @@ export function createCodeRabbitRuntime(): RuntimeAdapter {
       if (request.diff?.baseCommit) {
         args.push("--base-commit", request.diff.baseCommit)
       }
+      args.push(...(request.overrides?.extraArgs ?? []))
+
+      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
+        ? { ...process.env, ...request.overrides.env }
+        : undefined
 
       try {
-        const { stdout } = await execAbortable("cr", args, {
+        const { stdout } = await execAbortable(cmd, args, {
+          ...(env ? { env } : {}),
           maxBuffer: 50 * 1024 * 1024,
           timeout: 45 * 60 * 1000,
           signal: request.signal,

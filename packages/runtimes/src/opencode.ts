@@ -22,17 +22,25 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
 
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
+      const cmd = request.overrides?.command ?? "opencode"
+      const extraArgs = (request.overrides?.extraArgs ?? []).join(" ")
+      const spawnCmd = [`spawn ${cmd} run --format json -m ${request.model}`, extraArgs, "$prompt"].filter(Boolean).join(" ")
       const expectScript = [
         `set f [open "${request.promptFile}" r]`,
         `set prompt [read $f]`,
         `close $f`,
-        `spawn opencode run --format json -m ${request.model} $prompt`,
+        spawnCmd,
         `set timeout ${Math.ceil(10 * 60)}`,
         `expect eof`,
       ].join("; ")
 
+      const env = request.overrides?.env && Object.keys(request.overrides.env).length > 0
+        ? { ...process.env, ...request.overrides.env }
+        : undefined
+
       try {
         const { stdout } = await execAbortable("expect", ["-c", expectScript], {
+          ...(env ? { env } : {}),
           maxBuffer: 50 * 1024 * 1024,
           timeout: 10 * 60 * 1000,
           signal: request.signal,
