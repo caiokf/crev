@@ -91,55 +91,54 @@ jobs:
           repository: caiokf/homebrew-crev
           token: ${{ secrets.HOMEBREW_TAP_GH_TOKEN }}
       - name: Update formula
+        env:
+          TAG: ${{ github.ref_name }}
+        shell: bash
         run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          BASE_URL="https://github.com/caiokf/crev/releases/download/${GITHUB_REF_NAME}"
-
-          SHA_DARWIN_ARM64=$(curl -sSL "${BASE_URL}/crev-darwin-arm64" | sha256sum | cut -d' ' -f1)
-          SHA_DARWIN_X64=$(curl -sSL "${BASE_URL}/crev-darwin-x64" | sha256sum | cut -d' ' -f1)
-          SHA_LINUX_X64=$(curl -sSL "${BASE_URL}/crev-linux-x64" | sha256sum | cut -d' ' -f1)
-          SHA_LINUX_ARM64=$(curl -sSL "${BASE_URL}/crev-linux-arm64" | sha256sum | cut -d' ' -f1)
-
-          cat > Formula/crev.rb << FORMULA
-          class Crev < Formula
-            desc "Multi-AI code review CLI"
-            homepage "https://github.com/caiokf/crev"
-            version "${VERSION}"
-
-            on_macos do
-              if Hardware::CPU.arm?
-                url "${BASE_URL}/crev-darwin-arm64"
-                sha256 "${SHA_DARWIN_ARM64}"
-              else
-                url "${BASE_URL}/crev-darwin-x64"
-                sha256 "${SHA_DARWIN_X64}"
-              end
-            end
-
-            on_linux do
-              if Hardware::CPU.arm?
-                url "${BASE_URL}/crev-linux-arm64"
-                sha256 "${SHA_LINUX_ARM64}"
-              else
-                url "${BASE_URL}/crev-linux-x64"
-                sha256 "${SHA_LINUX_X64}"
-              end
-            end
-
-            def install
-              bin.install Dir["crev-*"].first => "crev"
-            end
-
-            test do
-              assert_match version.to_s, shell_output("#{bin}/crev --version")
-            end
-          end
-          FORMULA
-
+          VERSION="${TAG#v}"
+          BASE="https://github.com/caiokf/crev/releases/download/${TAG}"
+          SHA_DA=$(curl -sSL "${BASE}/crev-darwin-arm64" | sha256sum | cut -d' ' -f1)
+          SHA_DX=$(curl -sSL "${BASE}/crev-darwin-x64" | sha256sum | cut -d' ' -f1)
+          SHA_LX=$(curl -sSL "${BASE}/crev-linux-x64" | sha256sum | cut -d' ' -f1)
+          SHA_LA=$(curl -sSL "${BASE}/crev-linux-arm64" | sha256sum | cut -d' ' -f1)
+          {
+            echo 'class Crev < Formula'
+            echo '  desc "Multi-AI code review CLI"'
+            echo '  homepage "https://github.com/caiokf/crev"'
+            echo "  version \"${VERSION}\""
+            echo ''
+            echo '  on_macos do'
+            echo '    if Hardware::CPU.arm?'
+            echo "      url \"${BASE}/crev-darwin-arm64\""
+            echo "      sha256 \"${SHA_DA}\""
+            echo '    else'
+            echo "      url \"${BASE}/crev-darwin-x64\""
+            echo "      sha256 \"${SHA_DX}\""
+            echo '    end'
+            echo '  end'
+            echo ''
+            echo '  on_linux do'
+            echo '    if Hardware::CPU.arm?'
+            echo "      url \"${BASE}/crev-linux-arm64\""
+            echo "      sha256 \"${SHA_LA}\""
+            echo '    else'
+            echo "      url \"${BASE}/crev-linux-x64\""
+            echo "      sha256 \"${SHA_LX}\""
+            echo '    end'
+            echo '  end'
+            echo ''
+            echo '  def install'
+            echo '    bin.install Dir["crev-*"].first => "crev"'
+            echo '  end'
+            echo ''
+            echo '  test do'
+            echo '    assert_match version.to_s, shell_output("#{bin}/crev --version")'
+            echo '  end'
+            echo 'end'
+          } > Formula/crev.rb
       - name: Commit and push
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git add Formula/crev.rb
-          git commit -m "crev ${GITHUB_REF_NAME}"
-          git push
+          git diff --cached --quiet && echo "No changes" || (git commit -m "crev ${GITHUB_REF_NAME}" && git push)
