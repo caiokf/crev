@@ -224,7 +224,6 @@ async function runTriagePass(
     issues: allIssues,
     diffContent: opts.diff.diffContent,
     config: effectiveConfig,
-    crevDir: opts.crevDir,
   })
 
   for (const triaged of result.triaged) {
@@ -265,6 +264,8 @@ async function runSingleReviewer(
     const persona = loadAgentPrompt(reviewer.agent)
     if (persona) {
       prompt = `${persona}\n\n---\n\n${prompt}`
+    } else {
+      console.error(`Warning: Agent file not found for "${reviewer.name}": ${reviewer.agent}`)
     }
   }
 
@@ -454,18 +455,23 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
     ...existing.reviews.map((existingReview) => {
       const newReview = newResult.reviews.find((r) => r.reviewer === existingReview.reviewer)
       if (!newReview) return existingReview
-      // Preserve user annotations (e.g., status: "wont-fix") from existing issues
+      // Preserve user annotations (e.g., status, triage) from existing issues
       const existingIssueMap = new Map(existingReview.issues.map((i) => [i.id, i]))
-      const mergedIssues = newReview.issues.map((newIssue) => {
-        const existing = existingIssueMap.get(newIssue.id)
-        if (existing) {
-          const preserved: Record<string, unknown> = {}
-          if (existing.status) preserved.status = existing.status
-          if (existing.triage && !newIssue.triage) preserved.triage = existing.triage
-          if (Object.keys(preserved).length > 0) return { ...newIssue, ...preserved }
-        }
-        return newIssue
-      })
+      const newIssueIds = new Set(newReview.issues.map((i) => i.id))
+      const mergedIssues = [
+        ...newReview.issues.map((newIssue) => {
+          const existing = existingIssueMap.get(newIssue.id)
+          if (existing) {
+            const preserved: Record<string, unknown> = {}
+            if (existing.status) preserved.status = existing.status
+            if (existing.triage && !newIssue.triage) preserved.triage = existing.triage
+            if (Object.keys(preserved).length > 0) return { ...newIssue, ...preserved }
+          }
+          return newIssue
+        }),
+        // Keep old issues not produced by the new run (preserves user annotations)
+        ...existingReview.issues.filter((i) => !newIssueIds.has(i.id)),
+      ]
       return { ...newReview, issues: mergedIssues }
     }),
     ...newResult.reviews.filter((r) => !existingReviewerNames.has(r.reviewer)),
@@ -477,17 +483,14 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
       timestamp: newResult.metadata.timestamp,
     },
     reviews: mergedReviews,
-    summary: recomputeSummary(mergedReviews, newResult.summary.triage),
+    summary: recomputeSummary(mergedReviews),
   }
 
   fs.writeFileSync(resolvedPath, JSON.stringify(merged, null, 2), "utf-8")
   return resolvedPath
 }
 
-function recomputeSummary(
-  reviews: NormalizedReview[],
-  triage?: ReviewResult["summary"]["triage"],
-): ReviewResult["summary"] {
+function recomputeSummary(reviews: NormalizedReview[]): ReviewResult["summary"] {
   const allIssues = reviews.flatMap((r) => r.issues)
   const bySeverity: Record<string, number> = {}
   const byCategory: Record<string, number> = {}
@@ -498,6 +501,16 @@ function recomputeSummary(
     byCategory[issue.category] = (byCategory[issue.category] ?? 0) + 1
     byReviewer[issue.reviewer] = (byReviewer[issue.reviewer] ?? 0) + 1
   }
+
+  // Recompute triage counts from actual issue data
+  const triaged = allIssues.filter((i) => i.triage)
+  const triage = triaged.length > 0
+    ? {
+        actionable: triaged.filter((i) => i.triage?.verdict === "actionable").length,
+        deferred: triaged.filter((i) => i.triage?.verdict === "deferred").length,
+        dismissed: triaged.filter((i) => i.triage?.verdict === "dismissed").length,
+      }
+    : undefined
 
   return { totalIssues: allIssues.length, bySeverity, byCategory, byReviewer, triage }
 }

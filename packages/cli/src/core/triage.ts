@@ -10,7 +10,6 @@ type TriageInput = {
   issues: ReviewIssue[]
   diffContent: string
   config: Config
-  crevDir: string
 }
 
 type TriageResult = {
@@ -25,7 +24,7 @@ type TriageResult = {
 
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const start = performance.now()
-  const { issues, diffContent, config, crevDir } = input
+  const { issues, diffContent, config } = input
 
   if (issues.length === 0) {
     return {
@@ -78,7 +77,7 @@ async function loadContextFiles(patterns: string[]): Promise<string> {
       for (const file of files) {
         const filePath = path.join(resolved, file)
         const content = fs.readFileSync(filePath, "utf-8")
-        sections.push(`### ${pattern}${file}\n${content}`)
+        sections.push(`### ${pattern.endsWith("/") ? pattern : `${pattern}/`}${file}\n${content}`)
       }
       continue
     }

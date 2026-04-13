@@ -32,8 +32,8 @@ export function createDroidRuntime(): RuntimeAdapter {
     async execute(request: RuntimeExecutionRequest): Promise<RawExecutionOutput> {
       const start = performance.now()
       const cmd = request.overrides?.command ?? "droid"
-      const extraArgs = (request.overrides?.extraArgs ?? []).join(" ")
-      const spawnCmd = [`spawn ${cmd} -p --model ${request.model}`, extraArgs].filter(Boolean).join(" ")
+      const extraArgs = (request.overrides?.extraArgs ?? []).map(escapeTcl).join(" ")
+      const spawnCmd = [`spawn ${cmd} -p --model ${escapeTcl(request.model)}`, extraArgs].filter(Boolean).join(" ")
       const expectScript = [
         `set f [open "${escapeTcl(request.promptFile)}" r]`,
         `set prompt [read $f]`,

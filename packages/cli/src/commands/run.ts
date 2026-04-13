@@ -13,7 +13,7 @@ export function registerRunCommand(program: Command): void {
   program
     .command("run")
     .description("Execute a review")
-    .requiredOption("--schema <name>", "Which review schema to use")
+    .option("--schema <name>", "Which review schema to use")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
     .option("--type <type>", "Diff type: all, committed, uncommitted, current-state", "all")
@@ -26,8 +26,17 @@ export function registerRunCommand(program: Command): void {
     .option("--json", "Machine-readable JSON output")
     .option("--prompt-only", "Output prompts as JSON, don't execute")
     .action(async (opts) => {
+      const crevDir = findCrevDir()
+      const config = loadConfig(crevDir)
+
+      const schemaName = opts.schema ?? config.defaults.schema
+      if (!schemaName) {
+        console.error(chalk.red("Error: --schema is required (no default configured in config.yaml)"))
+        process.exit(1)
+      }
+
       const parsed = RawRunFlags.safeParse({
-        schema: opts.schema,
+        schema: schemaName,
         base: opts.base,
         baseCommit: opts.baseCommit,
         type: opts.type,
@@ -47,8 +56,6 @@ export function registerRunCommand(program: Command): void {
       }
 
       const cmd = parsed.data
-      const crevDir = findCrevDir()
-      const config = loadConfig(crevDir)
 
       const schemaPath = path.join(getSchemasDir(crevDir), `${cmd.schema}.yaml`)
       const schema = loadSchemaFile(schemaPath)
