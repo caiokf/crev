@@ -28,6 +28,11 @@ describe("RawRunFlags validation", () => {
     expect(result.success).toBe(false)
   })
 
+  it("rejects --pr with --type committed", () => {
+    const result = RawRunFlags.safeParse({ ...valid, pr: 42, type: "committed" })
+    expect(result.success).toBe(false)
+  })
+
   it("rejects --type current-state with --base", () => {
     const result = RawRunFlags.safeParse({ ...valid, type: "current-state", base: "main" })
     expect(result.success).toBe(false)

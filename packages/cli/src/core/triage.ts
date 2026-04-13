@@ -37,7 +37,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
 
   const context = await loadContextFiles(config.triage.context)
   const prompt = buildTriagePrompt(issues, diffContent, context, config.triage.prompt)
-  const verdicts = await callTriageAgent(prompt, config, crevDir)
+  const verdicts = await callTriageAgent(prompt, config)
 
   const triaged = issues.map((issue) => {
     const verdict = verdicts.find((v) => v.id === issue.id)
@@ -145,7 +145,7 @@ type RawTriageVerdict = {
   reasoning: string
 }
 
-async function callTriageAgent(prompt: string, config: Config, crevDir: string): Promise<RawTriageVerdict[]> {
+async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
   const promptFile = path.join(os.tmpdir(), `crev-prompt-triage-${process.pid}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")

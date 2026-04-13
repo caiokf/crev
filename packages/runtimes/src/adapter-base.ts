@@ -95,6 +95,14 @@ export async function checkInstalled(
 }
 
 /**
+ * Escape a string for safe use inside Tcl double-quoted strings.
+ * Neutralizes brackets, dollar signs, and backslashes that Tcl interprets.
+ */
+export function escapeTcl(s: string): string {
+  return s.replace(/[\\$\[\]{}]/g, "\\$&")
+}
+
+/**
  * Strip ANSI escape sequences and carriage returns from CLI output.
  */
 export function stripAnsi(str: string): string {

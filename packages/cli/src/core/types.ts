@@ -55,8 +55,8 @@ export const RawRunFlags = z
   .refine((f) => [f.pr, f.base, f.baseCommit].filter(Boolean).length <= 1, {
     message: "--pr, --base, and --base-commit are mutually exclusive",
   })
-  .refine((f) => !(f.pr && f.type === "uncommitted"), {
-    message: "--type uncommitted is incompatible with --pr",
+  .refine((f) => !(f.pr && f.type && f.type !== "all"), {
+    message: "--type cannot be used with --pr (PR diffs are fetched from GitHub)",
   })
   .refine((f) => !(f.type === "current-state" && (f.pr || f.base || f.baseCommit)), {
     message: "--type current-state reviews the full codebase and cannot be combined with --pr, --base, or --base-commit",

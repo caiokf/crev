@@ -1,5 +1,5 @@
 import { execAbortable } from "../exec.js"
-import { withDefaults } from "../adapter-base.js"
+import { withDefaults, escapeTcl } from "../adapter-base.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
 export function createOpenCodeRuntime(): RuntimeAdapter {
@@ -37,7 +37,7 @@ export function createOpenCodeRuntime(): RuntimeAdapter {
       const extraArgs = (request.overrides?.extraArgs ?? []).join(" ")
       const spawnCmd = [`spawn ${cmd} run --format json -m ${request.model}`, extraArgs, "$prompt"].filter(Boolean).join(" ")
       const expectScript = [
-        `set f [open "${request.promptFile}" r]`,
+        `set f [open "${escapeTcl(request.promptFile)}" r]`,
         `set prompt [read $f]`,
         `close $f`,
         spawnCmd,

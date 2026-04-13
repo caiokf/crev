@@ -458,7 +458,12 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
       const existingIssueMap = new Map(existingReview.issues.map((i) => [i.id, i]))
       const mergedIssues = newReview.issues.map((newIssue) => {
         const existing = existingIssueMap.get(newIssue.id)
-        if (existing?.status) return { ...newIssue, status: existing.status }
+        if (existing) {
+          const preserved: Record<string, unknown> = {}
+          if (existing.status) preserved.status = existing.status
+          if (existing.triage && !newIssue.triage) preserved.triage = existing.triage
+          if (Object.keys(preserved).length > 0) return { ...newIssue, ...preserved }
+        }
         return newIssue
       })
       return { ...newReview, issues: mergedIssues }

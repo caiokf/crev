@@ -1,4 +1,4 @@
-import { withDefaults, stripAnsi } from "../adapter-base.js"
+import { withDefaults, stripAnsi, escapeTcl } from "../adapter-base.js"
 import { execAbortable } from "../exec.js"
 import type { RawExecutionOutput, RuntimeAdapter, RuntimeExecutionRequest, RuntimeHealth } from "../types.js"
 
@@ -34,7 +34,7 @@ export function createMastraCodeRuntime(): RuntimeAdapter {
       const extraArgs = (request.overrides?.extraArgs ?? []).join(" ")
       const spawnCmd = [`spawn ${cmd} --model ${request.model} -p`, extraArgs].filter(Boolean).join(" ")
       const expectScript = [
-        `set f [open "${request.promptFile}" r]`,
+        `set f [open "${escapeTcl(request.promptFile)}" r]`,
         `set prompt [read $f]`,
         `close $f`,
         `${spawnCmd} $prompt`,

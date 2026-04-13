@@ -1,5 +1,5 @@
 import chalk from "chalk"
-import { visibleLength, padVisible } from "./ansi.js"
+import { padVisible } from "./ansi.js"
 
 const BRAILLE_FRAMES = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
 const BAR = "│"
@@ -146,8 +146,17 @@ export function createMultiSpinner(
       lines.push(`${BAR}`)
     }
 
+    // Write new lines, then erase any leftover old lines if count shrank
     for (const line of lines) {
       stream.write(`${ERASE_LINE}${line}\n`)
+    }
+    for (let i = lines.length; i < lineCount; i++) {
+      stream.write(`${ERASE_LINE}\n`)
+    }
+    // If we wrote more lines total than new content, move cursor back
+    const totalWritten = Math.max(lines.length, lineCount)
+    if (totalWritten > lines.length) {
+      stream.write(`\x1B[${totalWritten - lines.length}A`)
     }
 
     lineCount = lines.length
