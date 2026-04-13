@@ -1,5 +1,5 @@
 {
-  "name": "crev",
+  "name": "@caiokf/crev",
   "version": "0.1.0",
   "type": "module",
   "bin": {
