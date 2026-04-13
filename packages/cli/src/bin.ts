@@ -8,6 +8,7 @@ import { registerHelpCommand } from "./commands/help.js"
 import { registerSchemaCommand } from "./commands/schema.js"
 import { registerInitCommand } from "./commands/init.js"
 import { registerUpdateCommand } from "./commands/update.js"
+import { registerStatsCommand } from "./commands/stats.js"
 
 program
   .name("crev")
@@ -23,5 +24,6 @@ registerHelpCommand(program)
 registerSchemaCommand(program)
 registerInitCommand(program)
 registerUpdateCommand(program)
+registerStatsCommand(program)
 
 program.parse()

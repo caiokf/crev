@@ -131,6 +131,7 @@ export type ReviewResult = {
     slug: string
     timestamp: string
     schema: string
+    schemaHash?: string
     diffBase?: string
     diffType: string
     description?: string

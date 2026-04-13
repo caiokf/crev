@@ -1,4 +1,6 @@
+import crypto from "node:crypto"
 import { execSync } from "node:child_process"
+import fs from "node:fs"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadConfig } from "../core/config.js"
@@ -58,6 +60,8 @@ export function registerRunCommand(program: Command): void {
       const cmd = parsed.data
 
       const schemaPath = path.join(getSchemasDir(crevDir), `${cmd.schema}.yaml`)
+      const schemaRaw = fs.readFileSync(schemaPath, "utf-8")
+      const schemaHash = crypto.createHash("sha256").update(schemaRaw).digest("hex").slice(0, 8)
       const schema = loadSchemaFile(schemaPath)
 
       const slug = cmd.target.kind === "fresh" ? (cmd.target.slug ?? generateSlug()) : path.basename(cmd.target.reviewFile, ".json")
@@ -77,6 +81,7 @@ export function registerRunCommand(program: Command): void {
       const result = await orchestrate({
         schema,
         schemaName: cmd.schema,
+        schemaHash,
         config,
         diff,
         slug,

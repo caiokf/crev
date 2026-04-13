@@ -18,6 +18,7 @@ import type { DiffInput } from "@crev/runtimes"
 export type OrchestrateOptions = {
   schema: SchemaFileType
   schemaName: string
+  schemaHash?: string
   config: Config
   diff: DiffInput
   slug: string
@@ -405,6 +406,7 @@ function buildResult(
       slug: opts.slug,
       timestamp,
       schema: opts.schemaName,
+      schemaHash: opts.schemaHash,
       diffBase: opts.diff.base,
       diffType: opts.diff.type,
       description: opts.description,
