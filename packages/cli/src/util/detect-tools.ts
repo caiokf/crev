@@ -49,7 +49,7 @@ const TOOL_DEFINITIONS: Array<{
     name: "GitHub Copilot",
     id: "copilot",
     detectDir: ".github",
-    skillDir: ".github/prompts",
+    skillDir: ".github/skills/crev",
   },
   {
     name: "Codex CLI",

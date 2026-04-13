@@ -1,4 +1,4 @@
-export const claudeSkill = `---
+export const skillContent = `---
 name: crev
 description: Use when running AI code reviews, reviewing PRs, validating schemas, or setting up crev in a project - orchestrates multi-AI reviewer code reviews via the crev CLI with parallel execution, triage, and structured JSON output.
 ---
@@ -27,6 +27,8 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Scaffold new schema         | \`crev schema init <name>\`                                |
 | Full setup                  | \`crev init\`                                              |
 | Regenerate AI tool skills   | \`crev update\`                                            |
+| Review stats (latest)       | \`crev stats --schema <name>\`                             |
+| Review stats (all versions) | \`crev stats --schema <name> --history\`                   |
 | Detailed help               | \`crev help run\` / \`crev help schema\`                     |
 
 ## Workflow
@@ -85,6 +87,30 @@ Per-reviewer fields:
 - \`prompt\` / \`agent\`: mutually exclusive. CodeRabbit accepts neither.
 - \`scope\`: \`diff\` (default) reviews the diff only. \`codebase\` includes full source of changed files.
 - \`context\`: array of file paths or globs. Contents are appended to the prompt as additional context.
+
+### Reviewing Effectiveness
+
+Use \`crev stats\` to evaluate reviewer signal-to-noise and tune schemas:
+
+1. Run: \`crev stats --schema <name>\` — shows per-reviewer actionable/dismissed rates, cost per actionable finding, and recurring dismissed patterns
+2. Use \`--history\` to compare across schema revisions (tracks by content hash) — see if prompt changes improved signal
+3. High dismissed rate + recurring patterns = reviewer needs prompt tightening or removal from quick schemas
+4. \`--json\` for machine-readable output
+
+### Displaying Stats
+
+When the user asks to see stats or reviewer effectiveness, run \`crev stats --schema <name>\` and display the results as a formatted table:
+
+| Reviewer | Runtime | Runs | Issues | Actioned | Dismissed | Avg Time | Cost/Act |
+|----------|---------|------|--------|----------|-----------|----------|----------|
+| Bug Hunter | claude/opus | 10 | 66 | 19 (40%) | 19 (40%) | 231s | 122s |
+
+Include:
+- Runtime and model for each reviewer (e.g. \`claude/opus\`, \`codex/gpt-5.3-codex\`)
+- Actionable and dismissed rates as count + percentage
+- Average duration and cost per actionable finding
+- Recurring dismissed patterns section — highlights issues the user should address in prompts
+- Brief commentary: which reviewers are most/least effective, which need prompt tuning or removal
 
 ### Progress Updates
 
