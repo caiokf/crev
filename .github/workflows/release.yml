@@ -51,6 +51,8 @@ jobs:
         with:
           node-version: 20
       - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.2.15"
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
       - run: bun build --compile --target=${{ matrix.target }} ./packages/cli/dist/bin.js --outfile ${{ matrix.artifact }}
