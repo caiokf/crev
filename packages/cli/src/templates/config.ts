@@ -5,22 +5,9 @@ export const configTemplate = `defaults:
 
 runtimes:
   claude:
-    # command: cc          # use a custom binary name / alias
+    command: claude
     env: {}
     args: []
-  codex:
-    env: {}
-    args: []
-  gemini:
-    env: {}
-    args: []
-  # kimi:
-  #   env: {}
-  #   args: []
-  # opencode:
-  #   command: opencode
-  #   env: {}
-  #   args: []
 
 aliases:
   opus: claude-opus-4-6
@@ -29,11 +16,7 @@ aliases:
 
 diff:
   exclude:
-    - "pnpm-lock.yaml"
     - "package-lock.json"
-    - "yarn.lock"
-    - "**/*.snap"
-    - "**/*.generated.ts"
 
 output:
   dir: .crev/reviews

@@ -13,7 +13,7 @@ import { registerStatsCommand } from "./commands/stats.js"
 program
   .name("crev")
   .description("AI-powered multi-reviewer code review CLI")
-  .version("0.1.0")
+  .version("0.1.1")
 
 registerRunCommand(program)
 registerListCommand(program)
