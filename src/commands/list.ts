@@ -1,7 +1,7 @@
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { getAllRuntimes } from "@crev/runtimes"
+import { getAllRuntimes } from "valet"
 import { findCrevDir } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"

@@ -2,7 +2,7 @@ import { execFile } from "node:child_process"
 import fs from "node:fs"
 import path from "node:path"
 import { promisify } from "node:util"
-import type { DiffInput } from "@crev/runtimes"
+import type { DiffInput } from "valet"
 import type { DiffSource } from "./types.js"
 
 const execFileAsync = promisify(execFile)

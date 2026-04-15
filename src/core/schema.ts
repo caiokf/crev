@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
-import { getAllRuntimes, getRuntimeNames } from "@crev/runtimes"
+import { getAllRuntimes, getRuntimeNames } from "valet"
 
 // Single source of truth: derived from runtime adapters
 export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(

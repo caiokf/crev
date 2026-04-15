@@ -153,23 +153,9 @@ After `crev init`:
 └── reviews/             # Review output (JSON)
 ```
 
-## Packages
+## Related
 
-This is a monorepo with two packages:
-
-- **`crev`** -- The CLI tool
-- **`@crev/runtimes`** -- Standalone runtime adapter library
-
-```bash
-npm install @crev/runtimes
-```
-
-```typescript
-import { getRuntime, getAllRuntimes } from "@crev/runtimes"
-
-const claude = getRuntime("claude")
-const health = await claude.healthCheck()
-```
+- **[valet](https://github.com/caiokf/valet)** -- The standalone runtime adapter library used by crev
 
 ## License
 

@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { getRuntime, execAbortable } from "@crev/runtimes"
+import { getRuntime, execAbortable } from "valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { ReviewIssue } from "./types.js"

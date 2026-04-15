@@ -152,7 +152,7 @@ async function scaffold(
   console.log()
 
   try {
-    const { getAllRuntimes } = await import("@crev/runtimes")
+    const { getAllRuntimes } = await import("valet")
     const { listSchemas, loadSchemaFile } = await import("../core/schema.js")
 
     const schemasDir = path.join(crevDir, "schemas")

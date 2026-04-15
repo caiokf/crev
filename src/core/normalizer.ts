@@ -1,4 +1,4 @@
-import { execAbortable } from "@crev/runtimes"
+import { execAbortable } from "valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
