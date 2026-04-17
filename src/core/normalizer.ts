@@ -137,6 +137,7 @@ ${raw.slice(0, 100_000)}`
       return result.parsed ? result.issues : []
     }
 
+    console.warn(`Warning: Normalizer runtime "${normalizerRuntime}" is not supported (only "claude" is supported). Skipping normalization for "${reviewer}".`)
     return []
   } catch (err) {
     console.error(`Warning: Normalizer failed for "${reviewer}" (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
