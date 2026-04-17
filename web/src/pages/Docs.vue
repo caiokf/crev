@@ -566,26 +566,26 @@ crev list --runtimes</code></pre>
         <h2>GitHub Actions</h2>
         <div class="code-block">
           <div class="code-label">.github/workflows/crev.yml</div>
-          <pre><code><span class="y-key">name</span>: <span class="y-val">Code Review</span>
-<span class="y-key">on</span>: [<span class="y-val">pull_request</span>]
+          <pre v-pre><code>name: Code Review
+on: [pull_request]
 
-<span class="y-key">jobs</span>:
-  <span class="y-key">review</span>:
-    <span class="y-key">runs-on</span>: <span class="y-val">ubuntu-latest</span>
-    <span class="y-key">steps</span>:
-      - <span class="y-key">uses</span>: <span class="y-val">actions/checkout@v4</span>
-        <span class="y-key">with</span>:
-          <span class="y-key">fetch-depth</span>: <span class="y-val">0</span>
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - <span class="y-key">uses</span>: <span class="y-val">actions/setup-node@v4</span>
-        <span class="y-key">with</span>:
-          <span class="y-key">node-version</span>: <span class="y-val">20</span>
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
 
-      - <span class="y-key">run</span>: <span class="y-val">npm install -g @caiokf/crev</span>
+      - run: npm install -g @caiokf/crev
 
-      - <span class="y-key">run</span>: <span class="y-val">crev run --schema quick --plain --json</span>
-        <span class="y-key">env</span>:
-          <span class="y-key">ANTHROPIC_API_KEY</span>: <span class="y-str">${{ secrets.ANTHROPIC_API_KEY }}</span></code></pre>
+      - run: crev run --schema quick --plain --json
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}</code></pre>
         </div>
 
         <h2>Key flags</h2>
