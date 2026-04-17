@@ -297,7 +297,7 @@ async function runSingleReviewer(
   const request: RuntimeExecutionRequest = {
     taskName: reviewer.name,
     model,
-    prompt,
+    prompt: fullPrompt,
     promptFile,
     diff: opts.diff,
     outputFormat,
