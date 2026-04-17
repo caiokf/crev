@@ -88,6 +88,27 @@ Per-reviewer fields:
 - \`scope\`: \`diff\` (default) reviews the diff only. \`codebase\` includes full source of changed files.
 - \`context\`: array of file paths or globs. Contents are appended to the prompt as additional context.
 
+### Schema Authoring: Black-Box Approach
+
+When writing reviewer prompts and agent files, treat the target codebase as a **black box**. Schemas should be portable and resilient to internal refactors.
+
+**Avoid** in prompts and agent instructions:
+- Specific file paths (\`src/core/schema.ts\`, \`lib/utils/helpers.ts\`)
+- Internal directory structures (\`the handler in src/commands/\`)
+- References to specific function names, class names, or variable names that are implementation details
+- Assumptions about where code lives within the project
+
+**Encouraged** in prompts and agent instructions:
+- Coding patterns and conventions ("use early returns", "prefer composition over inheritance")
+- Code examples showing desired style or anti-patterns
+- Conceptual guidance ("API endpoints should validate input at the boundary")
+- Category-level references ("test files", "configuration files", "entry points")
+- Architectural principles ("keep business logic separate from transport layer")
+
+**Exception — stable top-level structure**: References to well-known, stable top-level directories (e.g., \`packages/\`, \`src/\`, \`schemas/\`, \`.crev/\`) are acceptable when they represent permanent structural boundaries unlikely to change. The distinction: \`src/\` as a concept is stable; \`src/core/schema.ts\` as a specific file is not.
+
+**Why**: Codebases evolve — files move, directories get renamed, modules get extracted. Schemas tied to specific paths break silently when the code changes. Black-box schemas remain effective across refactors because they describe *what to look for* conceptually, not *where to find it*.
+
 ### Reviewing Effectiveness
 
 Use \`crev stats\` to evaluate reviewer signal-to-noise and tune schemas:
