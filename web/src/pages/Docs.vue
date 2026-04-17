@@ -117,9 +117,14 @@ crev run --schema standard</code></pre>
 
         <div class="callout">
           <strong>Works with your coding agent.</strong> Running <code>crev init</code>
-          also installs a skill that coding agents like Claude Code understand
-          natively. Your agent can run reviews for you &mdash; no need to learn the
-          CLI flags yourself. Just ask your agent to review your code.
+          installs a skill that coding agents like Claude Code understand natively.
+          You don't need to memorize CLI flags &mdash; just ask your agent. It can:
+          <ul class="callout-list">
+            <li>Run reviews against any branch or PR</li>
+            <li>Fix the issues reviewers find</li>
+            <li>Create and modify review schemas</li>
+            <li>Show statistics on schema performance</li>
+          </ul>
         </div>
       </section>
 
@@ -858,6 +863,26 @@ crev list --runtimes</code></pre>
   background: var(--surface-2);
   padding: 2px 6px;
   border-radius: 4px;
+}
+
+.callout-list {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  list-style: none;
+}
+
+.callout-list li {
+  position: relative;
+  padding-left: 4px;
+  margin-bottom: 4px;
+  color: var(--text-2);
+}
+
+.callout-list li::before {
+  content: "–";
+  position: absolute;
+  left: -16px;
+  color: var(--accent-dim);
 }
 
 /* ── Misc ── */
