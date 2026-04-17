@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { glob } from "glob"
-import { getRuntime, type RuntimeExecutionRequest } from "valet"
+import { getRuntime, type RuntimeExecutionRequest } from "@caiokf/valet"
 import chalk from "chalk"
 import type { Config } from "./config.js"
 import { getOutputDir, loadAgentPrompt, resolveModelAlias, getRuntimeConfig, getOutputFormat } from "./config.js"
@@ -13,7 +13,7 @@ import type { NormalizedReview, ReviewResult } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
 import { SEVERITY_ORDER, SEVERITY_COLORS } from "../ui/theme.js"
-import type { DiffInput } from "valet"
+import type { DiffInput } from "@caiokf/valet"
 
 export type OrchestrateOptions = {
   schema: SchemaFileType
