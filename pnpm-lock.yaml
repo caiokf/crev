@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@caiokf/valet':
-        specifier: ^0.1.0
-        version: 0.1.0
+        specifier: ^0.1.1
+        version: 0.1.1
       '@inquirer/prompts':
         specifier: ^7.5.0
         version: 7.10.1(@types/node@25.5.2)
@@ -48,8 +48,8 @@ importers:
 
 packages:
 
-  '@caiokf/valet@0.1.0':
-    resolution: {integrity: sha512-6W1uZtUwHdoQ2uoWGrNRql9dYS9mAuVU+2+QqSzZqedFF6FjZqNOgDZpWQy7qQPFpewyqHrVoG5e7SguCnb5rw==}
+  '@caiokf/valet@0.1.1':
+    resolution: {integrity: sha512-DoXFIpk5Nhy8UmrLJrSEJfBkPGgT+k4uQXQfoCIkX7/Chc/CtHJkHhp97SlVA+eLP1g8oKR7a6LsCNlM1W7MHg==}
     engines: {node: '>=20'}
 
   '@esbuild/aix-ppc64@0.27.7':
@@ -995,7 +995,7 @@ packages:
 
 snapshots:
 
-  '@caiokf/valet@0.1.0': {}
+  '@caiokf/valet@0.1.1': {}
 
   '@esbuild/aix-ppc64@0.27.7':
     optional: true
