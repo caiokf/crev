@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
 import TerminalDemo from "../components/TerminalDemo.vue"
-import ShaderBackground from "../components/ShaderBackground.vue"
 
 const activeTab = ref<"npm" | "brew" | "curl">("npm")
 const copied = ref(false)
@@ -83,7 +82,6 @@ onMounted(() => {
 <template>
   <!-- Hero -->
   <section class="hero">
-    <ShaderBackground />
     <div class="hero-glow"></div>
     <div class="hero-content">
       <h1 class="hero-title">
@@ -216,7 +214,6 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   padding: 120px 24px 80px;
-  overflow: hidden;
 }
 
 .hero-glow {
@@ -246,6 +243,7 @@ onMounted(() => {
   letter-spacing: -1px;
   color: var(--text);
   margin-bottom: 20px;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
 }
 
 .hero-title em {
@@ -254,10 +252,12 @@ onMounted(() => {
 
 .hero-sub {
   font-size: 17px;
-  color: var(--text-2);
+  color: var(--text);
   line-height: 1.7;
   margin-bottom: 48px;
   font-weight: 300;
+  opacity: 0.8;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .hero-terminal {
@@ -271,9 +271,8 @@ onMounted(() => {
 }
 
 .section-dark {
-  background: var(--surface);
-  border-top: 1px solid var(--border);
-  border-bottom: 1px solid var(--border);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .container {
@@ -290,12 +289,14 @@ onMounted(() => {
 }
 
 .section-sub {
-  color: var(--text-2);
+  color: var(--text);
   font-size: 16px;
   line-height: 1.7;
   margin-bottom: 48px;
   font-weight: 300;
   max-width: 520px;
+  opacity: 0.75;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 /* ── Features ── */
@@ -307,9 +308,11 @@ onMounted(() => {
 
 .feature-card {
   padding: 28px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(12, 12, 17, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   transition: border-color 0.3s, box-shadow 0.3s;
 }
 
@@ -335,9 +338,10 @@ onMounted(() => {
 
 .feature-card p {
   font-size: 14px;
-  color: var(--text-2);
+  color: var(--text);
   line-height: 1.65;
   font-weight: 300;
+  opacity: 0.7;
 }
 
 /* ── Schema ── */
@@ -353,11 +357,13 @@ onMounted(() => {
 }
 
 .schema-code {
-  background: #0a0a10;
-  border: 1px solid var(--border);
+  background: rgba(10, 10, 16, 0.45);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   padding: 24px;
   overflow-x: auto;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .schema-code pre {
@@ -386,9 +392,11 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   padding: 10px 20px;
-  background: var(--surface);
-  border: 1px solid var(--border);
+  background: rgba(12, 12, 17, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
   font-family: var(--font-mono);
   font-size: 14px;
   color: var(--text-2);
@@ -410,10 +418,12 @@ onMounted(() => {
 .install-block {
   max-width: 680px;
   margin: 36px auto 0;
-  border: 1px solid var(--border);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   overflow: hidden;
-  background: #0a0a10;
+  background: rgba(10, 10, 16, 0.45);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 
 .install-tabs {
@@ -476,7 +486,8 @@ onMounted(() => {
 .install-hint {
   text-align: center;
   margin-top: 24px;
-  color: var(--text-3);
+  color: var(--text);
+  opacity: 0.6;
   font-size: 14px;
 }
 

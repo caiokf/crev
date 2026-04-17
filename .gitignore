@@ -9,3 +9,6 @@ coverage/
 .env
 .envrc
 .superset/
+.playwright-mcp/
+*.png
+*.jpeg

@@ -96,12 +96,14 @@ onMounted(() => {
 
 <style scoped>
 .terminal {
-  background: #0a0a10;
-  border: 1px solid var(--border);
+  background: rgba(10, 10, 16, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   overflow: hidden;
   width: 100%;
   max-width: 640px;
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
   box-shadow:
     0 0 0 1px rgba(255, 255, 255, 0.03),
     0 20px 60px rgba(0, 0, 0, 0.5),
@@ -113,8 +115,8 @@ onMounted(() => {
   align-items: center;
   gap: 6px;
   padding: 10px 14px;
-  background: #111118;
-  border-bottom: 1px solid var(--border);
+  background: rgba(17, 17, 24, 0.5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
 }
 
 .dot {

@@ -29,11 +29,15 @@ html {
   -moz-osx-font-smoothing: grayscale;
 }
 
+html {
+  background: var(--bg);
+}
+
 body {
   font-family: var(--font-body);
   font-weight: 400;
   color: var(--text);
-  background: var(--bg);
+  background: transparent;
   line-height: 1.6;
   overflow-x: hidden;
 }
