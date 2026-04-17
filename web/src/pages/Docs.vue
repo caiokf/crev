@@ -78,6 +78,13 @@ watch(() => route.hash, (hash) => {
           with a devil's-advocate pass.
         </p>
 
+        <div class="callout">
+          <strong>No API keys needed.</strong> crev runs headless through the CLI
+          tools you already have installed (Claude Code, Gemini CLI, Codex CLI, etc.).
+          It uses your existing subscriptions &mdash; there are no extra token costs
+          or separate API billing.
+        </div>
+
         <h2>Install</h2>
         <div class="code-block">
           <pre><code><span class="c-dim"># npm</span>
@@ -107,6 +114,13 @@ crev run --schema standard</code></pre>
           <code>crev init</code> creates a <code>.crev/</code> directory with a
           <code>config.yaml</code> and starter schemas in <code>.crev/schemas/</code>.
         </p>
+
+        <div class="callout">
+          <strong>Works with your coding agent.</strong> Running <code>crev init</code>
+          also installs a skill that coding agents like Claude Code understand
+          natively. Your agent can run reviews for you &mdash; no need to learn the
+          CLI flags yourself. Just ask your agent to review your code.
+        </div>
       </section>
 
       <!-- Configuration -->
@@ -267,9 +281,10 @@ crev run --schema standard</code></pre>
       <section id="runtimes">
         <h1>Runtimes</h1>
         <p class="lead">
-          A runtime is an AI provider that executes review prompts. Each reviewer
-          in a schema specifies which runtime to use. crev supports mixing
-          runtimes within a single review.
+          A runtime is an AI CLI tool that executes review prompts. crev runs
+          each reviewer headless through the CLI you already have installed &mdash;
+          Claude Code, Gemini CLI, Codex CLI, etc. No API keys or separate
+          billing: it uses your existing subscriptions.
         </p>
 
         <h2>Supported runtimes</h2>
@@ -604,6 +619,7 @@ crev list --runtimes</code></pre>
   display: flex;
   min-height: 100vh;
   padding-top: 56px;
+  background: var(--bg);
 }
 
 /* ── Sidebar ── */
@@ -816,6 +832,32 @@ crev list --runtimes</code></pre>
   background: var(--surface-2);
   padding: 1px 5px;
   border-radius: 3px;
+}
+
+/* ── Callout ── */
+.callout {
+  padding: 16px 20px;
+  background: rgba(255, 157, 0, 0.06);
+  border: 1px solid rgba(255, 157, 0, 0.15);
+  border-radius: 8px;
+  font-size: 14px;
+  color: var(--text-2);
+  line-height: 1.7;
+  margin-bottom: 24px;
+}
+
+.callout strong {
+  color: var(--accent);
+  font-weight: 600;
+}
+
+.callout code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--text);
+  background: var(--surface-2);
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 /* ── Misc ── */

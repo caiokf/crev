@@ -13,9 +13,9 @@ const lines: Line[] = [
 
 /* Second phase: reviewers complete one-by-one (fastest first) */
 const completions: { idx: number; text: string; cls: string; delay: number }[] = [
-  { idx: 3, text: "│    ◆ Security  (gemini/gemini-2.5-pro)   38.7s  2 issues", cls: "done", delay: 3200 },
-  { idx: 2, text: "│    ◆ Engineer  (claude/sonnet)            42.1s  5 issues", cls: "done-warn", delay: 3800 },
-  { idx: 4, text: "│    ◆ Architect (claude/opus)              51.3s  1 issue", cls: "done", delay: 5000 },
+  { idx: 3, text: "│    ◆ Security  (gemini/gemini-2.5-pro)     38.7s  2 issues", cls: "done", delay: 3200 },
+  { idx: 2, text: "│    ◆ Engineer  (claude/sonnet)             42.1s  5 issues", cls: "done-warn", delay: 3800 },
+  { idx: 4, text: "│    ◆ Architect (claude/opus)               51.3s  1 issue", cls: "done", delay: 5000 },
 ]
 
 const summaryLines: Line[] = [
