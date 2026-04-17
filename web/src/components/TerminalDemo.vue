@@ -101,6 +101,7 @@ onMounted(() => {
   overflow: hidden;
   width: 100%;
   max-width: 640px;
+  min-width: 0;
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
   box-shadow:
@@ -141,13 +142,16 @@ onMounted(() => {
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
-  min-height: 260px;
+  height: calc(13lh + 36px);
   text-align: left;
+  overflow: hidden;
 }
 
 .line {
   white-space: pre;
   color: var(--text-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .line.cmd {
