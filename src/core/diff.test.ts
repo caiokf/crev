@@ -1,5 +1,25 @@
-import { describe, expect, it } from "vitest"
-import { filterDiff } from "./diff.js"
+import { execSync } from "node:child_process"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { afterEach, describe, expect, it } from "vitest"
+import { filterDiff, resolveDiff } from "./diff.js"
+
+function createTempGitRepo(): string {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+  execSync("git init", { cwd: dir })
+  execSync("git config user.email test@test.com", { cwd: dir })
+  execSync("git config user.name Test", { cwd: dir })
+  return dir
+}
+
+const tempDirs: string[] = []
+afterEach(() => {
+  for (const dir of tempDirs) {
+    fs.rmSync(dir, { recursive: true, force: true })
+  }
+  tempDirs.length = 0
+})
 
 describe("filterDiff", () => {
   const sampleDiff = [
@@ -53,5 +73,78 @@ describe("filterDiff", () => {
   it("returns unchanged diff when no patterns match", () => {
     const result = filterDiff(sampleDiff, ["nonexistent.txt"])
     expect(result).toBe(sampleDiff)
+  })
+})
+
+describe("resolveDiff", () => {
+  it("current-state fails gracefully on a repo with no commits", async () => {
+    const dir = createTempGitRepo()
+    tempDirs.push(dir)
+    fs.writeFileSync(path.join(dir, "file.txt"), "hello")
+
+    const crevDir = path.join(dir, ".crev")
+    fs.mkdirSync(crevDir, { recursive: true })
+
+    const prev = process.cwd()
+    process.chdir(dir)
+    try {
+      await expect(
+        resolveDiff({
+          slug: "test",
+          source: { kind: "local", type: "current-state" },
+          crevDir,
+        })
+      ).rejects.toThrow("no commits")
+    } finally {
+      process.chdir(prev)
+    }
+  })
+
+  it("current-state returns diff of all files against empty tree", async () => {
+    const dir = createTempGitRepo()
+    tempDirs.push(dir)
+    fs.writeFileSync(path.join(dir, "file.txt"), "hello\n")
+    execSync("git add . && git commit -m init", { cwd: dir })
+
+    const crevDir = path.join(dir, ".crev")
+    fs.mkdirSync(crevDir, { recursive: true })
+
+    const prev = process.cwd()
+    process.chdir(dir)
+    try {
+      const result = await resolveDiff({
+        slug: "test",
+        source: { kind: "local", type: "current-state" },
+        crevDir,
+      })
+      expect(result.diffContent).toContain("file.txt")
+      expect(result.diffContent).toContain("+hello")
+    } finally {
+      process.chdir(prev)
+    }
+  })
+
+  it("committed type falls back to empty tree on initial commit", async () => {
+    const dir = createTempGitRepo()
+    tempDirs.push(dir)
+    fs.writeFileSync(path.join(dir, "file.txt"), "hello\n")
+    execSync("git add . && git commit -m init", { cwd: dir })
+
+    const crevDir = path.join(dir, ".crev")
+    fs.mkdirSync(crevDir, { recursive: true })
+
+    const prev = process.cwd()
+    process.chdir(dir)
+    try {
+      const result = await resolveDiff({
+        slug: "test",
+        source: { kind: "local", type: "committed" },
+        crevDir,
+      })
+      expect(result.diffContent).toContain("file.txt")
+      expect(result.diffContent).toContain("+hello")
+    } finally {
+      process.chdir(prev)
+    }
   })
 })
