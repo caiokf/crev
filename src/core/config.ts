@@ -66,8 +66,16 @@ const configSchema = z.object({
 export type Config = z.infer<typeof configSchema>
 
 export function findCrevDir(startDir?: string): string {
-  const dir = startDir ?? process.cwd()
-  return path.resolve(dir, ".crev")
+  let dir = startDir ?? process.cwd()
+
+  while (dir !== path.dirname(dir)) {
+    const candidate = path.join(dir, ".crev")
+    if (fs.existsSync(candidate)) return candidate
+    dir = path.dirname(dir)
+  }
+
+  // Fallback: return .crev relative to the starting directory
+  return path.resolve(startDir ?? process.cwd(), ".crev")
 }
 
 export function loadConfig(crevDir: string): Config {
