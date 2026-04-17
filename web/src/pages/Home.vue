@@ -7,6 +7,10 @@ import geminiLogo from "../assets/logos/gemini.svg"
 import codexLogo from "../assets/logos/codex.svg"
 import coderabbitLogo from "../assets/logos/coderabbit.svg"
 import opencodeLogo from "../assets/logos/opencode.svg"
+import kimiLogo from "../assets/logos/kimi.svg"
+import droidLogo from "../assets/logos/droid.svg"
+import mastraLogo from "../assets/logos/mastra.svg"
+import piLogo from "../assets/logos/pi.svg"
 
 const activeTab = ref<"npm" | "brew" | "curl">("npm")
 const copied = ref(false)
@@ -29,6 +33,10 @@ const runtimes = [
   { name: "Codex CLI", logo: codexLogo },
   { name: "CodeRabbit", logo: coderabbitLogo },
   { name: "OpenCode", logo: opencodeLogo },
+  { name: "Kimi", logo: kimiLogo },
+  { name: "Droid", logo: droidLogo },
+  { name: "MastraCode", logo: mastraLogo },
+  { name: "Pi", logo: piLogo },
 ]
 
 const features = [
@@ -248,6 +256,9 @@ onMounted(() => {
   z-index: 1;
   text-align: center;
   max-width: 720px;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .hero-title {
