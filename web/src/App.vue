@@ -9,7 +9,7 @@ const copied = ref(false)
 const installCommands = {
   npm: "npm install -g @caiokf/crev",
   brew: "brew tap caiokf/crev https://github.com/caiokf/crev && brew install crev",
-  curl: 'curl -fsSL https://raw.githubusercontent.com/caiokf/crev/main/install.sh | sh',
+  curl: "curl -fsSL https://crev.sh/install | sh",
 }
 
 function copy() {
@@ -488,7 +488,7 @@ onMounted(() => {
 
 /* ── Install ── */
 .install-block {
-  max-width: 600px;
+  max-width: 680px;
   margin: 36px auto 0;
   border: 1px solid var(--border);
   border-radius: 10px;
@@ -530,6 +530,8 @@ onMounted(() => {
   font-family: var(--font-mono);
   font-size: 14px;
   color: var(--text);
+  white-space: nowrap;
+  overflow-x: auto;
 }
 
 .copy-btn {
