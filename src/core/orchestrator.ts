@@ -450,7 +450,12 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
     return resolvedPath
   }
 
-  const existing = JSON.parse(fs.readFileSync(resolvedPath, "utf-8")) as ReviewResult
+  let existing: ReviewResult
+  try {
+    existing = JSON.parse(fs.readFileSync(resolvedPath, "utf-8")) as ReviewResult
+  } catch (err) {
+    throw new Error(`--review-file ${existingFilePath} contains invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+  }
 
   const existingReviewerNames = new Set(existing.reviews.map((r) => r.reviewer))
   const mergedReviews: NormalizedReview[] = [
