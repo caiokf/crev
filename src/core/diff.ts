@@ -103,8 +103,8 @@ async function getCommitDiff(baseCommit: string): Promise<string> {
 }
 
 async function getCurrentStateDiff(): Promise<string> {
-  const { stdout: emptyTree } = await execFileAsync("git", ["hash-object", "-t", "tree", "/dev/null"])
-  const { stdout } = await execFileAsync("git", ["diff", emptyTree.trim(), "HEAD"], { maxBuffer: MAX_BUFFER })
+  const EMPTY_TREE = "4b825dc642cb6eb9a060e54bf899d69f82cf7115"
+  const { stdout } = await execFileAsync("git", ["diff", EMPTY_TREE, "HEAD"], { maxBuffer: MAX_BUFFER })
   return stdout
 }
 
