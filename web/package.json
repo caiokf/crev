@@ -5,7 +5,8 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "vite build && CLOUDFLARE_ACCOUNT_ID=e59e9c6661466ac66902778ec7d8a0bf wrangler pages deploy dist --project-name crev --commit-dirty=true"
   },
   "dependencies": {
     "shaders": "2.5.100",
@@ -16,6 +17,7 @@
     "@vitejs/plugin-vue": "^5.2.0",
     "typescript": "^5.8.0",
     "vite": "^6.3.0",
-    "vue-tsc": "^2.2.0"
+    "vue-tsc": "^2.2.0",
+    "wrangler": "4.83.0"
   }
 }

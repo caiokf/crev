@@ -3,7 +3,7 @@ import Home from "./pages/Home.vue"
 import Docs from "./pages/Docs.vue"
 
 export const router = createRouter({
-  history: createWebHistory("/crev/"),
+  history: createWebHistory("/"),
   routes: [
     { path: "/", component: Home },
     { path: "/docs", component: Docs },
