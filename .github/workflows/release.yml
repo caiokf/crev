@@ -91,7 +91,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: main
-          token: ${{ secrets.HOMEBREW_TAP_GH_TOKEN }}
       - name: Update formula
         env:
           TAG: ${{ github.ref_name }}
