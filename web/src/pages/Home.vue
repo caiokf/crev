@@ -7,7 +7,7 @@ const copied = ref(false)
 
 const installCommands = {
   npm: "npm install -g @caiokf/crev",
-  brew: "brew tap caiokf/crev https://github.com/caiokf/crev && brew install crev",
+  brew: "brew tap caiokf/crev https://github.com/caiokf/crev\nbrew install crev",
   curl: "curl -fsSL https://crev.sh/install | sh",
 }
 
@@ -88,13 +88,19 @@ onMounted(() => {
         Multi-AI code review.<br />
         <em>One command.</em>
       </h1>
-      <p class="hero-sub">
-        Run multiple AI reviewers in parallel against your diffs.<br />
-        Every perspective, every time.
-      </p>
       <div class="hero-terminal">
         <TerminalDemo />
       </div>
+      <h2 class="hero-headline">
+        Run your coding agents headless.<br />
+        <em>No API keys.</em>
+      </h2>
+      <p class="hero-callout">
+        <strong class="accent">crev</strong> runs Claude Code, Gemini CLI, Codex CLI and more &mdash;
+        using the subscriptions you already pay for.
+        No extra token costs, no separate billing.
+        Every reviewer in parallel, every perspective, every time.
+      </p>
     </div>
   </section>
 
@@ -133,6 +139,7 @@ onMounted(() => {
           </p>
         </div>
         <div class="schema-code">
+          <div class="schema-filename">.crev/schemas/standard.yaml</div>
           <pre><code><span class="y-key">reviewers</span>:
   - <span class="y-key">name</span>: <span class="y-val">Engineer</span>
     <span class="y-key">runtime</span>: <span class="y-val">claude</span>
@@ -158,25 +165,8 @@ onMounted(() => {
     </div>
   </section>
 
-  <!-- Runtimes -->
-  <section class="section">
-    <div class="container">
-      <h2 class="section-title reveal" style="text-align: center">Supported runtimes</h2>
-      <div class="runtime-strip reveal">
-        <div
-          v-for="rt in runtimes"
-          :key="rt.name"
-          class="runtime-badge"
-        >
-          <span class="runtime-dot" :style="{ background: rt.color }"></span>
-          {{ rt.name }}
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Install -->
-  <section id="install" class="section section-dark">
+  <section id="install" class="section">
     <div class="container">
       <h2 class="section-title reveal" style="text-align: center">Get started</h2>
       <div class="install-block reveal">
@@ -191,7 +181,7 @@ onMounted(() => {
           </button>
         </div>
         <div class="install-cmd">
-          <code>{{ installCommands[activeTab] }}</code>
+          <pre><code>{{ installCommands[activeTab] }}</code></pre>
           <button class="copy-btn" @click="copy">
             {{ copied ? "copied" : "copy" }}
           </button>
@@ -200,6 +190,23 @@ onMounted(() => {
       <p class="install-hint reveal">
         Then run <code>crev init</code> in your project to get started.
       </p>
+    </div>
+  </section>
+
+  <!-- Runtimes -->
+  <section class="section section-dark">
+    <div class="container">
+      <h2 class="section-title reveal" style="text-align: center">Supported runtimes</h2>
+      <div class="runtime-strip reveal">
+        <div
+          v-for="rt in runtimes"
+          :key="rt.name"
+          class="runtime-badge"
+        >
+          <span class="runtime-dot" :style="{ background: rt.color }"></span>
+          {{ rt.name }}
+        </div>
+      </div>
     </div>
   </section>
 
@@ -248,16 +255,6 @@ onMounted(() => {
 
 .hero-title em {
   color: var(--accent);
-}
-
-.hero-sub {
-  font-size: 17px;
-  color: var(--text);
-  line-height: 1.7;
-  margin-bottom: 48px;
-  font-weight: 300;
-  opacity: 0.8;
-  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
 }
 
 .hero-terminal {
@@ -360,13 +357,22 @@ onMounted(() => {
   background: rgba(10, 10, 16, 0.45);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 10px;
-  padding: 24px;
-  overflow-x: auto;
+  padding: 0;
+  overflow: hidden;
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
 }
 
+.schema-filename {
+  padding: 10px 20px;
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
 .schema-code pre {
+  padding: 20px;
   font-family: var(--font-mono);
   font-size: 13px;
   line-height: 1.7;
@@ -460,8 +466,14 @@ onMounted(() => {
   font-family: var(--font-mono);
   font-size: 14px;
   color: var(--text);
-  white-space: nowrap;
-  overflow-x: auto;
+  min-height: calc(2lh + 32px);
+}
+
+.install-cmd pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: inherit;
+  white-space: pre;
 }
 
 .copy-btn {
@@ -499,6 +511,38 @@ onMounted(() => {
   border-radius: 4px;
 }
 
+/* ── Hero headline + callout ── */
+.hero-headline {
+  font-family: var(--font-display);
+  font-size: clamp(1.6rem, 4vw, 2.6rem);
+  font-weight: 400;
+  line-height: 1.2;
+  letter-spacing: -0.5px;
+  color: var(--text);
+  margin-top: 72px;
+  margin-bottom: 16px;
+  text-shadow: 0 2px 16px rgba(0, 0, 0, 0.6);
+}
+
+.hero-headline em {
+  color: var(--accent);
+}
+
+.hero-callout {
+  font-size: 16px;
+  color: rgba(255, 255, 255, 0.75);
+  line-height: 1.7;
+  font-weight: 300;
+  max-width: 540px;
+  margin: 0 auto;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.5);
+}
+
+.hero-callout strong.accent {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* ── Responsive ── */
 @media (max-width: 768px) {
   .schema-row {
@@ -521,11 +565,16 @@ onMounted(() => {
     flex-direction: column;
     gap: 12px;
     align-items: flex-start;
+    min-height: auto;
+  }
+
+  .install-cmd pre {
+    white-space: pre-wrap;
+    word-break: break-all;
   }
 
   .install-cmd code {
     font-size: 12px;
-    word-break: break-all;
   }
 
   .copy-btn {

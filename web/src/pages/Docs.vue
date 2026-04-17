@@ -14,6 +14,7 @@ const sections = [
   { id: "triage", label: "Triage" },
   { id: "cli", label: "CLI Reference" },
   { id: "output", label: "Output Format" },
+  { id: "skill", label: "SKILL.md" },
 ]
 
 function scrollTo(id: string) {
@@ -615,6 +616,139 @@ crev list --runtimes</code></pre>
           when triage is enabled.
         </p>
       </section>
+
+      <!-- SKILL.md -->
+      <section id="skill">
+        <h1>SKILL.md</h1>
+        <p class="lead">
+          Running <code>crev init</code> generates a <code>SKILL.md</code> file
+          for each coding agent you have installed (Claude Code, Codex CLI, etc.).
+          The agent reads this file automatically and knows how to run reviews,
+          create schemas, show stats &mdash; no manual configuration needed.
+        </p>
+
+        <div class="callout">
+          <strong>Just ask your agent.</strong> Once <code>crev init</code> has
+          run, your coding agent understands the full crev workflow. Ask it to
+          review a PR, fix findings, or tune a schema &mdash; it reads the skill
+          file and handles the rest.
+        </div>
+
+        <h2>Generated template</h2>
+        <div class="code-block">
+          <div class="code-label">SKILL.md</div>
+          <pre class="skill-pre"><code>---
+name: crev
+description: Use when running AI code reviews, reviewing PRs,
+  validating schemas, or setting up crev in a project -
+  orchestrates multi-AI reviewer code reviews via the crev CLI
+  with parallel execution, triage, and structured JSON output.
+---
+
+# crev
+
+Multi-AI code review CLI. Runs multiple AI reviewers in parallel
+against a diff, normalizes findings, and optionally triages them.
+
+## Quick Reference
+
+| Task                        | Command                                           |
+|-----------------------------|-------------------------------------------------  |
+| Run a review                | `crev run --schema &lt;name&gt; --base main`            |
+| Review a PR                 | `crev run --schema &lt;name&gt; --pr 42`                |
+| Review uncommitted changes  | `crev run --schema &lt;name&gt; --type uncommitted`     |
+| Review entire codebase      | `crev run --schema &lt;name&gt; --type current-state`   |
+| CI mode (no TUI)            | `crev run --schema &lt;name&gt; --plain --json`         |
+| Subset of reviewers         | `crev run --schema &lt;name&gt; --reviewers "Sec,Arch"` |
+| Preview prompts only        | `crev run --schema &lt;name&gt; --prompt-only`          |
+| List schemas/runtimes       | `crev list --schemas` / `crev list --runtimes`    |
+| Validate all schemas        | `crev schema validate --all`                      |
+| Preview diff                | `crev diff --base main`                           |
+| Health check                | `crev doctor`                                     |
+| Scaffold new schema         | `crev schema init &lt;name&gt;`                         |
+| Full setup                  | `crev init`                                       |
+| Review stats                | `crev stats --schema &lt;name&gt;`                      |
+| Stats across versions       | `crev stats --schema &lt;name&gt; --history`            |
+
+## Workflow
+
+### Running a Review
+
+1. Pick a schema: `crev list --schemas`
+2. Run: `crev run --schema &lt;name&gt; --base main`
+3. Read output from `.crev/reviews/&lt;slug&gt;.json`
+4. For each open issue: fix or mark as `wont-fix`
+5. Re-run to merge: `crev run --schema &lt;name&gt; --review-file ...`
+
+### Reading Results
+
+Output JSON structure:
+- `metadata` — slug, timestamp, schema used, diff info
+- `reviews[]` — per-reviewer: name, runtime, model, duration, issues
+- `summary` — totals by severity, category, status, reviewer, triage
+
+Each issue has:
+- `severity`: critical | high | medium | low
+- `category`: bug | security | performance | style | compliance | architecture
+- `status`: open | fixed | wont-fix
+- `triage.verdict`: actionable | deferred | dismissed
+- `file`, `line`, `title`, `description`
+
+### Creating a Schema
+
+Schemas live in `.crev/schemas/&lt;name&gt;.yaml`:
+
+```yaml
+description: What this schema reviews for
+reviewers:
+  - name: Security
+    runtime: claude
+    model: opus
+    agent: security.md
+  - name: Quick Check
+    runtime: gemini
+    model: gemini-2.5-flash
+    prompt: "Focus on bugs and logic errors only."
+  - name: Architecture
+    runtime: claude
+    model: opus
+    scope: codebase
+    context:
+      - packages/cli/src/bin.ts
+      - packages/cli/src/commands/*.ts
+triage:
+  enabled: true
+  runtime: claude
+  model: opus
+```
+
+### Schema Authoring: Black-Box Approach
+
+Treat the target codebase as a black box. Schemas should
+be portable and resilient to internal refactors.
+
+Avoid in prompts:
+- Specific file paths
+- Internal directory structures
+- References to specific function/class/variable names
+
+Encouraged in prompts:
+- Coding patterns and conventions
+- Code examples showing desired style
+- Conceptual guidance
+- Category-level references ("test files", "config files")
+- Architectural principles
+
+### Reviewing Effectiveness
+
+Use `crev stats` to evaluate reviewer signal-to-noise:
+
+1. `crev stats --schema &lt;name&gt;` — per-reviewer rates
+2. `--history` to compare across schema revisions
+3. High dismissed rate = needs prompt tuning
+4. `--json` for machine-readable output</code></pre>
+        </div>
+      </section>
     </main>
   </div>
 </template>
@@ -772,6 +906,11 @@ crev list --runtimes</code></pre>
   font-size: 13px;
   line-height: 1.7;
   color: var(--text-2);
+}
+
+.skill-pre {
+  white-space: pre-wrap;
+  word-wrap: break-word;
 }
 
 .y-key { color: #7dd3fc; }
