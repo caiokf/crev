@@ -1,11 +1,21 @@
 <script setup lang="ts">
+import { ref, onMounted, onUnmounted } from "vue"
 import { RouterLink, RouterView } from "vue-router"
 import ShaderBackground from "./components/ShaderBackground.vue"
+
+const scrolled = ref(false)
+
+function onScroll() {
+  scrolled.value = window.scrollY > 20
+}
+
+onMounted(() => window.addEventListener("scroll", onScroll, { passive: true }))
+onUnmounted(() => window.removeEventListener("scroll", onScroll))
 </script>
 
 <template>
   <ShaderBackground />
-  <nav class="nav">
+  <nav :class="['nav', { scrolled }]">
     <div class="nav-inner">
       <RouterLink to="/" class="nav-logo">crev</RouterLink>
       <div class="nav-links">
@@ -50,6 +60,12 @@ import ShaderBackground from "./components/ShaderBackground.vue"
   left: 0;
   right: 0;
   z-index: 100;
+  background: transparent;
+  border-bottom: 1px solid transparent;
+  transition: background 0.3s, border-color 0.3s, box-shadow 0.3s;
+}
+
+.nav.scrolled {
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
   background: rgba(5, 5, 8, 0.55);
@@ -73,6 +89,7 @@ import ShaderBackground from "./components/ShaderBackground.vue"
   font-weight: 500;
   color: var(--accent);
   letter-spacing: -0.5px;
+  flex-shrink: 0;
 }
 
 .nav-links {
@@ -80,21 +97,21 @@ import ShaderBackground from "./components/ShaderBackground.vue"
   align-items: center;
   gap: 28px;
   font-size: 14px;
-  color: var(--text-2);
+  color: var(--text);
+}
+
+.nav-links a {
+  opacity: 0.7;
+  transition: opacity 0.2s;
 }
 
 .nav-links a:hover {
-  color: var(--text);
+  opacity: 1;
 }
 
 .nav-gh {
   display: flex;
-  color: var(--text-2);
-  transition: color 0.2s;
-}
-
-.nav-gh:hover {
-  color: var(--text);
+  transition: opacity 0.2s;
 }
 
 .footer {
@@ -140,6 +157,24 @@ import ShaderBackground from "./components/ShaderBackground.vue"
 }
 
 @media (max-width: 768px) {
+  .nav.scrolled {
+    background: rgba(5, 5, 8, 0.8);
+  }
+
+  .nav-inner {
+    padding: 0 16px;
+  }
+
+  .nav-links {
+    gap: 16px;
+    font-size: 13px;
+  }
+
+  .nav-gh svg {
+    width: 16px;
+    height: 16px;
+  }
+
   .footer-inner {
     flex-direction: column;
     gap: 16px;
