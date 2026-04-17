@@ -141,21 +141,27 @@ async function executeReviewersWithTui(
     abort.abort()
   })
 
-  const settled = await Promise.allSettled(
-    reviewers.map(async (reviewer) => {
-      const result = await runSingleReviewer(reviewer, opts, outputFormat, abort.signal)
+  let settled: PromiseSettledResult<NormalizedReview>[]
+  try {
+    settled = await Promise.allSettled(
+      reviewers.map(async (reviewer) => {
+        const result = await runSingleReviewer(reviewer, opts, outputFormat, abort.signal)
 
-      if (abort.signal.aborted) return result
+        if (abort.signal.aborted) return result
 
-      const state = result.exitCode === 0 ? "done" : "failed"
-      spinner.updateEntry(reviewer.name, state, {
-        elapsed: result.durationMs / 1000,
-        resultText: formatIssueSummary(result.issues.length),
-      })
+        const state = result.exitCode === 0 ? "done" : "failed"
+        spinner.updateEntry(reviewer.name, state, {
+          elapsed: result.durationMs / 1000,
+          resultText: formatIssueSummary(result.issues.length),
+        })
 
-      return result
-    }),
-  )
+        return result
+      }),
+    )
+  } catch (err) {
+    spinner.stop()
+    throw err
+  }
 
   for (const reviewer of reviewers) {
     const entry = settled[reviewers.indexOf(reviewer)]
