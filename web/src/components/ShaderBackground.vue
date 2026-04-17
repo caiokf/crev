@@ -59,7 +59,7 @@ import { Shader, Ascii, SineWave, Perspective } from "shaders/vue"
   width: 100%;
   height: 100%;
   z-index: 0;
-  opacity: 0.3;
+  opacity: 0.36;
   mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 15%, black 60%);
   -webkit-mask-image: radial-gradient(ellipse 80% 70% at 50% 50%, transparent 15%, black 60%);
 }

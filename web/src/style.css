@@ -7,9 +7,9 @@
   --text: #e2e2e8;
   --text-2: #7a7a8c;
   --text-3: #4a4a58;
-  --accent: #4ade80;
-  --accent-dim: #22c55e;
-  --accent-glow: rgba(74, 222, 128, 0.12);
+  --accent: #ff9d00;
+  --accent-dim: #e08600;
+  --accent-glow: rgba(255, 157, 0, 0.12);
   --font-display: "Instrument Serif", Georgia, serif;
   --font-body: "Outfit", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", "SF Mono", monospace;
