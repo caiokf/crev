@@ -230,6 +230,7 @@ async function runTriagePass(
   const result = await runTriage({
     issues: allIssues,
     diffContent: opts.diff.diffContent,
+    diffType: opts.diff.type,
     config: effectiveConfig,
   })
 
@@ -277,9 +278,12 @@ async function runSingleReviewer(
   }
 
   const scope = reviewer.scope ?? "diff"
-  const sourceSection = scope === "codebase"
-    ? buildCodebaseReference(opts.diff)
-    : buildDiffReference(opts.diff.diffFile)
+  const isCurrentState = opts.diff.type === "current-state"
+  const sourceSection = isCurrentState
+    ? buildCurrentStateReference(opts.diff, scope === "codebase")
+    : scope === "codebase"
+      ? buildCodebaseReference(opts.diff)
+      : buildDiffReference(opts.diff.diffFile)
 
   const contextSection = await resolveContextFiles(reviewer.context)
 
@@ -329,6 +333,43 @@ export function buildDiffReference(diffFile: string): string {
     diffFile,
     "",
     "Read the diff from that file path instead of expecting it to be pasted inline.",
+  ].join("\n")
+}
+
+export function buildCurrentStateReference(diff: DiffInput, inlineSource: boolean): string {
+  const files = extractChangedFiles(diff.diffContent)
+
+  if (inlineSource) {
+    const sections: string[] = [
+      "Review all files in this repository for issues.",
+      "This is a full codebase review, not a diff review.",
+      "",
+    ]
+
+    const sourceFiles = files.filter((f) => {
+      const resolved = path.resolve(f)
+      return fs.existsSync(resolved)
+    })
+
+    if (sourceFiles.length > 0) {
+      sections.push("Full source of all tracked files:", "")
+      for (const file of sourceFiles) {
+        const content = fs.readFileSync(path.resolve(file), "utf-8")
+        sections.push(`--- ${file} ---`, content, "")
+      }
+    }
+
+    return sections.join("\n")
+  }
+
+  return [
+    "Review all files in this repository for issues.",
+    "This is a full codebase review, not a diff review.",
+    "",
+    "Files to review:",
+    ...files.map((f) => `- ${f}`),
+    "",
+    "Read each file from the filesystem to review its contents.",
   ].join("\n")
 }
 

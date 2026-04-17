@@ -10,6 +10,7 @@ import type { ReviewIssue } from "./types.js"
 type TriageInput = {
   issues: ReviewIssue[]
   diffContent: string
+  diffType?: string
   config: Config
 }
 
@@ -25,7 +26,7 @@ type TriageResult = {
 
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const start = performance.now()
-  const { issues, diffContent, config } = input
+  const { issues, diffContent, diffType, config } = input
 
   if (issues.length === 0) {
     return {
@@ -36,7 +37,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   }
 
   const context = await loadContextFiles(config.triage.context)
-  const prompt = buildTriagePrompt(issues, diffContent, context, config.triage.prompt)
+  const prompt = buildTriagePrompt(issues, diffContent, context, config.triage.prompt, diffType)
   const verdicts = await callTriageAgent(prompt, config)
 
   const triaged = issues.map((issue) => {
@@ -109,6 +110,7 @@ export function buildTriagePrompt(
   diffContent: string,
   context: string,
   triageInstructions: string,
+  diffType?: string,
 ): string {
   const issuesSummary = issues.map((issue) => ({
     id: issue.id,
@@ -126,10 +128,9 @@ export function buildTriagePrompt(
 ## Project context
 ${context || "(No project context files found)"}
 
-## The diff being reviewed
-\`\`\`diff
-${diffContent.slice(0, 80_000)}
-\`\`\`
+${diffType === "current-state"
+    ? `## Scope\nThis is a full codebase review (current-state), not a diff review. The issues below reference files in the repository.`
+    : `## The diff being reviewed\n\`\`\`diff\n${diffContent.slice(0, 80_000)}\n\`\`\``}
 
 ## Issues found by reviewers (${issues.length} total)
 ${JSON.stringify(issuesSummary, null, 2)}

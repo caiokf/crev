@@ -103,9 +103,6 @@ async function getCommitDiff(baseCommit: string): Promise<string> {
 }
 
 async function getCurrentStateDiff(): Promise<string> {
-  const { stdout: emptyTree } = await execFileAsync("git", ["hash-object", "-t", "tree", "/dev/null"])
-  const treeHash = emptyTree.trim()
-
   // Check if HEAD exists (repo might have no commits yet)
   try {
     await execFileAsync("git", ["rev-parse", "--verify", "HEAD"])
@@ -116,8 +113,13 @@ async function getCurrentStateDiff(): Promise<string> {
     )
   }
 
-  const { stdout } = await execFileAsync("git", ["diff", treeHash, "HEAD"], { maxBuffer: MAX_BUFFER })
-  return stdout
+  // Instead of diffing the entire repo against an empty tree (which can exceed
+  // buffer limits on large repos), produce synthetic diff headers from the file
+  // list. This keeps extractChangedFiles() and filterDiff() working while
+  // staying lightweight. Reviewers will read the actual files directly.
+  const { stdout } = await execFileAsync("git", ["ls-tree", "-r", "--name-only", "HEAD"])
+  const files = stdout.trim().split("\n").filter(Boolean)
+  return files.map((f) => `diff --git a/${f} b/${f}`).join("\n")
 }
 
 async function getTypeDiff(type: "all" | "committed" | "uncommitted"): Promise<string> {

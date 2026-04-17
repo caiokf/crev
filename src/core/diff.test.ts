@@ -100,10 +100,12 @@ describe("resolveDiff", () => {
     }
   })
 
-  it("current-state returns diff of all files against empty tree", async () => {
+  it("current-state returns synthetic diff headers for all tracked files", async () => {
     const dir = createTempGitRepo()
     tempDirs.push(dir)
     fs.writeFileSync(path.join(dir, "file.txt"), "hello\n")
+    fs.mkdirSync(path.join(dir, "src"), { recursive: true })
+    fs.writeFileSync(path.join(dir, "src/app.ts"), "export {}\n")
     execSync("git add . && git commit -m init", { cwd: dir })
 
     const crevDir = path.join(dir, ".crev")
@@ -117,8 +119,12 @@ describe("resolveDiff", () => {
         source: { kind: "local", type: "current-state" },
         crevDir,
       })
-      expect(result.diffContent).toContain("file.txt")
-      expect(result.diffContent).toContain("+hello")
+      // Should contain synthetic diff headers, not actual diff content
+      expect(result.diffContent).toContain("diff --git a/file.txt b/file.txt")
+      expect(result.diffContent).toContain("diff --git a/src/app.ts b/src/app.ts")
+      // Should NOT contain actual file content (no +lines)
+      expect(result.diffContent).not.toContain("+hello")
+      expect(result.diffContent).not.toContain("+export")
     } finally {
       process.chdir(prev)
     }
