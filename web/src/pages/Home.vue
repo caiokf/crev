@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
+import { RouterLink } from "vue-router"
 import TerminalDemo from "../components/TerminalDemo.vue"
+import claudeLogo from "../assets/logos/claude.svg"
+import geminiLogo from "../assets/logos/gemini.svg"
+import codexLogo from "../assets/logos/codex.svg"
+import coderabbitLogo from "../assets/logos/coderabbit.svg"
+import opencodeLogo from "../assets/logos/opencode.svg"
 
 const activeTab = ref<"npm" | "brew" | "curl">("npm")
 const copied = ref(false)
@@ -18,12 +24,11 @@ function copy() {
 }
 
 const runtimes = [
-  { name: "Claude", color: "#d4a574" },
-  { name: "Gemini", color: "#8b9cf7" },
-  { name: "Codex", color: "#10a37f" },
-  { name: "CodeRabbit", color: "#ff6b35" },
-  { name: "Copilot", color: "#6e40c9" },
-  { name: "OpenCode", color: "#e44d26" },
+  { name: "Claude Code", logo: claudeLogo },
+  { name: "Gemini CLI", logo: geminiLogo },
+  { name: "Codex CLI", logo: codexLogo },
+  { name: "CodeRabbit", logo: coderabbitLogo },
+  { name: "OpenCode", logo: opencodeLogo },
 ]
 
 const features = [
@@ -85,17 +90,17 @@ onMounted(() => {
     <div class="hero-glow"></div>
     <div class="hero-content">
       <h1 class="hero-title">
-        Multi-AI code review.<br />
+        Multi-AI <em>C</em>ode <em>Rev</em>iew.<br />
         <em>One command.</em>
       </h1>
       <div class="hero-terminal">
         <TerminalDemo />
       </div>
-      <h2 class="hero-headline">
+      <h2 class="hero-headline reveal">
         Run your coding agents headless.<br />
         <em>No API keys.</em>
       </h2>
-      <p class="hero-callout">
+      <p class="hero-callout reveal">
         <strong class="accent">crev</strong> runs Claude Code, Gemini CLI, Codex CLI and more &mdash;
         using the subscriptions you already pay for.
         No extra token costs, no separate billing.
@@ -190,6 +195,9 @@ onMounted(() => {
       <p class="install-hint reveal">
         Then run <code>crev init</code> in your project to get started.
       </p>
+      <p class="install-hint reveal" style="margin-top: 12px">
+        <RouterLink to="/docs" class="docs-link">Read the documentation &rarr;</RouterLink>
+      </p>
     </div>
   </section>
 
@@ -203,7 +211,7 @@ onMounted(() => {
           :key="rt.name"
           class="runtime-badge"
         >
-          <span class="runtime-dot" :style="{ background: rt.color }"></span>
+          <img :src="rt.logo" :alt="rt.name" class="runtime-logo" />
           {{ rt.name }}
         </div>
       </div>
@@ -396,8 +404,8 @@ onMounted(() => {
 .runtime-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 20px;
+  gap: 10px;
+  padding: 12px 22px;
   background: rgba(12, 12, 17, 0.4);
   border: 1px solid rgba(255, 255, 255, 0.06);
   border-radius: 8px;
@@ -414,10 +422,10 @@ onMounted(() => {
   color: var(--text);
 }
 
-.runtime-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
+.runtime-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
 }
 
 /* ── Install ── */
@@ -541,6 +549,15 @@ onMounted(() => {
 .hero-callout strong.accent {
   color: var(--accent);
   font-weight: 600;
+}
+
+.docs-link {
+  color: var(--accent);
+  transition: opacity 0.2s;
+}
+
+.docs-link:hover {
+  opacity: 1;
 }
 
 /* ── Responsive ── */

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted } from "vue"
 
-type Line = { text: string; cls: string; delay: number }
+type Line = { text: string; html?: string; cls: string; delay: number }
 
 const lines: Line[] = [
   { text: "Running 3 reviewers from schema standard", cls: "info", delay: 1000 },
@@ -12,10 +12,10 @@ const lines: Line[] = [
 ]
 
 /* Second phase: reviewers complete one-by-one (fastest first) */
-const completions: { idx: number; text: string; cls: string; delay: number }[] = [
-  { idx: 3, text: "│    ◆ Security  (gemini/gemini-2.5-pro)     38.7s  2 issues", cls: "done", delay: 3200 },
-  { idx: 2, text: "│    ◆ Engineer  (claude/sonnet)             42.1s  5 issues", cls: "done-warn", delay: 3800 },
-  { idx: 4, text: "│    ◆ Architect (claude/opus)               51.3s  1 issue", cls: "done", delay: 5000 },
+const completions: { idx: number; html: string; cls: string; delay: number }[] = [
+  { idx: 3, html: `│    <span class="c-ok">◆</span> <span class="c-name">Security</span>  <span class="c-rt">(gemini/gemini-2.5-pro)</span>     <span class="c-time">38.7s</span>  <span class="c-issues">2 issues</span>`, cls: "done-rich", delay: 3200 },
+  { idx: 2, html: `│    <span class="c-warn">◆</span> <span class="c-name">Engineer</span>  <span class="c-rt">(claude/sonnet)</span>             <span class="c-time">42.1s</span>  <span class="c-issues-warn">5 issues</span>`, cls: "done-rich", delay: 3800 },
+  { idx: 4, html: `│    <span class="c-ok">◆</span> <span class="c-name">Architect</span> <span class="c-rt">(claude/opus)</span>               <span class="c-time">51.3s</span>  <span class="c-issues">1 issue</span>`, cls: "done-rich", delay: 5000 },
 ]
 
 const summaryLines: Line[] = [
@@ -53,7 +53,7 @@ onMounted(() => {
       /* Phase 2: replace pending lines with completed ones (fastest first) */
       for (const c of completions) {
         setTimeout(() => {
-          displayLines.value[c.idx] = { text: c.text, cls: c.cls, delay: 0 }
+          displayLines.value[c.idx] = { text: "", html: c.html, cls: c.cls, delay: 0 }
         }, c.delay)
       }
 
@@ -81,9 +81,8 @@ onMounted(() => {
         <span v-if="!cmdDone" class="cursor">_</span>
       </div>
       <template v-for="(line, idx) in displayLines" :key="'l'+idx">
-        <div v-if="idx < visibleCount" :class="['line', line.cls]" class="line-enter">
-          {{ line.text }}
-        </div>
+        <div v-if="idx < visibleCount && line.html" :class="['line', line.cls]" class="line-enter" v-html="line.html"></div>
+        <div v-else-if="idx < visibleCount" :class="['line', line.cls]" class="line-enter">{{ line.text }}</div>
       </template>
       <template v-for="(line, idx) in summaryLines" :key="'s'+idx">
         <div v-if="idx < summaryVisible" :class="['line', line.cls]" class="line-enter">
@@ -180,6 +179,18 @@ onMounted(() => {
 .line.done-warn {
   color: #fbbf24;
 }
+
+.line.done-rich {
+  color: var(--text-3);
+}
+
+.line.done-rich :deep(.c-ok) { color: #4ade80; }
+.line.done-rich :deep(.c-warn) { color: #fbbf24; }
+.line.done-rich :deep(.c-name) { color: var(--text); font-weight: 500; }
+.line.done-rich :deep(.c-rt) { color: var(--text-3); }
+.line.done-rich :deep(.c-time) { color: var(--text-2); }
+.line.done-rich :deep(.c-issues) { color: #4ade80; }
+.line.done-rich :deep(.c-issues-warn) { color: #fbbf24; }
 
 .line.summary {
   color: var(--text);

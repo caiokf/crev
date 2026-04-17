@@ -13,6 +13,7 @@ const sections = [
   { id: "models", label: "Models" },
   { id: "triage", label: "Triage" },
   { id: "cli", label: "CLI Reference" },
+  { id: "ci-cd", label: "CI/CD" },
   { id: "output", label: "Output Format" },
   { id: "skill", label: "SKILL.md" },
 ]
@@ -74,7 +75,7 @@ watch(() => route.hash, (hash) => {
       <section id="getting-started">
         <h1>Getting Started</h1>
         <p class="lead">
-          crev runs multiple AI reviewers in parallel against your code diffs,
+          <strong>crev</strong> (<strong>C</strong>ode <strong>REV</strong>iew) runs multiple AI reviewers in parallel against your code diffs,
           normalizes findings into structured JSON, and optionally triages them
           with a devil's-advocate pass.
         </p>
@@ -551,6 +552,64 @@ crev list --runtimes</code></pre>
             <code class="prop-name">crev schema validate</code>
             <span class="prop-desc">Validate schema files.</span>
           </div>
+        </div>
+      </section>
+
+      <!-- CI/CD -->
+      <section id="ci-cd">
+        <h1>CI/CD</h1>
+        <p class="lead">
+          crev works in headless CI environments with the <code>--plain</code>
+          and <code>--json</code> flags. Run reviews automatically on every PR.
+        </p>
+
+        <h2>GitHub Actions</h2>
+        <div class="code-block">
+          <div class="code-label">.github/workflows/crev.yml</div>
+          <pre><code><span class="y-key">name</span>: <span class="y-val">Code Review</span>
+<span class="y-key">on</span>: [<span class="y-val">pull_request</span>]
+
+<span class="y-key">jobs</span>:
+  <span class="y-key">review</span>:
+    <span class="y-key">runs-on</span>: <span class="y-val">ubuntu-latest</span>
+    <span class="y-key">steps</span>:
+      - <span class="y-key">uses</span>: <span class="y-val">actions/checkout@v4</span>
+        <span class="y-key">with</span>:
+          <span class="y-key">fetch-depth</span>: <span class="y-val">0</span>
+
+      - <span class="y-key">uses</span>: <span class="y-val">actions/setup-node@v4</span>
+        <span class="y-key">with</span>:
+          <span class="y-key">node-version</span>: <span class="y-val">20</span>
+
+      - <span class="y-key">run</span>: <span class="y-val">npm install -g @caiokf/crev</span>
+
+      - <span class="y-key">run</span>: <span class="y-val">crev run --schema quick --plain --json</span>
+        <span class="y-key">env</span>:
+          <span class="y-key">ANTHROPIC_API_KEY</span>: <span class="y-str">${{ secrets.ANTHROPIC_API_KEY }}</span></code></pre>
+        </div>
+
+        <h2>Key flags</h2>
+        <div class="props-table compact">
+          <div class="prop-row">
+            <code class="prop-name">--plain</code>
+            <span class="prop-desc">Disables the TUI. Plain text output suitable for CI logs.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">--json</code>
+            <span class="prop-desc">Machine-readable JSON output. Pipe to <code>jq</code> or post to PR comments.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">--base &lt;branch&gt;</code>
+            <span class="prop-desc">Diff against the target branch. In PRs, use the base branch.</span>
+          </div>
+        </div>
+
+        <div class="callout">
+          <strong>API keys in CI.</strong> In headless CI environments where CLI
+          tools aren't logged in interactively, you'll need API keys set as
+          environment variables (e.g. <code>ANTHROPIC_API_KEY</code>,
+          <code>GEMINI_API_KEY</code>). Locally, crev uses your existing CLI
+          subscriptions with no keys needed.
         </div>
       </section>
 

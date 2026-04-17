@@ -26,7 +26,7 @@ import ShaderBackground from "./components/ShaderBackground.vue"
 
     <footer class="footer">
     <div class="footer-inner">
-      <span class="footer-logo">crev</span>
+      <span class="footer-logo">crev <span class="footer-tagline">&mdash; Code Review</span></span>
       <div class="footer-links">
         <a href="https://github.com/caiokf/crev" target="_blank">GitHub</a>
         <a href="https://www.npmjs.com/package/@caiokf/crev" target="_blank">npm</a>
@@ -115,6 +115,12 @@ import ShaderBackground from "./components/ShaderBackground.vue"
   font-size: 15px;
   color: var(--text-3);
   font-weight: 500;
+}
+
+.footer-tagline {
+  font-family: var(--font-body);
+  font-weight: 300;
+  color: var(--text-3);
 }
 
 .footer-links {

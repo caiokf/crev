@@ -6,7 +6,7 @@
   ██████ ██     ██ ████████    ███
 ```
 
-# crev
+# crev — **C**ode **REV**iew
 
 ### Use your existing subscriptions
 
