@@ -1,6 +1,7 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { glob } from "glob"
 import { getRuntime, execAbortable } from "valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
@@ -86,6 +87,16 @@ async function loadContextFiles(patterns: string[]): Promise<string> {
       const content = fs.readFileSync(resolved, "utf-8")
       sections.push(`### ${pattern}\n${content}`)
       continue
+    }
+
+    // Expand glob patterns (e.g., docs/**/*.md)
+    const matches = await glob(pattern, { nodir: true })
+    for (const file of matches.sort()) {
+      const filePath = path.resolve(file)
+      if (fs.existsSync(filePath)) {
+        const content = fs.readFileSync(filePath, "utf-8")
+        sections.push(`### ${file}\n${content}`)
+      }
     }
   }
 
