@@ -1,3 +1,4 @@
+declare const CREV_VERSION: string
 import { program } from "commander"
 import { registerRunCommand } from "./commands/run.js"
 import { registerListCommand } from "./commands/list.js"
@@ -13,7 +14,7 @@ import { registerStatsCommand } from "./commands/stats.js"
 program
   .name("crev")
   .description("AI-powered multi-reviewer code review CLI")
-  .version("0.1.1")
+  .version(CREV_VERSION)
 
 registerRunCommand(program)
 registerListCommand(program)
