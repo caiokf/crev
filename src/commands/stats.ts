@@ -411,7 +411,7 @@ function printDelta(prev: RevisionGroup, curr: RevisionGroup): void {
 
 // ── Helpers ──
 
-function normalizeTitle(title: string): string {
+export function normalizeTitle(title: string): string {
   // Extract significant keywords, stripping noise words and punctuation.
   // Goal: "Command name `update` is misleading" and "`update` verb is ambiguous"
   // should map to a similar fingerprint.
@@ -434,7 +434,7 @@ function normalizeTitle(title: string): string {
   return words.join(" ")
 }
 
-function titlesAreSimilar(a: string, b: string): boolean {
+export function titlesAreSimilar(a: string, b: string): boolean {
   const wordsA = new Set(a.split(" "))
   const wordsB = new Set(b.split(" "))
   const intersection = [...wordsA].filter((w) => wordsB.has(w)).length
@@ -443,7 +443,7 @@ function titlesAreSimilar(a: string, b: string): boolean {
   return union > 0 && intersection / union > 0.5
 }
 
-function clusterDismissedTitles(titles: string[]): { representative: string; count: number }[] {
+export function clusterDismissedTitles(titles: string[]): { representative: string; count: number }[] {
   const clusters: { normalized: string; representative: string; count: number }[] = []
 
   for (const title of titles) {
