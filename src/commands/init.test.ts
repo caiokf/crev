@@ -1,58 +1,64 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { detectAITools } from "../util/detect-tools.js"
+import { writeIfNew } from "../util/paths.js"
+import { configTemplate } from "../templates/config.js"
 
 describe("init scaffolding", () => {
   let tmpDir: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-init-"))
+    vi.spyOn(console, "log").mockImplementation(() => {})
   })
 
   afterEach(() => {
     fs.rmSync(tmpDir, { recursive: true })
+    vi.restoreAllMocks()
   })
 
-  it("creates .crev directory structure", () => {
+  it("creates .crev directory structure with writeIfNew", () => {
     const crevDir = path.join(tmpDir, ".crev")
     for (const dir of ["schemas", "diffs", "reviews"]) {
       fs.mkdirSync(path.join(crevDir, dir), { recursive: true })
     }
 
+    writeIfNew(path.join(crevDir, "config.yaml"), configTemplate)
+    writeIfNew(path.join(crevDir, "diffs", ".gitkeep"), "")
+    writeIfNew(path.join(crevDir, "reviews", ".gitkeep"), "")
+
     expect(fs.existsSync(path.join(crevDir, "schemas"))).toBe(true)
     expect(fs.existsSync(path.join(crevDir, "diffs"))).toBe(true)
     expect(fs.existsSync(path.join(crevDir, "reviews"))).toBe(true)
+    expect(fs.readFileSync(path.join(crevDir, "config.yaml"), "utf-8")).toBe(configTemplate)
+    expect(fs.existsSync(path.join(crevDir, "diffs", ".gitkeep"))).toBe(true)
+    expect(fs.existsSync(path.join(crevDir, "reviews", ".gitkeep"))).toBe(true)
   })
 
-  it("does not overwrite existing non-empty files", () => {
+  it("does not overwrite existing non-empty files via writeIfNew", () => {
     const crevDir = path.join(tmpDir, ".crev")
     fs.mkdirSync(crevDir, { recursive: true })
 
     const configPath = path.join(crevDir, "config.yaml")
     fs.writeFileSync(configPath, "custom: true", "utf-8")
 
-    // Simulate writeIfNew behavior
-    if (fs.existsSync(configPath) && fs.readFileSync(configPath, "utf-8").trim()) {
-      // skip
-    } else {
-      fs.writeFileSync(configPath, "overwritten", "utf-8")
-    }
+    writeIfNew(configPath, configTemplate)
 
     expect(fs.readFileSync(configPath, "utf-8")).toBe("custom: true")
   })
 
-  it("writes empty .gitkeep files", () => {
+  it("overwrites empty files via writeIfNew", () => {
     const crevDir = path.join(tmpDir, ".crev")
-    fs.mkdirSync(path.join(crevDir, "diffs"), { recursive: true })
-    fs.mkdirSync(path.join(crevDir, "reviews"), { recursive: true })
+    fs.mkdirSync(crevDir, { recursive: true })
 
-    fs.writeFileSync(path.join(crevDir, "diffs", ".gitkeep"), "", "utf-8")
-    fs.writeFileSync(path.join(crevDir, "reviews", ".gitkeep"), "", "utf-8")
+    const configPath = path.join(crevDir, "config.yaml")
+    fs.writeFileSync(configPath, "  \n  ", "utf-8")
 
-    expect(fs.existsSync(path.join(crevDir, "diffs", ".gitkeep"))).toBe(true)
-    expect(fs.existsSync(path.join(crevDir, "reviews", ".gitkeep"))).toBe(true)
+    writeIfNew(configPath, configTemplate)
+
+    expect(fs.readFileSync(configPath, "utf-8")).toBe(configTemplate)
   })
 })
 
