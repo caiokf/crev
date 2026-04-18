@@ -1,5 +1,31 @@
 import { describe, expect, it } from "vitest"
-import { RawRunFlags } from "./types.js"
+import { RawRunFlags, UserCancelledError } from "./types.js"
+
+describe("UserCancelledError", () => {
+  it("is an instance of Error", () => {
+    const err = new UserCancelledError()
+    expect(err).toBeInstanceOf(Error)
+  })
+
+  it("has the correct name", () => {
+    const err = new UserCancelledError()
+    expect(err.name).toBe("UserCancelledError")
+  })
+
+  it("has a descriptive message", () => {
+    const err = new UserCancelledError()
+    expect(err.message).toBe("Review cancelled by user.")
+  })
+
+  it("can be caught with instanceof", () => {
+    try {
+      throw new UserCancelledError()
+    } catch (err) {
+      expect(err instanceof UserCancelledError).toBe(true)
+      expect(err instanceof Error).toBe(true)
+    }
+  })
+})
 
 describe("RawRunFlags validation", () => {
   const valid = { schema: "quick" }
