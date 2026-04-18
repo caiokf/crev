@@ -468,6 +468,11 @@ function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir
 
 function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string): string {
   const resolvedPath = path.resolve(process.cwd(), existingFilePath)
+  const projectRoot = process.cwd()
+
+  if (!resolvedPath.startsWith(projectRoot + path.sep) && resolvedPath !== projectRoot) {
+    throw new Error(`--review-file path "${existingFilePath}" resolves outside the project root`)
+  }
 
   if (!fs.existsSync(resolvedPath)) {
     fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })
