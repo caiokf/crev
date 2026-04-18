@@ -466,13 +466,16 @@ function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir
   return filePath
 }
 
-function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string): string {
-  const resolvedPath = path.resolve(process.cwd(), existingFilePath)
-  const projectRoot = process.cwd()
-
+export function validateReviewFilePath(filePath: string, projectRoot: string): string {
+  const resolvedPath = path.resolve(projectRoot, filePath)
   if (!resolvedPath.startsWith(projectRoot + path.sep) && resolvedPath !== projectRoot) {
-    throw new Error(`--review-file path "${existingFilePath}" resolves outside the project root`)
+    throw new Error(`--review-file path "${filePath}" resolves outside the project root`)
   }
+  return resolvedPath
+}
+
+function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string): string {
+  const resolvedPath = validateReviewFilePath(existingFilePath, process.cwd())
 
   if (!fs.existsSync(resolvedPath)) {
     fs.mkdirSync(path.dirname(resolvedPath), { recursive: true })

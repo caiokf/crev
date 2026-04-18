@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
-import { extractChangedFiles, buildCodebaseReference, buildDiffReference } from "./orchestrator.js"
+import { extractChangedFiles, buildCodebaseReference, buildDiffReference, validateReviewFilePath } from "./orchestrator.js"
 
 describe("extractChangedFiles", () => {
   it("extracts file paths from standard git diff", () => {
@@ -131,5 +131,34 @@ describe("buildCodebaseReference", () => {
     }
     const result = buildCodebaseReference(diff)
     expect(result).toContain(`--- ${relativePath} ---`)
+  })
+})
+
+describe("validateReviewFilePath", () => {
+  it("accepts paths within the project root", () => {
+    const result = validateReviewFilePath(".crev/reviews/test.json", "/project")
+    expect(result).toBe(path.resolve("/project", ".crev/reviews/test.json"))
+  })
+
+  it("accepts nested subdirectory paths", () => {
+    const result = validateReviewFilePath("deep/nested/file.json", "/project")
+    expect(result).toBe(path.resolve("/project", "deep/nested/file.json"))
+  })
+
+  it("rejects paths that escape the project root via ../", () => {
+    expect(() => {
+      validateReviewFilePath("../../etc/passwd", "/project/sub")
+    }).toThrow("resolves outside the project root")
+  })
+
+  it("rejects absolute paths outside the project", () => {
+    expect(() => {
+      validateReviewFilePath("/tmp/evil.json", "/project")
+    }).toThrow("resolves outside the project root")
+  })
+
+  it("accepts absolute paths inside the project", () => {
+    const result = validateReviewFilePath("/project/reviews/test.json", "/project")
+    expect(result).toBe("/project/reviews/test.json")
   })
 })
