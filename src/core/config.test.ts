@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { getOutputDir, loadAgentPrompt, loadConfig, resolveModelAlias } from "./config.js"
+import { getOutputDir, loadAgentPrompt, loadConfig, resolveModelAlias, resolveClaudeModelId } from "./config.js"
 
 describe("loadConfig", () => {
   let tmpDir: string
@@ -69,6 +69,45 @@ describe("resolveModelAlias", () => {
   it("returns model as-is when no alias", () => {
     const config = loadConfig("/nonexistent")
     expect(resolveModelAlias(config, "sonnet")).toBe("sonnet")
+  })
+})
+
+describe("resolveClaudeModelId", () => {
+  it("resolves 'opus' to full Claude model ID", () => {
+    const config = loadConfig("/nonexistent")
+    expect(resolveClaudeModelId(config, "opus")).toBe("claude-opus-4-6")
+  })
+
+  it("resolves 'sonnet' to full Claude model ID", () => {
+    const config = loadConfig("/nonexistent")
+    expect(resolveClaudeModelId(config, "sonnet")).toBe("claude-sonnet-4-6")
+  })
+
+  it("resolves 'haiku' to full Claude model ID", () => {
+    const config = loadConfig("/nonexistent")
+    expect(resolveClaudeModelId(config, "haiku")).toBe("claude-haiku-4-5-20251001")
+  })
+
+  it("passes through full model IDs unchanged", () => {
+    const config = loadConfig("/nonexistent")
+    expect(resolveClaudeModelId(config, "claude-opus-4-6")).toBe("claude-opus-4-6")
+  })
+
+  it("passes through unknown model names unchanged", () => {
+    const config = loadConfig("/nonexistent")
+    expect(resolveClaudeModelId(config, "gpt-5.4")).toBe("gpt-5.4")
+  })
+
+  it("applies user aliases before Claude shorthands", () => {
+    const config = loadConfig("/nonexistent")
+    ;(config.aliases as Record<string, string>)["fast"] = "haiku"
+    expect(resolveClaudeModelId(config, "fast")).toBe("claude-haiku-4-5-20251001")
+  })
+
+  it("user alias to full ID bypasses shorthands", () => {
+    const config = loadConfig("/nonexistent")
+    ;(config.aliases as Record<string, string>)["default"] = "claude-sonnet-4-6"
+    expect(resolveClaudeModelId(config, "default")).toBe("claude-sonnet-4-6")
   })
 })
 
