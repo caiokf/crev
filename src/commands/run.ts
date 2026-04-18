@@ -7,7 +7,7 @@ import { findCrevDir, loadConfig } from "../core/config.js"
 import { resolveDiff } from "../core/diff.js"
 import { orchestrate } from "../core/orchestrator.js"
 import { loadSchemaFile } from "../core/schema.js"
-import { RawRunFlags } from "../core/types.js"
+import { RawRunFlags, UserCancelledError } from "../core/types.js"
 import { getSchemasDir } from "../util/paths.js"
 import path from "node:path"
 
@@ -78,20 +78,29 @@ export function registerRunCommand(program: Command): void {
         return
       }
 
-      const result = await orchestrate({
-        schema,
-        schemaName: cmd.schema,
-        schemaHash,
-        config,
-        diff,
-        slug,
-        crevDir,
-        description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
-        reviewerFilter: cmd.reviewers,
-        plain: cmd.plain || cmd.output.kind === "plain",
-        promptOnly: cmd.output.kind === "prompt-only",
-        reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
-      })
+      let result
+      try {
+        result = await orchestrate({
+          schema,
+          schemaName: cmd.schema,
+          schemaHash,
+          config,
+          diff,
+          slug,
+          crevDir,
+          description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
+          reviewerFilter: cmd.reviewers,
+          plain: cmd.plain || cmd.output.kind === "plain",
+          promptOnly: cmd.output.kind === "prompt-only",
+          reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
+        })
+      } catch (err) {
+        if (err instanceof UserCancelledError) {
+          console.log(chalk.yellow("Review cancelled. No files saved."))
+          return
+        }
+        throw err
+      }
 
       if (cmd.output.kind === "prompt-only" || cmd.output.kind === "json") {
         console.log(JSON.stringify(result, null, 2))

@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+export class UserCancelledError extends Error {
+  constructor() {
+    super("Review cancelled by user.")
+    this.name = "UserCancelledError"
+  }
+}
+
 // ── Diff source: exactly one of these, never a bag of optionals ──
 
 export type DiffSource =

@@ -9,6 +9,7 @@ import { getOutputDir, loadAgentPrompt, resolveModelAlias, getRuntimeConfig, get
 import { cleanupDiffFile } from "./diff.js"
 import { normalizeOutput } from "./normalizer.js"
 import { runTriage } from "./triage.js"
+import { UserCancelledError } from "./types.js"
 import type { NormalizedReview, ReviewResult } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
@@ -172,8 +173,7 @@ async function executeReviewersWithTui(
 
   if (action === "quit") {
     spinner.stop()
-    console.log(chalk.yellow("Review cancelled. No files saved."))
-    process.exit(0)
+    throw new UserCancelledError()
   }
 
   if (action === "finalize") {
