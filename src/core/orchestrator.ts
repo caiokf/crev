@@ -48,11 +48,11 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
   const { reviews, spinner } = await executeReviewers(reviewers, opts, outputFormat)
 
-  const triageResult = await runTriagePass(reviews, opts, spinner)
+  await runTriagePass(reviews, opts, spinner)
 
   spinner?.stop()
 
-  const result = buildResult(reviews, opts, timestamp, triageResult)
+  const result = buildResult(reviews, opts, timestamp)
 
   const outputPath = opts.reviewFile
     ? mergeAndWriteOutput(result, opts.reviewFile)
@@ -191,19 +191,17 @@ async function executeReviewersWithTui(
   return { reviews: results, spinner: action ? null : spinner }
 }
 
-type TriageSummary = { actionable: number; deferred: number; dismissed: number }
-
 async function runTriagePass(
   reviews: NormalizedReview[],
   opts: OrchestrateOptions,
   spinner: MultiSpinnerHandle | null,
-): Promise<TriageSummary | undefined> {
+): Promise<void> {
   const schemaTriage = opts.schema.triage
   const enabled = schemaTriage?.enabled ?? opts.config.triage.enabled
-  if (!enabled) return undefined
+  if (!enabled) return
 
   const allIssues = reviews.flatMap((r) => r.issues)
-  if (allIssues.length === 0) return undefined
+  if (allIssues.length === 0) return
 
   // Schema-level triage overrides global config
   const effectiveConfig: OrchestrateOptions["config"] = schemaTriage
@@ -254,7 +252,6 @@ async function runTriagePass(
     console.log(`Triage complete: ${resultText} (${elapsed}s)`)
   }
 
-  return result.summary
 }
 
 async function runSingleReviewer(
@@ -434,20 +431,7 @@ function buildResult(
   reviews: NormalizedReview[],
   opts: OrchestrateOptions,
   timestamp: string,
-  triageSummary?: TriageSummary,
 ): ReviewResult {
-  const allIssues = reviews.flatMap((r) => r.issues)
-
-  const bySeverity: Record<string, number> = {}
-  const byCategory: Record<string, number> = {}
-  const byReviewer: Record<string, number> = {}
-
-  for (const issue of allIssues) {
-    bySeverity[issue.severity] = (bySeverity[issue.severity] ?? 0) + 1
-    byCategory[issue.category] = (byCategory[issue.category] ?? 0) + 1
-    byReviewer[issue.reviewer] = (byReviewer[issue.reviewer] ?? 0) + 1
-  }
-
   return {
     metadata: {
       slug: opts.slug,
@@ -459,13 +443,7 @@ function buildResult(
       description: opts.description,
     },
     reviews,
-    summary: {
-      totalIssues: allIssues.length,
-      bySeverity,
-      byCategory,
-      byReviewer,
-      triage: triageSummary,
-    },
+    summary: recomputeSummary(reviews),
   }
 }
 
