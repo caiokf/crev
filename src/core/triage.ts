@@ -4,6 +4,7 @@ import path from "node:path"
 import { glob } from "glob"
 import { getRuntime, execAbortable } from "@caiokf/valet"
 import type { Config } from "./config.js"
+import { resolveClaudeModelId } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { ReviewIssue } from "./types.js"
 
@@ -163,14 +164,7 @@ async function callTriageAgent(prompt: string, config: Config): Promise<RawTriag
 
   try {
     if (runtime === "claude") {
-      const modelId =
-        model === "opus"
-          ? "claude-opus-4-6"
-          : model === "sonnet"
-            ? "claude-sonnet-4-6"
-            : model === "haiku"
-              ? "claude-haiku-4-5-20251001"
-              : model
+      const modelId = resolveClaudeModelId(config, model)
 
       const { stdout } = await execAbortable("claude", ["--print", "--model", modelId], {
         maxBuffer: 50 * 1024 * 1024,

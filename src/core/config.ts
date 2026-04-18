@@ -93,6 +93,17 @@ export function resolveModelAlias(config: Config, model: string): string {
   return config.aliases[model] ?? model
 }
 
+const CLAUDE_MODEL_SHORTHANDS: Record<string, string> = {
+  opus: "claude-opus-4-6",
+  sonnet: "claude-sonnet-4-6",
+  haiku: "claude-haiku-4-5-20251001",
+}
+
+export function resolveClaudeModelId(config: Config, model: string): string {
+  const aliased = resolveModelAlias(config, model)
+  return CLAUDE_MODEL_SHORTHANDS[aliased] ?? aliased
+}
+
 export function getOutputDir(config: Config, crevDir: string): string {
   if (path.isAbsolute(config.output.dir)) {
     return config.output.dir

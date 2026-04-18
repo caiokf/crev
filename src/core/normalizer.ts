@@ -1,5 +1,6 @@
 import { execAbortable } from "@caiokf/valet"
 import type { Config } from "./config.js"
+import { resolveClaudeModelId } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 
@@ -122,12 +123,7 @@ ${raw.slice(0, 100_000)}`
     const normalizerModel = config.normalizer.model
 
     if (normalizerRuntime === "claude") {
-      const modelId =
-        normalizerModel === "haiku"
-          ? "claude-haiku-4-5-20251001"
-          : normalizerModel === "sonnet"
-            ? "claude-sonnet-4-6"
-            : normalizerModel
+      const modelId = resolveClaudeModelId(config, normalizerModel)
       const { stdout } = await execAbortable("claude", ["--print", "--model", modelId], {
         maxBuffer: 50 * 1024 * 1024,
         timeout: 2 * 60 * 1000,
