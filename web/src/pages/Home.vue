@@ -167,7 +167,6 @@ onMounted(() => {
   - <span class="y-key">name</span>: <span class="y-val">Architect</span>
     <span class="y-key">runtime</span>: <span class="y-val">claude</span>
     <span class="y-key">model</span>: <span class="y-val">opus</span>
-    <span class="y-key">scope</span>: <span class="y-val">codebase</span>
 
 <span class="y-key">triage</span>:
   <span class="y-key">enabled</span>: <span class="y-bool">true</span>

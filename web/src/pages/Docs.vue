@@ -264,18 +264,6 @@ crev run --schema standard</code></pre>
             <span class="prop-req">optional</span>
             <span class="prop-desc">Path to an external agent/prompt file</span>
           </div>
-          <div class="prop-row">
-            <code class="prop-name">scope</code>
-            <span class="prop-type">"diff" | "codebase"</span>
-            <span class="prop-req">optional</span>
-            <span class="prop-desc">Review scope. <code>codebase</code> includes full source files of changed files</span>
-          </div>
-          <div class="prop-row">
-            <code class="prop-name">context</code>
-            <span class="prop-type">string[]</span>
-            <span class="prop-req">optional</span>
-            <span class="prop-desc">Additional context file globs to include in the prompt</span>
-          </div>
         </div>
 
         <h2>Example schema</h2>
@@ -297,7 +285,6 @@ crev run --schema standard</code></pre>
   - <span class="y-key">name</span>: <span class="y-val">Architect</span>
     <span class="y-key">runtime</span>: <span class="y-val">claude</span>
     <span class="y-key">model</span>: <span class="y-val">opus</span>
-    <span class="y-key">scope</span>: <span class="y-val">codebase</span>
 
 <span class="y-key">triage</span>:
   <span class="y-key">enabled</span>: <span class="y-bool">true</span>
@@ -463,8 +450,7 @@ crev list --runtimes</code></pre>
         <h2>How it works</h2>
         <ol class="steps">
           <li>All issues from all reviewers are collected</li>
-          <li>Context files are loaded (if configured)</li>
-          <li>A triage agent reviews each issue against the diff and context</li>
+          <li>A triage agent reviews each issue against the diff</li>
           <li>Each issue receives a verdict:
             <strong class="verdict-actionable">actionable</strong>,
             <strong class="verdict-deferred">deferred</strong>, or
@@ -483,9 +469,6 @@ crev list --runtimes</code></pre>
   <span class="y-key">enabled</span>: <span class="y-bool">true</span>
   <span class="y-key">runtime</span>: <span class="y-val">claude</span>
   <span class="y-key">model</span>: <span class="y-val">opus</span>             <span class="c-dim"># Use a strong model for triage</span>
-  <span class="y-key">context</span>:                  <span class="c-dim"># Additional files for context</span>
-    - <span class="y-str">"ARCHITECTURE.md"</span>
-    - <span class="y-str">"docs/conventions.md"</span>
   <span class="y-key">prompt</span>: <span class="y-str">|
     Focus on production impact. Dismiss style
     nits unless they affect readability.</span></code></pre>
@@ -537,6 +520,10 @@ crev list --runtimes</code></pre>
           <div class="prop-row">
             <code class="prop-name">--type &lt;type&gt;</code>
             <span class="prop-desc">Diff type: all | committed | uncommitted</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">--analyze</code>
+            <span class="prop-desc">Full codebase analysis (no diff)</span>
           </div>
           <div class="prop-row">
             <code class="prop-name">--reviewers &lt;names&gt;</code>
@@ -754,7 +741,7 @@ against a diff, normalizes findings, and optionally triages them.
 | Run a review                | `crev run --schema &lt;name&gt; --base main`            |
 | Review a PR                 | `crev run --schema &lt;name&gt; --pr 42`                |
 | Review uncommitted changes  | `crev run --schema &lt;name&gt; --type uncommitted`     |
-| Review entire codebase      | `crev run --schema &lt;name&gt; --type current-state`   |
+| Full codebase analysis      | `crev run --schema &lt;name&gt; --analyze`              |
 | CI mode (no TUI)            | `crev run --schema &lt;name&gt; --plain --json`         |
 | Subset of reviewers         | `crev run --schema &lt;name&gt; --reviewers "Sec,Arch"` |
 | Preview prompts only        | `crev run --schema &lt;name&gt; --prompt-only`          |
@@ -809,10 +796,6 @@ reviewers:
   - name: Architecture
     runtime: claude
     model: opus
-    scope: codebase
-    context:
-      - packages/cli/src/bin.ts
-      - packages/cli/src/commands/*.ts
 triage:
   enabled: true
   runtime: claude

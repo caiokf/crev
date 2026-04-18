@@ -216,25 +216,19 @@ crev run --schema standard --base-commit abc123f</code></pre>
         </p>
 
         <div class="code-block">
-          <pre><code><span class="c-dim"># Full codebase review</span>
-crev run --schema thorough --type current-state
+          <pre><code><span class="c-dim"># Full codebase analysis</span>
+crev run --schema thorough --analyze
 
 <span class="c-dim"># Security-focused codebase scan</span>
-crev run --schema standard --type current-state --reviewers Security</code></pre>
+crev run --schema standard --analyze --reviewers Security</code></pre>
         </div>
 
         <p>
-          With <code>current-state</code>, crev instructs each reviewer to review the
-          entire codebase rather than a diff. Reviewers navigate the project
-          using their built-in file access and review it holistically &mdash; no
-          file listing is passed, they explore the codebase themselves.
+          With <code>--analyze</code>, crev instructs each reviewer to analyze the
+          entire codebase rather than a diff. Reviewers have full filesystem access
+          and navigate the project themselves, reading files as needed to review
+          it holistically.
         </p>
-
-        <div class="callout">
-          <strong>Tip:</strong> Combine with <code>scope: codebase</code> in your schema
-          to inline the full source of every file into the reviewer's prompt &mdash;
-          giving it the deepest possible context for architectural reviews.
-        </div>
       </section>
 
       <!-- Review a Branch -->
@@ -364,13 +358,11 @@ crev schema show my-schema</code></pre>
   - <span class="y-key">name</span>: <span class="y-val">API Contract</span>
     <span class="y-key">runtime</span>: <span class="y-val">gemini</span>
     <span class="y-key">model</span>: <span class="y-val">gemini-2.5-pro</span>
-    <span class="y-key">scope</span>: <span class="y-val">codebase</span>
     <span class="y-key">prompt</span>: <span class="y-str">|
-      Review for API contract consistency. Check that response
-      shapes match documented types, error codes are consistent,
+      Review for API contract consistency. Read the API spec
+      in docs/api-spec.yaml and check that response shapes
+      match documented types, error codes are consistent,
       and breaking changes are flagged.</span>
-    <span class="y-key">context</span>:
-      - <span class="y-str">"docs/api-spec.yaml"</span>
 
   - <span class="y-key">name</span>: <span class="y-val">Auth</span>
     <span class="y-key">runtime</span>: <span class="y-val">claude</span>
@@ -381,15 +373,14 @@ crev schema show my-schema</code></pre>
   <span class="y-key">enabled</span>: <span class="y-bool">true</span>
   <span class="y-key">runtime</span>: <span class="y-val">claude</span>
   <span class="y-key">model</span>: <span class="y-val">opus</span>
-  <span class="y-key">context</span>:
-    - <span class="y-str">"ARCHITECTURE.md"</span></code></pre>
+</code></pre>
         </div>
 
         <p>
           Key design principle: <strong>treat schemas as portable</strong>. Avoid
-          hardcoding file paths in prompts. Use <code>context</code> to provide
-          project-specific files and keep prompts focused on <em>what</em> to look for,
-          not <em>where</em>.
+          hardcoding file paths in prompts. Keep prompts focused on <em>what</em>
+          to look for &mdash; reviewers have filesystem access and can read files
+          directly when they need additional context.
         </p>
       </section>
 
