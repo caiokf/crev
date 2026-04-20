@@ -28,7 +28,18 @@ export type OrchestrateOptions = {
   reviewerFilter?: string[]
   plain?: boolean
   promptOnly?: boolean
+  silent?: boolean
   reviewFile?: string
+}
+
+export type PromptOnlyResult = {
+  metadata: ReviewResult["metadata"]
+  prompts: Array<{
+    reviewer: string
+    runtime: string
+    model: string
+    prompt: string
+  }>
 }
 
 export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResult> {
@@ -41,7 +52,7 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
   const outputFormat = getOutputFormat()
   const timestamp = new Date().toISOString()
 
-  if (!opts.plain && !opts.promptOnly) {
+  if (!opts.plain && !opts.promptOnly && !opts.silent) {
     const msg = `Running ${reviewers.length} reviewer${reviewers.length > 1 ? "s" : ""} from schema ${opts.schemaName}`
     process.stdout.write(`${msg}\n`)
   }
@@ -54,12 +65,12 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
   const result = buildResult(reviews, opts, timestamp)
 
-  const outputPath = opts.reviewFile
-    ? mergeAndWriteOutput(result, opts.reviewFile)
+  const output = opts.reviewFile
+    ? { jsonPath: mergeAndWriteOutput(result, opts.reviewFile) }
     : writeOutput(result, opts.config, opts.slug, opts.crevDir)
 
-  if (!opts.promptOnly) {
-    const displayPath = path.relative(process.cwd(), outputPath)
+  if (!opts.promptOnly && !opts.silent) {
+    const displayPath = formatOutputPath(output, opts.config.output.format)
     printSummary(result, displayPath, opts.plain)
   }
 
@@ -77,6 +88,37 @@ export function filterReviewers(reviewers: ReviewerConfig[], filter?: string[]):
   return reviewers.filter((r) => filterLower.includes(r.name.toLowerCase()))
 }
 
+export function buildPromptOnlyResult(opts: OrchestrateOptions): PromptOnlyResult {
+  const reviewers = filterReviewers(opts.schema.reviewers, opts.reviewerFilter)
+  if (reviewers.length === 0) {
+    throw new Error("No reviewers matched the filter")
+  }
+
+  const outputFormat = getOutputFormat()
+  const timestamp = new Date().toISOString()
+
+  return {
+    metadata: {
+      slug: opts.slug,
+      timestamp,
+      schema: opts.schemaName,
+      schemaHash: opts.schemaHash,
+      diffBase: opts.diff.base,
+      diffType: opts.diff.type,
+      description: opts.description,
+    },
+    prompts: reviewers.map((reviewer) => {
+      const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat)
+      return {
+        reviewer: reviewer.name,
+        runtime: reviewer.runtime,
+        model: built.model,
+        prompt: built.fullPrompt,
+      }
+    }),
+  }
+}
+
 type ReviewersResult = {
   reviews: NormalizedReview[]
   spinner: MultiSpinnerHandle | null
@@ -87,7 +129,7 @@ async function executeReviewers(
   opts: OrchestrateOptions,
   outputFormat: string,
 ): Promise<ReviewersResult> {
-  if (opts.plain || opts.promptOnly) {
+  if (opts.plain || opts.promptOnly || opts.silent) {
     return { reviews: await executeReviewersPlain(reviewers, opts, outputFormat), spinner: null }
   }
 
@@ -104,13 +146,13 @@ async function executeReviewersPlain(
   outputFormat: string,
 ): Promise<NormalizedReview[]> {
   const promises = reviewers.map(async (reviewer) => {
-    if (!opts.promptOnly) {
+    if (!opts.promptOnly && !opts.silent) {
       console.log(`Starting: ${reviewer.name} (${reviewer.runtime}/${resolveModelAlias(opts.config, reviewer.model)})`)
     }
 
     const result = await runSingleReviewer(reviewer, opts, outputFormat)
 
-    if (!opts.promptOnly) {
+    if (!opts.promptOnly && !opts.silent) {
       const elapsed = (result.durationMs / 1000).toFixed(1)
       const issueCount = result.issues.length
       console.log(`Completed: ${reviewer.name} - ${issueCount} issue${issueCount !== 1 ? "s" : ""} (${elapsed}s)`)
@@ -220,7 +262,7 @@ async function runTriagePass(
 
   if (spinner) {
     spinner.addEntry("Triage", triageDetail)
-  } else if (!opts.promptOnly) {
+  } else if (!opts.promptOnly && !opts.silent) {
     console.log(`Triage: analyzing ${allIssues.length} issues...`)
   }
 
@@ -246,7 +288,7 @@ async function runTriagePass(
       elapsed: result.durationMs / 1000,
       resultText,
     })
-  } else if (!opts.promptOnly) {
+  } else if (!opts.promptOnly && !opts.silent) {
     const elapsed = (result.durationMs / 1000).toFixed(1)
     console.log(`Triage complete: ${resultText} (${elapsed}s)`)
   }
@@ -260,34 +302,9 @@ async function runSingleReviewer(
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
   const runtime = getRuntime(reviewer.runtime)
-  const model = reviewer.model === "default" ? runtime.defaultModel : reviewer.model
-
-  let prompt = reviewer.prompt ?? "Review the following code changes for issues."
-
-  if (reviewer.agent) {
-    const persona = loadAgentPrompt(reviewer.agent)
-    if (persona) {
-      prompt = `${persona}\n\n---\n\n${prompt}`
-    } else {
-      console.error(`Warning: Agent file not found for "${reviewer.name}": ${reviewer.agent}`)
-    }
-  }
-
-  const isAnalyze = opts.diff.type === "analyze"
-  const sourceSection = isAnalyze
-    ? buildAnalyzeReference(opts.diff)
-    : buildDiffReference(opts.diff.diffFile)
-
-  const promptWithSource = prompt.includes("{{diff}}")
-    ? prompt.replaceAll("{{diff}}", () => sourceSection)
-    : `${prompt}\n\n${sourceSection}`
-
-  const fullPrompt = [
-    promptWithSource,
-    "",
-    "Respond with valid JSON matching this schema:",
-    outputFormat,
-  ].join("\n")
+  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat)
+  const model = built.model
+  const fullPrompt = built.fullPrompt
 
   const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
   const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}.txt`)
@@ -315,6 +332,42 @@ async function runSingleReviewer(
   } finally {
     try { fs.unlinkSync(promptFile) } catch {}
   }
+}
+
+function buildReviewerPrompt(
+  reviewer: ReviewerConfig,
+  diff: DiffInput,
+  outputFormat: string,
+): { model: string; fullPrompt: string } {
+  const runtime = getRuntime(reviewer.runtime)
+  const model = reviewer.model === "default" ? runtime.defaultModel : reviewer.model
+
+  let prompt = reviewer.prompt ?? "Review the following code changes for issues."
+  if (reviewer.agent) {
+    const persona = loadAgentPrompt(reviewer.agent)
+    if (persona) {
+      prompt = `${persona}\n\n---\n\n${prompt}`
+    } else {
+      console.error(`Warning: Agent file not found for "${reviewer.name}": ${reviewer.agent}`)
+    }
+  }
+
+  const sourceSection = diff.type === "analyze"
+    ? buildAnalyzeReference(diff)
+    : buildDiffReference(diff.diffFile)
+
+  const promptWithSource = prompt.includes("{{diff}}")
+    ? prompt.replaceAll("{{diff}}", () => sourceSection)
+    : `${prompt}\n\n${sourceSection}`
+
+  const fullPrompt = [
+    promptWithSource,
+    "",
+    "Respond with valid JSON matching this schema:",
+    outputFormat,
+  ].join("\n")
+
+  return { model, fullPrompt }
 }
 
 export function buildDiffReference(diffFile: string): string {
@@ -371,7 +424,12 @@ function buildResult(
   }
 }
 
-function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir: string): string {
+type OutputPaths = {
+  jsonPath: string
+  markdownPath?: string
+}
+
+function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir: string): OutputPaths {
   const outputDir = getOutputDir(config, crevDir)
   fs.mkdirSync(outputDir, { recursive: true })
 
@@ -384,11 +442,81 @@ function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir
   ].join("-")
 
   const suffix = crypto.randomBytes(3).toString("hex")
-  const filename = `${datePart}-${slug}-${suffix}.json`
-  const filePath = path.join(outputDir, filename)
+  const basename = `${datePart}-${slug}-${suffix}`
+  const jsonPath = path.join(outputDir, `${basename}.json`)
 
-  fs.writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8")
-  return filePath
+  // JSON is the canonical artifact used by other commands (show, stats, merges).
+  fs.writeFileSync(jsonPath, JSON.stringify(result, null, 2), "utf-8")
+
+  if (config.output.format === "markdown" || config.output.format === "both") {
+    const markdownPath = path.join(outputDir, `${basename}.md`)
+    fs.writeFileSync(markdownPath, renderMarkdown(result), "utf-8")
+    return { jsonPath, markdownPath }
+  }
+
+  return { jsonPath }
+}
+
+function formatOutputPath(paths: OutputPaths, format: Config["output"]["format"]): string {
+  const rel = (p: string) => path.relative(process.cwd(), p)
+  if (format === "both" && paths.markdownPath) {
+    return `${rel(paths.jsonPath)}, ${rel(paths.markdownPath)}`
+  }
+  if (format === "markdown" && paths.markdownPath) {
+    return rel(paths.markdownPath)
+  }
+  return rel(paths.jsonPath)
+}
+
+function renderMarkdown(result: ReviewResult): string {
+  const lines: string[] = []
+  lines.push(`# Review: ${result.metadata.slug}`)
+  lines.push("")
+  lines.push(`- Schema: ${result.metadata.schema}`)
+  lines.push(`- Timestamp: ${result.metadata.timestamp}`)
+  lines.push(`- Diff type: ${result.metadata.diffType}`)
+  if (result.metadata.diffBase) {
+    lines.push(`- Diff base: ${result.metadata.diffBase}`)
+  }
+  if (result.metadata.description) {
+    lines.push(`- Description: ${result.metadata.description}`)
+  }
+
+  lines.push("")
+  lines.push("## Summary")
+  lines.push(`- Total issues: ${result.summary.totalIssues}`)
+  if (result.summary.triage) {
+    lines.push(`- Actionable: ${result.summary.triage.actionable}`)
+    lines.push(`- Deferred: ${result.summary.triage.deferred}`)
+    lines.push(`- Dismissed: ${result.summary.triage.dismissed}`)
+  } else {
+    for (const sev of SEVERITY_ORDER) {
+      const count = result.summary.bySeverity[sev]
+      if (count) lines.push(`- ${sev}: ${count}`)
+    }
+  }
+
+  for (const review of result.reviews) {
+    lines.push("")
+    lines.push(`## ${review.reviewer} (${review.runtime}/${review.model})`)
+    lines.push(`- Duration: ${(review.durationMs / 1000).toFixed(1)}s`)
+
+    if (review.issues.length === 0) {
+      lines.push("- No issues found")
+      continue
+    }
+
+    for (const issue of review.issues) {
+      const location = issue.file ? ` (${issue.file}${issue.line ? `:${issue.line}` : ""})` : ""
+      const triage = issue.triage ? ` [${issue.triage.verdict}]` : ""
+      lines.push(`- [${issue.severity}] ${issue.title}${location}${triage}`)
+      if (issue.description) {
+        lines.push(`  ${issue.description.replace(/\s+/g, " ").trim()}`)
+      }
+    }
+  }
+
+  return lines.join("\n") + "\n"
 }
 
 export function validateReviewFilePath(filePath: string, projectRoot: string): string {

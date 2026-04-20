@@ -4,10 +4,10 @@ import fs from "node:fs"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
-import { resolveDiff } from "../core/diff.js"
-import { orchestrate } from "../core/orchestrator.js"
+import { cleanupDiffFile, resolveDiff } from "../core/diff.js"
+import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
 import { loadSchemaFile, resolveSchemaPath } from "../core/schema.js"
-import { RawRunFlags, UserCancelledError } from "../core/types.js"
+import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
 
 export function registerRunCommand(program: Command): void {
@@ -17,7 +17,7 @@ export function registerRunCommand(program: Command): void {
     .option("--schema <name>", "Which review schema to use")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
-    .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
+    .option("--type <type>", "Diff type: all, committed, uncommitted")
     .option("--pr <number>", "GitHub PR number")
     .option("--analyze", "Full codebase analysis (no diff)")
     .option("--reviewers <list>", "Comma-separated reviewer names")
@@ -37,11 +37,20 @@ export function registerRunCommand(program: Command): void {
         process.exit(1)
       }
 
+      const effectiveBase = opts.base
+        ?? (!opts.pr && !opts.baseCommit && !opts.analyze ? config.defaults.base : undefined)
+
+      const effectiveType = opts.analyze
+        ? "all"
+        : opts.pr
+          ? (opts.type ?? "all")
+          : (opts.type ?? config.defaults.type)
+
       const parsed = RawRunFlags.safeParse({
         schema: schemaName,
-        base: opts.base,
+        base: effectiveBase,
         baseCommit: opts.baseCommit,
-        type: opts.type,
+        type: effectiveType,
         analyze: opts.analyze ?? false,
         pr: opts.pr ? Number(opts.pr) : undefined,
         reviewers: opts.reviewers,
@@ -79,8 +88,30 @@ export function registerRunCommand(program: Command): void {
         crevDir,
       })
 
-      if (!diff.diffContent.trim()) {
-        console.log("No diff content found. Nothing to review.")
+      if (!diff.diffContent.trim() && cmd.output.kind !== "prompt-only") {
+        cleanupDiffFile(diff)
+        if (cmd.output.kind === "json") {
+          console.log(JSON.stringify(buildEmptyResult(schemaName, schemaHash, slug, cmd, diff.type), null, 2))
+        } else {
+          console.log("No diff content found. Nothing to review.")
+        }
+        return
+      }
+
+      if (cmd.output.kind === "prompt-only") {
+        const promptPreview = buildPromptOnlyResult({
+          schema,
+          schemaName: cmd.schema,
+          schemaHash,
+          config,
+          diff,
+          slug,
+          crevDir,
+          description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
+          reviewerFilter: cmd.reviewers,
+        })
+        cleanupDiffFile(diff)
+        console.log(JSON.stringify(promptPreview, null, 2))
         return
       }
 
@@ -97,7 +128,7 @@ export function registerRunCommand(program: Command): void {
           description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
           reviewerFilter: cmd.reviewers,
           plain: cmd.plain || cmd.output.kind === "plain",
-          promptOnly: cmd.output.kind === "prompt-only",
+          silent: cmd.output.kind === "json",
           reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
         })
       } catch (err) {
@@ -108,10 +139,37 @@ export function registerRunCommand(program: Command): void {
         throw err
       }
 
-      if (cmd.output.kind === "prompt-only" || cmd.output.kind === "json") {
+      if (cmd.output.kind === "json") {
         console.log(JSON.stringify(result, null, 2))
       }
     })
+}
+
+function buildEmptyResult(
+  schema: string,
+  schemaHash: string,
+  slug: string,
+  cmd: RunCommand,
+  diffType: string,
+): ReviewResult {
+  return {
+    metadata: {
+      slug,
+      timestamp: new Date().toISOString(),
+      schema,
+      schemaHash,
+      diffBase: cmd.diff.kind === "branch" ? cmd.diff.base : undefined,
+      diffType,
+      description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
+    },
+    reviews: [],
+    summary: {
+      totalIssues: 0,
+      bySeverity: {},
+      byCategory: {},
+      byReviewer: {},
+    },
+  }
 }
 
 function generateSlug(): string {
