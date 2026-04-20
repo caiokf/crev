@@ -146,7 +146,7 @@ async function scaffold(
   console.log()
 
   try {
-    const { getAllRuntimes } = await import("valet")
+    const { getAllRuntimes } = await import("@caiokf/valet")
     const { listSchemas, loadSchemaFile } = await import("../core/schema.js")
 
     const schemasDir = path.join(crevDir, "schemas")
@@ -219,4 +219,3 @@ async function scaffold(
   console.log(`  Run ${chalk.cyan("crev run --schema quick")} to start your first review.`)
   console.log()
 }
-
