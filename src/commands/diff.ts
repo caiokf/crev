@@ -10,7 +10,7 @@ export function registerDiffCommand(program: Command): void {
     .description("Preview what diff would be reviewed (dry-run)")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
-    .option("--type <type>", "Diff type: all, committed, uncommitted, current-state", "all")
+    .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
     .option("--pr <number>", "GitHub PR number")
     .action(async (opts) => {
       const specified = [opts.pr, opts.base, opts.baseCommit].filter(Boolean).length
@@ -19,14 +19,9 @@ export function registerDiffCommand(program: Command): void {
         process.exit(1)
       }
 
-      const validTypes = ["all", "committed", "uncommitted", "current-state"]
+      const validTypes = ["all", "committed", "uncommitted"]
       if (!validTypes.includes(opts.type)) {
         console.error(chalk.red(`Error: Invalid --type "${opts.type}". Must be one of: ${validTypes.join(", ")}`))
-        process.exit(1)
-      }
-
-      if (opts.type === "current-state" && (opts.base || opts.baseCommit || opts.pr)) {
-        console.error(chalk.red("Error: --type current-state cannot be combined with --base, --base-commit, or --pr"))
         process.exit(1)
       }
 
