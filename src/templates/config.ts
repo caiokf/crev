@@ -20,7 +20,7 @@ diff:
 
 output:
   dir: .crev/reviews
-  format: json
+  format: json              # json | markdown | both
 
 normalizer:
   enabled: true

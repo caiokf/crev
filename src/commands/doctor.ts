@@ -4,10 +4,10 @@ import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { getAllRuntimes, type RuntimeHealth, type RuntimeAdapter } from "@caiokf/valet"
-import { findCrevDir, loadConfig, getRuntimeConfig } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig, getRuntimeConfig } from "../core/config.js"
 import { resolveModelAlias } from "../core/config.js"
-import { listSchemas, loadSchemaFile } from "../core/schema.js"
-import { getSchemasDir } from "../util/paths.js"
+import type { Config } from "../core/config.js"
+import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../ui/ansi.js"
 
 export function registerDoctorCommand(program: Command): void {
@@ -19,17 +19,18 @@ export function registerDoctorCommand(program: Command): void {
     .option("--json", "Machine-readable JSON output")
     .action(async (opts) => {
       const crevDir = findCrevDir()
-      const schemasDir = getSchemasDir(crevDir)
       const jsonOutput = opts.json ?? false
       const cols = process.stdout.columns ?? 80
 
       // Collect which runtimes are used by which schemas
-      const schemas = listSchemas(schemasDir)
+      const schemas = listAllSchemas(crevDir)
       const runtimeUsage = new Map<string, string[]>()
       const schemaLoadErrors = new Map<string, string>()
       for (const name of schemas) {
         try {
-          const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
+          const schemaPath = resolveSchemaPath(name, crevDir)
+          if (!schemaPath) continue
+          const schema = loadSchemaFile(schemaPath)
           for (const reviewer of schema.reviewers) {
             const list = runtimeUsage.get(reviewer.runtime) ?? []
             list.push(name)
@@ -45,7 +46,7 @@ export function registerDoctorCommand(program: Command): void {
         }
       }
 
-      const config = loadConfig(crevDir)
+      const config = loadLayeredConfig(crevDir)
 
       // Check all runtimes in parallel with simple progress indicator
       const allRuntimes = getAllRuntimes()
@@ -91,12 +92,14 @@ export function registerDoctorCommand(program: Command): void {
         : allHealthResults.filter((h) => h.installed)
 
       // Check project setup
-      const projectChecks = checkProjectSetup(crevDir, schemasDir)
+      const projectChecks = checkProjectSetup(crevDir)
 
       // Determine schema readiness
       const schemaReadiness = schemas.map((name) => {
         try {
-          const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
+          const resolved = resolveSchemaPath(name, crevDir)
+          if (!resolved) return { name, ready: false, issues: ["Schema file not found"] }
+          const schema = loadSchemaFile(resolved)
           const issues: string[] = []
           for (const reviewer of schema.reviewers) {
             const health = allHealthResults.find((h) => h.name === reviewer.runtime)
@@ -230,7 +233,7 @@ export function registerDoctorCommand(program: Command): void {
 
 type ProjectCheck = { name: string; ok: boolean; detail: string }
 
-function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] {
+function checkProjectSetup(crevDir: string): ProjectCheck[] {
   const checks: ProjectCheck[] = []
 
   checks.push({
@@ -239,9 +242,9 @@ function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] 
     detail: fs.existsSync(path.join(crevDir, "config.yaml")) ? "valid" : "missing",
   })
 
-  const schemaCount = listSchemas(schemasDir).length
+  const schemaCount = listAllSchemas(crevDir).length
   checks.push({
-    name: ".crev/schemas/",
+    name: "schemas",
     ok: schemaCount > 0,
     detail: schemaCount > 0 ? `${schemaCount} schema${schemaCount !== 1 ? "s" : ""}` : "empty",
   })
@@ -269,7 +272,7 @@ function checkProjectSetup(crevDir: string, schemasDir: string): ProjectCheck[] 
  * Medium (60-90): claude          ✓ installed  2.1.81   ✓ auth'd
  * Wide   (> 90):  claude          ✓ installed  2.1.81   ✓ auth'd  env: ANTHROPIC_API_KEY
  */
-function formatRuntimeLine(health: RuntimeHealth, config: ReturnType<typeof loadConfig>, cols: number, nameColWidth: number): string {
+function formatRuntimeLine(health: RuntimeHealth, config: Config, cols: number, nameColWidth: number): string {
   const rtConfig = getRuntimeConfig(config, health.name)
   const commandName = rtConfig.command ?? health.command ?? health.name
 
@@ -328,7 +331,7 @@ type SmokeResult = {
 
 async function runSmokeTests(
   runtimes: RuntimeAdapter[],
-  config: ReturnType<typeof loadConfig>,
+  config: Config,
   jsonOutput: boolean,
 ): Promise<SmokeResult[]> {
   const SMOKE_PROMPT = 'Respond with exactly this text and nothing else: hello smoke-test'

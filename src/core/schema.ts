@@ -3,6 +3,7 @@ import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
 import { getAllRuntimes, getRuntimeNames } from "@caiokf/valet"
+import { getUserCrevDir } from "./config.js"
 
 // Single source of truth: derived from runtime adapters
 export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(
@@ -82,8 +83,59 @@ export function listSchemas(schemasDir: string): string[] {
   return fs
     .readdirSync(schemasDir)
     .filter((f) => f.endsWith(".yaml") || f.endsWith(".yml"))
+    .filter((f) => !f.endsWith(".local.yaml") && !f.endsWith(".local.yml"))
     .map((f) => path.basename(f, path.extname(f)))
     .sort()
+}
+
+/**
+ * List all available schemas across all layers, deduplicated by name.
+ * Includes schemas from: ~/.crev/schemas, .crev/schemas, and .local.yaml overrides.
+ */
+export function listAllSchemas(crevDir: string): string[] {
+  const userSchemasDir = path.join(getUserCrevDir(), "schemas")
+  const projectSchemasDir = path.join(crevDir, "schemas")
+
+  const names = new Set<string>()
+
+  // Gather from user dir
+  for (const name of listSchemas(userSchemasDir)) names.add(name)
+
+  // Gather from project dir (includes base schemas)
+  for (const name of listSchemas(projectSchemasDir)) names.add(name)
+
+  // Gather .local.yaml schemas (expose them by their base name)
+  if (fs.existsSync(projectSchemasDir)) {
+    for (const f of fs.readdirSync(projectSchemasDir)) {
+      if (f.endsWith(".local.yaml") || f.endsWith(".local.yml")) {
+        const base = f.replace(/\.local\.(yaml|yml)$/, "")
+        names.add(base)
+      }
+    }
+  }
+
+  return [...names].sort()
+}
+
+/**
+ * Resolve a schema name to its file path, checking layers in priority order:
+ *   .crev/schemas/<name>.local.yaml > .crev/schemas/<name>.yaml > ~/.crev/schemas/<name>.yaml
+ */
+export function resolveSchemaPath(schemaName: string, crevDir: string): string | null {
+  const projectSchemasDir = path.join(crevDir, "schemas")
+  const userSchemasDir = path.join(getUserCrevDir(), "schemas")
+
+  const candidates = [
+    path.join(projectSchemasDir, `${schemaName}.local.yaml`),
+    path.join(projectSchemasDir, `${schemaName}.yaml`),
+    path.join(userSchemasDir, `${schemaName}.yaml`),
+  ]
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) return candidate
+  }
+
+  return null
 }
 
 export async function validateAgentRefs(

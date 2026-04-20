@@ -1,10 +1,8 @@
-import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { getAllRuntimes } from "@caiokf/valet"
 import { findCrevDir } from "../core/config.js"
-import { listSchemas, loadSchemaFile } from "../core/schema.js"
-import { getSchemasDir } from "../util/paths.js"
+import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 
 export function registerListCommand(program: Command): void {
   program
@@ -21,10 +19,11 @@ export function registerListCommand(program: Command): void {
       const data: Record<string, unknown> = {}
 
       if (showAll || opts.schemas) {
-        const schemasDir = getSchemasDir(crevDir)
-        const schemas = listSchemas(schemasDir).map((name) => {
+        const schemas = listAllSchemas(crevDir).map((name) => {
           try {
-            const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
+            const schemaPath = resolveSchemaPath(name, crevDir)
+            if (!schemaPath) return { name, description: "not found", reviewers: 0 }
+            const schema = loadSchemaFile(schemaPath)
             return {
               name,
               description: schema.description ?? "",

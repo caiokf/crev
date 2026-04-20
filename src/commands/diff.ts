@@ -1,6 +1,6 @@
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir, loadConfig } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
 import type { DiffSource } from "../core/types.js"
 
@@ -36,7 +36,7 @@ export function registerDiffCommand(program: Command): void {
       }
 
       const crevDir = findCrevDir()
-      const config = loadConfig(crevDir)
+      const config = loadLayeredConfig(crevDir)
 
       const source: DiffSource = opts.pr
         ? { kind: "pr", pr: Number(opts.pr) }

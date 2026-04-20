@@ -10,6 +10,7 @@ import { registerSchemaCommand } from "./commands/schema.js"
 import { registerInitCommand } from "./commands/init.js"
 import { registerUpdateCommand } from "./commands/update.js"
 import { registerStatsCommand } from "./commands/stats.js"
+import { registerConfigCommand } from "./commands/config.js"
 
 program
   .name("crev")
@@ -26,5 +27,6 @@ registerSchemaCommand(program)
 registerInitCommand(program)
 registerUpdateCommand(program)
 registerStatsCommand(program)
+registerConfigCommand(program)
 
 program.parse()

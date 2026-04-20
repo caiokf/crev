@@ -1,7 +1,9 @@
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
+import { annotatedMerge, deepMerge, type ProvenanceMap } from "./merge.js"
 
 const runtimeConfigSchema = z.object({
   command: z.string().optional(),
@@ -77,6 +79,32 @@ export function findCrevDir(startDir?: string): string {
   return path.resolve(startDir ?? process.cwd(), ".crev")
 }
 
+export function getUserCrevDir(): string {
+  return path.join(os.homedir(), ".crev")
+}
+
+function loadRawYaml(filePath: string): Record<string, unknown> | null {
+  if (!fs.existsSync(filePath)) return null
+  const raw = fs.readFileSync(filePath, "utf-8")
+  const parsed = YAML.parse(raw)
+  return parsed && typeof parsed === "object" ? parsed : null
+}
+
+/**
+ * Returns the ordered config file paths from lowest to highest priority.
+ * user (~/.crev/config.yaml) < project (.crev/config.yaml) < local (.crev/config.local.yaml)
+ */
+export function getConfigLayerPaths(crevDir: string): { label: string; path: string }[] {
+  return [
+    { label: "~/.crev/config.yaml", path: path.join(getUserCrevDir(), "config.yaml") },
+    { label: ".crev/config.yaml", path: path.join(crevDir, "config.yaml") },
+    { label: ".crev/config.local.yaml", path: path.join(crevDir, "config.local.yaml") },
+  ]
+}
+
+/**
+ * Load config from a single file (legacy behavior, used in tests).
+ */
 export function loadConfig(crevDir: string): Config {
   const configPath = path.join(crevDir, "config.yaml")
   if (!fs.existsSync(configPath)) {
@@ -86,6 +114,46 @@ export function loadConfig(crevDir: string): Config {
   const raw = fs.readFileSync(configPath, "utf-8")
   const parsed = YAML.parse(raw)
   return configSchema.parse(parsed ?? {})
+}
+
+/**
+ * Load config with layered merging:
+ *   ~/.crev/config.yaml < .crev/config.yaml < .crev/config.local.yaml
+ * Deep merges objects, arrays replace, scalars overwrite.
+ */
+export function loadLayeredConfig(crevDir: string): Config {
+  const layerPaths = getConfigLayerPaths(crevDir)
+  const layers: Record<string, unknown>[] = []
+
+  for (const layer of layerPaths) {
+    const data = loadRawYaml(layer.path)
+    if (data) layers.push(data)
+  }
+
+  if (layers.length === 0) return configSchema.parse({})
+
+  const merged = deepMerge(...layers)
+  return configSchema.parse(merged)
+}
+
+/**
+ * Load config with provenance annotations (for `crev config` display).
+ */
+export function loadAnnotatedConfig(crevDir: string): { config: Config; provenance: ProvenanceMap } {
+  const layerPaths = getConfigLayerPaths(crevDir)
+  const layers: { label: string; data: Record<string, unknown> }[] = []
+
+  for (const layer of layerPaths) {
+    const data = loadRawYaml(layer.path)
+    if (data) layers.push({ label: layer.label, data })
+  }
+
+  if (layers.length === 0) {
+    return { config: configSchema.parse({}), provenance: {} }
+  }
+
+  const { merged, provenance } = annotatedMerge(layers)
+  return { config: configSchema.parse(merged), provenance }
 }
 
 export function resolveModelAlias(config: Config, model: string): string {

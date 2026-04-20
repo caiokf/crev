@@ -3,12 +3,11 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir, loadConfig } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { resolveDiff } from "../core/diff.js"
 import { orchestrate } from "../core/orchestrator.js"
-import { loadSchemaFile } from "../core/schema.js"
+import { loadSchemaFile, resolveSchemaPath } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError } from "../core/types.js"
-import { getSchemasDir } from "../util/paths.js"
 import path from "node:path"
 
 export function registerRunCommand(program: Command): void {
@@ -30,7 +29,7 @@ export function registerRunCommand(program: Command): void {
     .option("--prompt-only", "Output prompts as JSON, don't execute")
     .action(async (opts) => {
       const crevDir = findCrevDir()
-      const config = loadConfig(crevDir)
+      const config = loadLayeredConfig(crevDir)
 
       const schemaName = opts.schema ?? config.defaults.schema
       if (!schemaName) {
@@ -61,7 +60,11 @@ export function registerRunCommand(program: Command): void {
 
       const cmd = parsed.data
 
-      const schemaPath = path.join(getSchemasDir(crevDir), `${cmd.schema}.yaml`)
+      const schemaPath = resolveSchemaPath(cmd.schema, crevDir)
+      if (!schemaPath) {
+        console.error(chalk.red(`Error: schema "${cmd.schema}" not found`))
+        process.exit(1)
+      }
       const schemaRaw = fs.readFileSync(schemaPath, "utf-8")
       const schemaHash = crypto.createHash("sha256").update(schemaRaw).digest("hex").slice(0, 8)
       const schema = loadSchemaFile(schemaPath)

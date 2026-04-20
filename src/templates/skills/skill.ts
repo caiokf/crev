@@ -27,9 +27,46 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Scaffold new schema         | \`crev schema init <name>\`                                |
 | Full setup                  | \`crev init\`                                              |
 | Regenerate AI tool skills   | \`crev update\`                                            |
+| Show resolved config        | \`crev config\`                                            |
+| Show config layers          | \`crev config --layers\`                                   |
 | Review stats (latest)       | \`crev stats --schema <name>\`                             |
 | Review stats (all versions) | \`crev stats --schema <name> --history\`                   |
 | Detailed help               | \`crev help run\` / \`crev help schema\`                     |
+
+## Configuration
+
+### Layered Config
+
+Config is loaded from three layers, deep-merged from lowest to highest priority:
+
+1. \`~/.crev/config.yaml\` — user/machine defaults (shared across all projects)
+2. \`.crev/config.yaml\` — project config (git-tracked, shared with team)
+3. \`.crev/config.local.yaml\` — local overrides (gitignored, per-developer)
+
+**Merge rules:**
+- Objects merge recursively (adding an alias in local doesn't clobber project aliases)
+- Arrays replace entirely (local \`diff.exclude\` replaces project's list)
+- Scalars overwrite (higher priority wins)
+
+Run \`crev config\` to see the fully resolved config with annotations showing which file provided each value.
+Run \`crev config --layers\` to see which config files are active.
+
+### Layered Schemas
+
+Schemas are resolved in priority order (first match wins, no merging within a schema):
+
+1. \`.crev/schemas/<name>.local.yaml\` — local override (gitignored)
+2. \`.crev/schemas/<name>.yaml\` — project schema (git-tracked)
+3. \`~/.crev/schemas/<name>.yaml\` — user schema (personal defaults)
+
+To override a project schema locally, create \`.crev/schemas/<name>.local.yaml\` with the full schema content.
+To add a personal schema available across all projects, place it in \`~/.crev/schemas/\`.
+
+**Files to gitignore:**
+\\\`\\\`\\\`
+.crev/config.local.yaml
+.crev/schemas/*.local.yaml
+\\\`\\\`\\\`
 
 ## Workflow
 
@@ -37,11 +74,13 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 
 1. Pick a schema: \`crev list --schemas\`
 2. Run: \`crev run --schema <name> --base main\`
-3. Read output from \`.crev/reviews/<slug>.json\`
+3. Read output from \`.crev/reviews/<slug>.json\` (or \`.md\` if format is markdown/both)
 4. For each open issue: fix the code or mark as \`wont-fix\` in the JSON
 5. Re-run to merge: \`crev run --schema <name> --review-file .crev/reviews/<slug>.json\`
 
 ### Reading Results
+
+Output format is controlled by \`output.format\` in config.yaml: \`json\` (default), \`markdown\`, or \`both\`.
 
 Output JSON structure:
 - \`metadata\` — slug, timestamp, schema used, diff info

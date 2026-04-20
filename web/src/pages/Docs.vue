@@ -172,10 +172,68 @@ crev run --schema standard</code></pre>
       <section id="configuration">
         <h1>Configuration</h1>
         <p class="lead">
-          Global settings live in <code>.crev/config.yaml</code>. This file controls
-          defaults, runtime overrides, model aliases, and output preferences.
+          Configuration is loaded from three layers, deep-merged from lowest to highest priority.
+          This lets you set user-wide defaults, share team config via git, and keep local overrides
+          private.
         </p>
 
+        <h2>Config layers</h2>
+        <div class="props-table">
+          <div class="prop-row">
+            <code class="prop-name">~/.crev/config.yaml</code>
+            <span class="prop-desc">User/machine defaults. Shared across all projects.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">.crev/config.yaml</code>
+            <span class="prop-desc">Project config. Git-tracked, shared with your team.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">.crev/config.local.yaml</code>
+            <span class="prop-desc">Local overrides. Gitignored, per-developer.</span>
+          </div>
+        </div>
+
+        <div class="callout">
+          <strong>Deep merge rules:</strong> Objects merge recursively (adding one alias locally
+          doesn't clobber project aliases). Arrays replace entirely. Scalars overwrite.
+          Run <code>crev config</code> to see the fully resolved config with annotations
+          showing which file provided each value.
+        </div>
+
+        <h2>Schema layers</h2>
+        <p>
+          Schemas are resolved in priority order (first match wins, full file replacement):
+        </p>
+        <div class="props-table">
+          <div class="prop-row">
+            <code class="prop-name">.crev/schemas/&lt;name&gt;.local.yaml</code>
+            <span class="prop-desc">Local override (gitignored)</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">.crev/schemas/&lt;name&gt;.yaml</code>
+            <span class="prop-desc">Project schema (git-tracked)</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">~/.crev/schemas/&lt;name&gt;.yaml</code>
+            <span class="prop-desc">User schema (personal defaults)</span>
+          </div>
+        </div>
+        <p>
+          To override a project schema locally, create a <code>.local.yaml</code> variant with
+          the full schema content. To add a personal schema across all projects, place it in
+          <code>~/.crev/schemas/</code>.
+        </p>
+
+        <h2>Gitignore</h2>
+        <p>
+          Add these to your <code>.gitignore</code> to keep local overrides private:
+        </p>
+        <div class="code-block">
+          <pre><code>.crev/config.local.yaml
+.crev/schemas/*.local.yaml</code></pre>
+        </div>
+
+        <h2>Config file reference</h2>
         <div class="code-block">
           <div class="code-label">config.yaml</div>
           <pre><code><span class="y-key">defaults</span>:
@@ -577,6 +635,14 @@ crev list --runtimes</code></pre>
             <code class="prop-name">crev schema validate</code>
             <span class="prop-desc">Validate schema files.</span>
           </div>
+          <div class="prop-row">
+            <code class="prop-name">crev config</code>
+            <span class="prop-desc">Show resolved config with source annotations.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">crev config --layers</code>
+            <span class="prop-desc">Show which config files are active and their paths.</span>
+          </div>
         </div>
       </section>
 
@@ -642,8 +708,10 @@ jobs:
       <section id="output">
         <h1>Output Format</h1>
         <p class="lead">
-          Reviews produce structured JSON with metadata, per-reviewer issues,
-          and an aggregate summary.
+          Reviews produce structured output with metadata, per-reviewer issues,
+          and an aggregate summary. Set <code>output.format</code> in
+          <code>config.yaml</code> to <code>json</code> (default),
+          <code>markdown</code>, or <code>both</code>.
         </p>
 
         <h2>Issue structure</h2>
@@ -760,7 +828,7 @@ against a diff, normalizes findings, and optionally triages them.
 
 1. Pick a schema: `crev list --schemas`
 2. Run: `crev run --schema &lt;name&gt; --base main`
-3. Read output from `.crev/reviews/&lt;slug&gt;.json`
+3. Read output from `.crev/reviews/&lt;slug&gt;.json` (or `.md` if format is markdown/both)
 4. For each open issue: fix or mark as `wont-fix`
 5. Re-run to merge: `crev run --schema &lt;name&gt; --review-file ...`
 
