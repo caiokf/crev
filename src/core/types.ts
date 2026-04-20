@@ -118,8 +118,8 @@ export const RawRunFlags = z
   .refine((f) => !(f.promptOnly && f.reviewFile), {
     message: "--prompt-only and --review-file are incompatible",
   })
-  .refine((f) => !(f.promptOnly && (f.plain || f.json)), {
-    message: "--prompt-only cannot be combined with --plain or --json",
+  .refine((f) => !(f.promptOnly && f.plain), {
+    message: "--prompt-only cannot be combined with --plain",
   })
   .refine((f) => !(f.reviewFile && f.slug), {
     message: "--slug is incompatible with --review-file (slug comes from existing file)",

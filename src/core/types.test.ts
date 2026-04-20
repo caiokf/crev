@@ -113,9 +113,10 @@ describe("RawRunFlags validation", () => {
     expect(result.success).toBe(false)
   })
 
-  it("rejects --json with --prompt-only", () => {
+  it("allows --json with --prompt-only", () => {
     const result = RawRunFlags.safeParse({ ...valid, json: true, promptOnly: true })
-    expect(result.success).toBe(false)
+    expect(result.success).toBe(true)
+    expect(result.success && result.data.output).toEqual({ kind: "prompt-only", format: "json" })
   })
 
   // ── Valid transforms ──
