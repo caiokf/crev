@@ -6,7 +6,7 @@ import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { cleanupDiffFile, resolveDiff } from "../core/diff.js"
 import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
-import { loadSchemaFile, resolveSchemaPath } from "../core/schema.js"
+import { loadSchemaFile, resolveSchemaPath, type SchemaFileType } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
 
@@ -76,7 +76,20 @@ export function registerRunCommand(program: Command): void {
       }
       const schemaRaw = fs.readFileSync(schemaPath, "utf-8")
       const schemaHash = crypto.createHash("sha256").update(schemaRaw).digest("hex").slice(0, 8)
-      const schema = loadSchemaFile(schemaPath)
+      let schema: SchemaFileType
+      try {
+        schema = loadSchemaFile(schemaPath)
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        console.error(chalk.red(`Error: ${reason}`))
+        process.exit(1)
+      }
+
+      const reviewerFilterError = getReviewerFilterError(schema, cmd.reviewers)
+      if (reviewerFilterError) {
+        console.error(chalk.red(`Error: ${reviewerFilterError}`))
+        process.exit(1)
+      }
 
       const slug = cmd.target.kind === "fresh" ? (cmd.target.slug ?? generateSlug()) : path.basename(cmd.target.reviewFile, ".json")
 
@@ -99,20 +112,27 @@ export function registerRunCommand(program: Command): void {
       }
 
       if (cmd.output.kind === "prompt-only") {
-        const promptPreview = buildPromptOnlyResult({
-          schema,
-          schemaName: cmd.schema,
-          schemaHash,
-          config,
-          diff,
-          slug,
-          crevDir,
-          description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
-          reviewerFilter: cmd.reviewers,
-        })
-        cleanupDiffFile(diff)
-        console.log(JSON.stringify(promptPreview, null, 2))
-        return
+        try {
+          const promptPreview = buildPromptOnlyResult({
+            schema,
+            schemaName: cmd.schema,
+            schemaHash,
+            config,
+            diff,
+            slug,
+            crevDir,
+            description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
+            reviewerFilter: cmd.reviewers,
+          })
+          console.log(JSON.stringify(promptPreview, null, 2))
+          return
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err)
+          console.error(chalk.red(`Error: ${reason}`))
+          process.exit(1)
+        } finally {
+          cleanupDiffFile(diff)
+        }
       }
 
       let result
@@ -136,13 +156,29 @@ export function registerRunCommand(program: Command): void {
           console.log(chalk.yellow("Review cancelled. No files saved."))
           return
         }
-        throw err
+        const reason = err instanceof Error ? err.message : String(err)
+        console.error(chalk.red(`Error: ${reason}`))
+        process.exit(1)
       }
 
       if (cmd.output.kind === "json") {
         console.log(JSON.stringify(result, null, 2))
       }
     })
+}
+
+export function getReviewerFilterError(schema: SchemaFileType, reviewerFilter?: string[]): string | null {
+  if (!reviewerFilter || reviewerFilter.length === 0) return null
+
+  const normalized = reviewerFilter.map((r) => r.toLowerCase().trim()).filter(Boolean)
+  if (normalized.length === 0 || normalized.includes("all")) return null
+
+  const schemaReviewers = schema.reviewers.map((r) => r.name)
+  const schemaReviewersSet = new Set(schemaReviewers.map((r) => r.toLowerCase()))
+  const hasMatch = normalized.some((name) => schemaReviewersSet.has(name))
+  if (hasMatch) return null
+
+  return `No reviewers matched --reviewers. Available reviewers: ${schemaReviewers.join(", ")}`
 }
 
 function buildEmptyResult(
