@@ -1,5 +1,5 @@
 <p align="center">
-  <img src=".github/banner.svg" alt="crev banner" width="600" />
+  <img src=".github/banner.svg" alt="crev banner" width="100%" />
 </p>
 
 # crev — **C**ode **REV**iew
