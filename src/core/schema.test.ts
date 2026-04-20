@@ -216,12 +216,15 @@ describe("resolveSchemaPath", () => {
 
 describe("validateAgentRefs", () => {
   let tmpDir: string
+  let prevCwd: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+    prevCwd = process.cwd()
   })
 
   afterEach(() => {
+    process.chdir(prevCwd)
     fs.rmSync(tmpDir, { recursive: true })
   })
 
@@ -248,6 +251,50 @@ describe("validateAgentRefs", () => {
     const issues = await validateAgentRefs({
       reviewers: [{ name: "Test", runtime: "claude", model: "sonnet" }],
     })
+    expect(issues).toHaveLength(0)
+  })
+
+  it("resolves relative agent paths using schema/project context, not cwd", async () => {
+    const projectRoot = tmpDir
+    const crevDir = path.join(projectRoot, ".crev")
+    const schemaPath = path.join(crevDir, "schemas", "custom.yaml")
+    const agentPath = path.join(crevDir, "agents", "security.md")
+    const nestedCwd = path.join(projectRoot, "apps", "web")
+
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true })
+    fs.mkdirSync(path.dirname(agentPath), { recursive: true })
+    fs.mkdirSync(nestedCwd, { recursive: true })
+    fs.writeFileSync(agentPath, "persona")
+
+    process.chdir(nestedCwd)
+
+    const issues = await validateAgentRefs(
+      {
+        reviewers: [{ name: "Security", runtime: "claude", model: "sonnet", agent: ".crev/agents/security.md" }],
+      },
+      { schemaPath, crevDir },
+    )
+
+    expect(issues).toHaveLength(0)
+  })
+
+  it("resolves bare agent filenames from .crev/agents", async () => {
+    const projectRoot = tmpDir
+    const crevDir = path.join(projectRoot, ".crev")
+    const schemaPath = path.join(crevDir, "schemas", "custom.yaml")
+    const agentPath = path.join(crevDir, "agents", "security.md")
+
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true })
+    fs.mkdirSync(path.dirname(agentPath), { recursive: true })
+    fs.writeFileSync(agentPath, "persona")
+
+    const issues = await validateAgentRefs(
+      {
+        reviewers: [{ name: "Security", runtime: "claude", model: "sonnet", agent: "security.md" }],
+      },
+      { schemaPath, crevDir },
+    )
+
     expect(issues).toHaveLength(0)
   })
 })
