@@ -264,7 +264,7 @@ export function sanitizeRuntimeHealth(health: RuntimeHealth): RuntimeHealth {
   return {
     ...health,
     version: sanitizeRuntimeText(health.version),
-    authDetail: sanitizeRuntimeText(health.authDetail),
+    authDetail: sanitizeRuntimeText(health.authDetail) ?? health.authDetail,
     error: sanitizeRuntimeText(health.error),
   }
 }

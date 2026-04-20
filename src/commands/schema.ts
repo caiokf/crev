@@ -111,11 +111,11 @@ export function registerSchemaCommand(program: Command): void {
 
         for (const name of schemas) {
           const resolved = resolveSchemaPath(name, crevDir)
-          if (resolved) results.push(await validateSingleSchema(resolved))
+          if (resolved) results.push(await validateSingleSchema(resolved, crevDir))
         }
       } else if (file) {
         const schemaPath = path.resolve(file)
-        results.push(await validateSingleSchema(schemaPath))
+        results.push(await validateSingleSchema(schemaPath, crevDir))
       } else {
         exitWithError(chalk.red("Specify a schema file or use --all"))
       }
@@ -148,6 +148,7 @@ export function registerSchemaCommand(program: Command): void {
 
 async function validateSingleSchema(
   schemaPath: string,
+  crevDir?: string,
 ): Promise<{ file: string; valid: boolean; errors: string[] }> {
   const errors: string[] = []
 
@@ -167,7 +168,7 @@ async function validateSingleSchema(
 
   // Validate agent refs
   const schema = loadSchemaFile(schemaPath)
-  const agentIssues = await validateAgentRefs(schema)
+  const agentIssues = await validateAgentRefs(schema, { schemaPath, crevDir })
   for (const issue of agentIssues) {
     errors.push(issue.message)
   }
