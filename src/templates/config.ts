@@ -31,5 +31,4 @@ triage:
   enabled: false
   runtime: claude
   model: opus
-  context: []
 `

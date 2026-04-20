@@ -1,6 +1,8 @@
-import { execAbortable } from "@caiokf/valet"
+import fs from "node:fs"
+import os from "node:os"
+import path from "node:path"
+import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
-import { resolveClaudeModelId } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 
@@ -118,25 +120,28 @@ If there are no issues, return: { "issues": [] }
 Raw review output:
 ${raw.slice(0, 100_000)}`
 
+  const normalizerRuntime = config.normalizer.runtime
+  const normalizerModel = config.normalizer.model
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-normalizer-${process.pid}.txt`)
+  fs.writeFileSync(promptFile, prompt, "utf-8")
+
   try {
-    const normalizerRuntime = config.normalizer.runtime
-    const normalizerModel = config.normalizer.model
+    const rt = getRuntime(normalizerRuntime)
+    const result = await rt.execute({
+      taskName: "Normalizer",
+      model: normalizerModel,
+      prompt,
+      promptFile,
+      diff: { diffContent: "", diffFile: "", type: "all" },
+      outputFormat: "",
+    })
 
-    if (normalizerRuntime === "claude") {
-      const modelId = resolveClaudeModelId(config, normalizerModel)
-      const { stdout } = await execAbortable("claude", ["--print", "--model", modelId], {
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 2 * 60 * 1000,
-        stdin: prompt,
-      })
-      const result = tryParseIssues(stdout, reviewer, runtime, model)
-      return result.parsed ? result.issues : []
-    }
-
-    console.warn(`Warning: Normalizer runtime "${normalizerRuntime}" is not supported (only "claude" is supported). Skipping normalization for "${reviewer}".`)
-    return []
+    const parsed = tryParseIssues(result.raw, reviewer, runtime, model)
+    return parsed.parsed ? parsed.issues : []
   } catch (err) {
-    console.error(`Warning: Normalizer failed for "${reviewer}" (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`Warning: Normalizer failed for "${reviewer}" (${normalizerRuntime}/${normalizerModel}): ${err instanceof Error ? err.message : String(err)}`)
     return []
+  } finally {
+    try { fs.unlinkSync(promptFile) } catch {}
   }
 }

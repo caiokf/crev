@@ -1,10 +1,8 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { glob } from "glob"
-import { getRuntime, execAbortable } from "@caiokf/valet"
+import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
-import { resolveClaudeModelId } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { ReviewIssue } from "./types.js"
 
@@ -37,8 +35,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     }
   }
 
-  const context = await loadContextFiles(config.triage.context)
-  const prompt = buildTriagePrompt(issues, diffContent, context, config.triage.prompt, diffType)
+  const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType)
   const verdicts = await callTriageAgent(prompt, config)
 
   const triaged = issues.map((issue) => {
@@ -65,51 +62,9 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   }
 }
 
-async function loadContextFiles(patterns: string[]): Promise<string> {
-  const sections: string[] = []
-
-  for (const pattern of patterns) {
-    const resolved = path.resolve(process.cwd(), pattern)
-
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      const files = fs
-        .readdirSync(resolved)
-        .filter((f) => f.endsWith(".md") || f.endsWith(".yaml") || f.endsWith(".yml"))
-        .sort()
-
-      for (const file of files) {
-        const filePath = path.join(resolved, file)
-        const content = fs.readFileSync(filePath, "utf-8")
-        sections.push(`### ${pattern.endsWith("/") ? pattern : `${pattern}/`}${file}\n${content}`)
-      }
-      continue
-    }
-
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-      const content = fs.readFileSync(resolved, "utf-8")
-      sections.push(`### ${pattern}\n${content}`)
-      continue
-    }
-
-    // Expand glob patterns (e.g., docs/**/*.md)
-    const matches = await glob(pattern, { nodir: true })
-    for (const file of matches.sort()) {
-      const filePath = path.resolve(file)
-      if (fs.existsSync(filePath)) {
-        const content = fs.readFileSync(filePath, "utf-8")
-        sections.push(`### ${file}\n${content}`)
-      }
-    }
-  }
-
-  const joined = sections.join("\n\n")
-  return joined.slice(0, 50_000)
-}
-
 export function buildTriagePrompt(
   issues: ReviewIssue[],
   diffContent: string,
-  context: string,
   triageInstructions: string,
   diffType?: string,
 ): string {
@@ -126,11 +81,8 @@ export function buildTriagePrompt(
 
   return `${triageInstructions}
 
-## Project context
-${context || "(No project context files found)"}
-
-${diffType === "current-state"
-    ? `## Scope\nThis is a full codebase review (current-state), not a diff review. The issues below reference files in the repository.`
+${diffType === "analyze"
+    ? `## Scope\nThis is a full codebase analysis, not a diff review. The issues below reference files in the repository.`
     : `## The diff being reviewed\n\`\`\`diff\n${diffContent.slice(0, 80_000)}\n\`\`\``}
 
 ## Issues found by reviewers (${issues.length} total)
@@ -163,18 +115,6 @@ async function callTriageAgent(prompt: string, config: Config): Promise<RawTriag
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {
-    if (runtime === "claude") {
-      const modelId = resolveClaudeModelId(config, model)
-
-      const { stdout } = await execAbortable("claude", ["--print", "--model", modelId], {
-        maxBuffer: 50 * 1024 * 1024,
-        timeout: 5 * 60 * 1000,
-        stdin: prompt,
-      })
-
-      return parseTriageResponse(stdout)
-    }
-
     const rt = getRuntime(runtime)
     const result = await rt.execute({
       taskName: "Triage",

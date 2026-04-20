@@ -17,18 +17,18 @@ const sampleIssue: ReviewIssue = {
 }
 
 describe("buildTriagePrompt", () => {
-  it("includes issues, diff, and context", () => {
-    const prompt = buildTriagePrompt([sampleIssue], "diff content", "context content", "Triage instructions")
+  it("includes issues, diff, and instructions", () => {
+    const prompt = buildTriagePrompt([sampleIssue], "diff content", "Triage instructions")
     expect(prompt).toContain("Triage instructions")
-    expect(prompt).toContain("context content")
     expect(prompt).toContain("diff content")
     expect(prompt).toContain("security--xss-1")
     expect(prompt).toContain("1 total")
   })
 
-  it("handles empty context", () => {
-    const prompt = buildTriagePrompt([sampleIssue], "diff", "", "Instructions")
-    expect(prompt).toContain("(No project context files found)")
+  it("uses analyze scope text when diffType is analyze", () => {
+    const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", "analyze")
+    expect(prompt).toContain("full codebase analysis")
+    expect(prompt).not.toContain("```diff")
   })
 })
 

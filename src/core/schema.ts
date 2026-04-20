@@ -20,8 +20,6 @@ export const ReviewerSchema = z
     model: z.string().min(1, "Model is required"),
     prompt: z.string().optional(),
     agent: z.string().optional(),
-    context: z.array(z.string()).optional(),
-    scope: z.enum(["diff", "codebase"]).default("diff"),
   })
   .refine((r) => !(r.prompt && r.agent), {
     message: "Specify either prompt or agent, not both",
@@ -35,7 +33,6 @@ export const TriageSchema = z
     enabled: z.boolean().default(false),
     runtime: RuntimeName.optional(),
     model: z.string().optional(),
-    context: z.array(z.string()).default([]),
   })
   .refine((t) => !t.enabled || (t.runtime && t.model), {
     message: "Triage requires runtime and model when enabled",

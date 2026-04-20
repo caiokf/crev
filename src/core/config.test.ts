@@ -36,8 +36,6 @@ triage:
   enabled: true
   runtime: claude
   model: opus
-  context:
-    - "docs/"
 `
     fs.writeFileSync(path.join(tmpDir, "config.yaml"), yaml)
 
@@ -46,7 +44,6 @@ triage:
     expect(config.defaults.base).toBe("develop")
     expect(config.diff.exclude).toEqual(["pnpm-lock.yaml"])
     expect(config.triage.enabled).toBe(true)
-    expect(config.triage.context).toEqual(["docs/"])
   })
 
   it("applies defaults for missing fields", () => {

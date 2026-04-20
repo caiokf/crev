@@ -44,7 +44,6 @@ const configSchema = z.object({
       enabled: z.boolean().default(false),
       runtime: z.string().default("claude"),
       model: z.string().default("opus"),
-      context: z.array(z.string()).default([]),
       prompt: z
         .string()
         .default(
