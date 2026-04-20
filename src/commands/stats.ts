@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir, loadConfig, getOutputDir } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult, ReviewIssue } from "../core/types.js"
 
 type ReviewerStats = {
@@ -46,7 +46,7 @@ export function registerStatsCommand(program: Command): void {
     .option("--json", "Machine-readable JSON output")
     .action((opts) => {
       const crevDir = findCrevDir()
-      const config = loadConfig(crevDir)
+      const config = loadLayeredConfig(crevDir)
       const outputDir = getOutputDir(config, crevDir)
 
       if (!fs.existsSync(outputDir)) {
@@ -102,7 +102,7 @@ export function registerStatsCommand(program: Command): void {
 function loadAllReviews(outputDir: string): ReviewResult[] {
   return fs
     .readdirSync(outputDir)
-    .filter((f) => f.endsWith(".json") && f !== ".gitkeep")
+    .filter((f) => f.endsWith(".json"))
     .sort()
     .flatMap((f) => {
       try {

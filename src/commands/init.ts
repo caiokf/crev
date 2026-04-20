@@ -122,9 +122,7 @@ async function scaffold(
   tools: AITool[],
 ): Promise<void> {
   // Create directories
-  for (const dir of ["schemas", "diffs", "reviews"]) {
-    fs.mkdirSync(path.join(crevDir, dir), { recursive: true })
-  }
+  fs.mkdirSync(path.join(crevDir, "schemas"), { recursive: true })
 
   // Write config
   writeIfNew(path.join(crevDir, "config.yaml"), configTemplate)
@@ -136,10 +134,6 @@ async function scaffold(
       writeIfNew(path.join(crevDir, "schemas", `${name}.yaml`), schema.content)
     }
   }
-
-  // Write .gitkeep files
-  writeIfNew(path.join(crevDir, "diffs", ".gitkeep"), "")
-  writeIfNew(path.join(crevDir, "reviews", ".gitkeep"), "")
 
   // Write skills for selected tools
   for (const tool of tools) {

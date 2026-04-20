@@ -2,7 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir, loadConfig, getOutputDir } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
 import { SEVERITY_COLORS } from "../ui/theme.js"
 
@@ -85,13 +85,13 @@ export function registerShowCommand(program: Command): void {
 }
 
 function findLatestReview(crevDir: string): string | null {
-  const config = loadConfig(crevDir)
+  const config = loadLayeredConfig(crevDir)
   const outputDir = getOutputDir(config, crevDir)
 
   if (!fs.existsSync(outputDir)) return null
 
   const files = fs.readdirSync(outputDir)
-    .filter((f) => f.endsWith(".json") && f !== ".gitkeep")
+    .filter((f) => f.endsWith(".json"))
     .sort()
 
   if (files.length === 0) return null

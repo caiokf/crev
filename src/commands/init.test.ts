@@ -21,20 +21,13 @@ describe("init scaffolding", () => {
 
   it("creates .crev directory structure with writeIfNew", () => {
     const crevDir = path.join(tmpDir, ".crev")
-    for (const dir of ["schemas", "diffs", "reviews"]) {
-      fs.mkdirSync(path.join(crevDir, dir), { recursive: true })
-    }
+    fs.mkdirSync(path.join(crevDir, "schemas"), { recursive: true })
 
     writeIfNew(path.join(crevDir, "config.yaml"), configTemplate)
-    writeIfNew(path.join(crevDir, "diffs", ".gitkeep"), "")
-    writeIfNew(path.join(crevDir, "reviews", ".gitkeep"), "")
 
     expect(fs.existsSync(path.join(crevDir, "schemas"))).toBe(true)
-    expect(fs.existsSync(path.join(crevDir, "diffs"))).toBe(true)
-    expect(fs.existsSync(path.join(crevDir, "reviews"))).toBe(true)
+    expect(fs.existsSync(path.join(crevDir, "config.yaml"))).toBe(true)
     expect(fs.readFileSync(path.join(crevDir, "config.yaml"), "utf-8")).toBe(configTemplate)
-    expect(fs.existsSync(path.join(crevDir, "diffs", ".gitkeep"))).toBe(true)
-    expect(fs.existsSync(path.join(crevDir, "reviews", ".gitkeep"))).toBe(true)
   })
 
   it("does not overwrite existing non-empty files via writeIfNew", () => {
