@@ -58,7 +58,7 @@ export const ValidatedSchemaFile = SchemaFile.superRefine((schema, ctx) => {
   }
 })
 
-export type SchemaFileType = z.infer<typeof SchemaFile>
+export type SchemaFileType = z.infer<typeof ValidatedSchemaFile>
 export type ReviewerConfig = z.input<typeof ReviewerSchema>
 
 export type ValidationIssue = {
@@ -67,15 +67,40 @@ export type ValidationIssue = {
   message: string
 }
 
+function invalidSchemaParseResult(
+  message: string,
+): z.SafeParseReturnType<unknown, z.infer<typeof ValidatedSchemaFile>> {
+  return {
+    success: false,
+    error: new z.ZodError([
+      {
+        code: z.ZodIssueCode.custom,
+        path: [],
+        message,
+      },
+    ]),
+  }
+}
+
 export function parseSchemaFile(content: string): z.SafeParseReturnType<unknown, z.infer<typeof ValidatedSchemaFile>> {
-  const parsed = YAML.parse(content)
-  return ValidatedSchemaFile.safeParse(parsed)
+  try {
+    const parsed = YAML.parse(content)
+    return ValidatedSchemaFile.safeParse(parsed)
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    return invalidSchemaParseResult(`Invalid YAML: ${reason}`)
+  }
 }
 
 export function loadSchemaFile(schemaPath: string): SchemaFileType {
   const content = fs.readFileSync(schemaPath, "utf-8")
-  const parsed = YAML.parse(content)
-  return SchemaFile.parse(parsed)
+  try {
+    const parsed = YAML.parse(content)
+    return ValidatedSchemaFile.parse(parsed)
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    throw new Error(`Invalid schema file "${schemaPath}": ${reason}`)
+  }
 }
 
 export function listSchemas(schemasDir: string): string[] {
@@ -119,7 +144,9 @@ export function listAllSchemas(crevDir: string): string[] {
 
 /**
  * Resolve a schema name to its file path, checking layers in priority order:
- *   .crev/schemas/<name>.local.yaml > .crev/schemas/<name>.yaml > ~/.crev/schemas/<name>.yaml
+ *   .crev/schemas/<name>.local.yaml > .crev/schemas/<name>.local.yml >
+ *   .crev/schemas/<name>.yaml > .crev/schemas/<name>.yml >
+ *   ~/.crev/schemas/<name>.yaml > ~/.crev/schemas/<name>.yml
  */
 export function resolveSchemaPath(schemaName: string, crevDir: string): string | null {
   const projectSchemasDir = path.join(crevDir, "schemas")
@@ -127,8 +154,11 @@ export function resolveSchemaPath(schemaName: string, crevDir: string): string |
 
   const candidates = [
     path.join(projectSchemasDir, `${schemaName}.local.yaml`),
+    path.join(projectSchemasDir, `${schemaName}.local.yml`),
     path.join(projectSchemasDir, `${schemaName}.yaml`),
+    path.join(projectSchemasDir, `${schemaName}.yml`),
     path.join(userSchemasDir, `${schemaName}.yaml`),
+    path.join(userSchemasDir, `${schemaName}.yml`),
   ]
 
   for (const candidate of candidates) {

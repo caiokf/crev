@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { ValidatedSchemaFile, listSchemas, parseSchemaFile, validateAgentRefs } from "./schema.js"
+import { ValidatedSchemaFile, listSchemas, loadSchemaFile, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
 
 describe("schema validation", () => {
   it("parses a valid schema", () => {
@@ -113,6 +113,54 @@ reviewers:
     const result = parseSchemaFile(yaml)
     expect(result.success).toBe(false)
   })
+
+  it("returns safe parse error for malformed YAML", () => {
+    const yaml = `
+reviewers:
+  - name: Engineer
+    runtime: claude
+    model sonnet
+`
+    const result = parseSchemaFile(yaml)
+    expect(result.success).toBe(false)
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes("Invalid YAML:"))).toBe(true)
+    }
+  })
+})
+
+describe("loadSchemaFile", () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it("rejects invalid model values", () => {
+    const schemaPath = path.join(tmpDir, "invalid-model.yaml")
+    fs.writeFileSync(schemaPath, `
+reviewers:
+  - name: Engineer
+    runtime: claude
+    model: definitely-not-real
+`)
+    expect(() => loadSchemaFile(schemaPath)).toThrow(/Invalid model/)
+  })
+
+  it("throws friendly error for malformed YAML", () => {
+    const schemaPath = path.join(tmpDir, "malformed.yaml")
+    fs.writeFileSync(schemaPath, `
+reviewers:
+  - name: Engineer
+    runtime: claude
+    model sonnet
+`)
+    expect(() => loadSchemaFile(schemaPath)).toThrow(/Invalid schema file/)
+  })
 })
 
 describe("listSchemas", () => {
@@ -137,6 +185,32 @@ describe("listSchemas", () => {
 
   it("returns empty for non-existent directory", () => {
     expect(listSchemas("/nonexistent")).toEqual([])
+  })
+})
+
+describe("resolveSchemaPath", () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+    fs.mkdirSync(path.join(tmpDir, "schemas"), { recursive: true })
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true })
+  })
+
+  it("resolves project .yml schemas", () => {
+    const schemaPath = path.join(tmpDir, "schemas", "quick.yml")
+    fs.writeFileSync(schemaPath, "reviewers:\n  - name: Engineer\n    runtime: claude\n    model: sonnet\n")
+    expect(resolveSchemaPath("quick", tmpDir)).toBe(schemaPath)
+  })
+
+  it("prioritizes .local.yml over .yml", () => {
+    const localPath = path.join(tmpDir, "schemas", "quick.local.yml")
+    fs.writeFileSync(path.join(tmpDir, "schemas", "quick.yml"), "reviewers:\n  - name: A\n    runtime: claude\n    model: sonnet\n")
+    fs.writeFileSync(localPath, "reviewers:\n  - name: B\n    runtime: claude\n    model: sonnet\n")
+    expect(resolveSchemaPath("quick", tmpDir)).toBe(localPath)
   })
 })
 
