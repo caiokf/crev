@@ -1,14 +1,26 @@
-node_modules/
+# Build
 dist/
 *.tsbuildinfo
+
+# Dependencies
+node_modules/
+
+# Test
+coverage/
+
+# crev artifacts (generated per-run)
 .crev/diffs/
 .crev/reviews/
-coverage/
-.personal/
 
+# Environment
 .env
 .envrc
+
+# IDE / tool state
 .superset/
 .playwright-mcp/
+.personal/
+
+# Media (screenshots, etc.)
 *.png
 *.jpeg
