@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { getOutputDir, loadAgentPrompt, loadConfig, resolveModelAlias, resolveClaudeModelId } from "./config.js"
+import { findCrevDir, getOutputDir, loadAgentPrompt, loadConfig, resolveModelAlias, resolveClaudeModelId } from "./config.js"
 
 describe("loadConfig", () => {
   let tmpDir: string
@@ -140,5 +140,35 @@ describe("loadAgentPrompt", () => {
   it("returns null for missing agent", () => {
     const prompt = loadAgentPrompt(path.join(tmpDir, "agents", "missing.md"))
     expect(prompt).toBeNull()
+  })
+})
+
+describe("findCrevDir", () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it(".crev exists in startDir — returns that path", () => {
+    fs.mkdirSync(path.join(tmpDir, ".crev"))
+    expect(findCrevDir(tmpDir)).toBe(path.join(tmpDir, ".crev"))
+  })
+
+  it(".crev exists in parent directory — walks up and finds it", () => {
+    fs.mkdirSync(path.join(tmpDir, ".crev"))
+    const childDir = path.join(tmpDir, "packages", "cli")
+    fs.mkdirSync(childDir, { recursive: true })
+    expect(findCrevDir(childDir)).toBe(path.join(tmpDir, ".crev"))
+  })
+
+  it("no .crev anywhere — returns fallback .crev relative to startDir", () => {
+    const emptyDir = path.join(tmpDir, "empty")
+    fs.mkdirSync(emptyDir)
+    expect(findCrevDir(emptyDir)).toBe(path.resolve(emptyDir, ".crev"))
   })
 })
