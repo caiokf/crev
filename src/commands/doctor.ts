@@ -1,9 +1,11 @@
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { getAllRuntimes, type RuntimeHealth } from "@caiokf/valet"
+import { getAllRuntimes, type RuntimeHealth, type RuntimeAdapter } from "@caiokf/valet"
 import { findCrevDir, loadConfig, getRuntimeConfig } from "../core/config.js"
+import { resolveModelAlias } from "../core/config.js"
 import { listSchemas, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
 import { visibleLength, padVisible, truncateVisible } from "../ui/ansi.js"
@@ -13,6 +15,7 @@ export function registerDoctorCommand(program: Command): void {
     .command("doctor")
     .description("Health check for runtimes and schemas")
     .option("--all", "Check all known runtimes, not just those in schemas")
+    .option("--smoke", "Run a smoke test through each installed runtime")
     .option("--json", "Machine-readable JSON output")
     .action(async (opts) => {
       const crevDir = findCrevDir()
@@ -194,6 +197,33 @@ export function registerDoctorCommand(program: Command): void {
         }
       }
 
+      // Smoke test
+      if (opts.smoke) {
+        const readyRuntimes = allRuntimes.filter((rt) => {
+          const health = allHealthResults.find((h) => h.name === rt.name)
+          return health?.installed && health?.authenticated !== "no"
+        })
+
+        if (readyRuntimes.length === 0) {
+          console.log(`\n  ${chalk.dim("No runtimes available for smoke test")}`)
+        } else {
+          const smokeResults = await runSmokeTests(readyRuntimes, config, jsonOutput)
+
+          if (jsonOutput) {
+            console.log(JSON.stringify({ smoke: smokeResults }, null, 2))
+          } else {
+            console.log(`\n  ${chalk.bold("Smoke Test")}`)
+            console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
+            for (const r of smokeResults) {
+              const icon = r.pass ? chalk.green("✓") : chalk.red("✗")
+              const time = chalk.dim(`${(r.durationMs / 1000).toFixed(1)}s`)
+              const detail = r.pass ? time : `${time} ${chalk.dim(r.error ?? "")}`
+              console.log(`  ${r.runtime.padEnd(14)} ${r.model.padEnd(22)} ${icon} ${detail}`)
+            }
+          }
+        }
+      }
+
       console.log()
     })
 }
@@ -286,5 +316,92 @@ function formatRuntimeLine(health: RuntimeHealth, config: ReturnType<typeof load
   }
 
   return line
+}
+
+type SmokeResult = {
+  runtime: string
+  model: string
+  pass: boolean
+  durationMs: number
+  error?: string
+}
+
+async function runSmokeTests(
+  runtimes: RuntimeAdapter[],
+  config: ReturnType<typeof loadConfig>,
+  jsonOutput: boolean,
+): Promise<SmokeResult[]> {
+  const SMOKE_PROMPT = 'Respond with exactly this text and nothing else: hello smoke-test'
+  const results: SmokeResult[] = []
+
+  const isTTY = process.stdout.isTTY && !jsonOutput
+
+  // Run one model per runtime (the default model)
+  const tasks = runtimes
+    .filter((rt) => rt.supportsCustomPrompt)
+    .map((rt) => ({
+      runtime: rt,
+      model: resolveModelAlias(config, rt.defaultModel),
+    }))
+
+  if (isTTY) {
+    process.stdout.write(`\n  ${chalk.dim(`Running smoke tests... 0/${tasks.length}`)}`)
+  }
+
+  let done = 0
+  await Promise.all(
+    tasks.map(async ({ runtime, model }) => {
+      const promptFile = path.join(os.tmpdir(), `crev-smoke-${runtime.name}-${process.pid}.txt`)
+      fs.writeFileSync(promptFile, SMOKE_PROMPT, "utf-8")
+
+      const start = performance.now()
+      try {
+        const rtConfig = getRuntimeConfig(config, runtime.name)
+        const result = await runtime.execute({
+          taskName: "smoke-test",
+          model,
+          prompt: SMOKE_PROMPT,
+          promptFile,
+          diff: { diffContent: "", diffFile: "", type: "all" },
+          outputFormat: "",
+          overrides: {
+            command: rtConfig.command,
+            env: rtConfig.env,
+            extraArgs: rtConfig.args,
+          },
+        })
+
+        const durationMs = performance.now() - start
+        const pass = result.exitCode === 0 && result.raw.toLowerCase().includes("hello smoke-test")
+        results.push({
+          runtime: runtime.name,
+          model,
+          pass,
+          durationMs,
+          error: pass ? undefined : (result.exitCode !== 0 ? `exit code ${result.exitCode}` : "unexpected output"),
+        })
+      } catch (err) {
+        results.push({
+          runtime: runtime.name,
+          model,
+          pass: false,
+          durationMs: performance.now() - start,
+          error: err instanceof Error ? err.message : String(err),
+        })
+      } finally {
+        try { fs.unlinkSync(promptFile) } catch {}
+        done++
+        if (isTTY) {
+          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Running smoke tests... ${done}/${tasks.length}`)}`)
+        }
+      }
+    }),
+  )
+
+  if (isTTY) {
+    process.stdout.write("\r\x1B[2K")
+  }
+
+  return results.sort((a, b) => a.runtime.localeCompare(b.runtime))
 }
 
