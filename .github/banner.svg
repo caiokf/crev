@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 200">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#06060a"/>
+      <stop offset="100%" stop-color="#0c0a12"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#ffb347"/>
+      <stop offset="100%" stop-color="#ff9d00"/>
+    </linearGradient>
+    <linearGradient id="grid-fill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ff9d00" stop-opacity="0.06"/>
+      <stop offset="100%" stop-color="#ff9d00" stop-opacity="0.01"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="800" height="200" rx="12" fill="url(#bg)"/>
+
+  <!-- Decorative diff-like lines (left side) -->
+  <g font-family="ui-monospace, monospace" font-size="11" opacity="0.12">
+    <text x="30" y="38" fill="#ff9d00">@@ -12,6 +12,8 @@</text>
+    <text x="30" y="54" fill="#888">  const config = load()</text>
+    <text x="30" y="70" fill="#4ade80">+ validate(schema)</text>
+    <text x="30" y="86" fill="#4ade80">+ runReviewers(diff)</text>
+    <text x="30" y="102" fill="#888">  return result</text>
+    <text x="30" y="118" fill="#f87171">- // TODO: add triage</text>
+    <text x="30" y="134" fill="#4ade80">+ const triaged = triage(issues)</text>
+    <text x="30" y="150" fill="#888">  writeOutput(triaged)</text>
+    <text x="30" y="166" fill="#888">  cleanup()</text>
+  </g>
+
+  <!-- Decorative reviewer labels (right side) -->
+  <g font-family="ui-monospace, monospace" font-size="10" opacity="0.15">
+    <text x="590" y="48" fill="#ff9d00">&#x25CF; Engineer    claude/sonnet</text>
+    <text x="590" y="68" fill="#ff9d00">&#x25CF; Security    claude/opus</text>
+    <text x="590" y="88" fill="#ff9d00">&#x25CF; Architect   gemini/pro</text>
+    <text x="590" y="108" fill="#4ade80">&#x2713; 3/3 complete</text>
+    <text x="590" y="138" fill="#ff9d00">&#x25CF; Triage      claude/opus</text>
+    <text x="590" y="158" fill="#4ade80">&#x2713; 4 actionable, 2 dismissed</text>
+  </g>
+
+  <!-- "crev" text -->
+  <text x="400" y="108" font-family="system-ui, -apple-system, sans-serif" font-weight="800" font-size="58" fill="url(#accent)" letter-spacing="-2" text-anchor="middle">crev</text>
+
+  <!-- Tagline -->
+  <text x="400" y="148" font-family="ui-monospace, monospace" font-size="13" fill="#7a7a8a" text-anchor="middle" letter-spacing="0.5">Multi-AI code review. One command. No API keys.</text>
+</svg>

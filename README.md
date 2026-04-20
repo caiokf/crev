@@ -1,10 +1,6 @@
-```
-  ██████ ████████  ████████ ██     ██
- ██      ██     ██ ██       ██     ██
- ██      ████████  █████    ██     ██
- ██      ██   ██   ██        ██   ██
-  ██████ ██     ██ ████████    ███
-```
+<p align="center">
+  <img src=".github/banner.svg" alt="crev banner" width="600" />
+</p>
 
 # crev — **C**ode **REV**iew
 
@@ -29,19 +25,28 @@ crev run --schema standard --base main
 
 # 6 specialized reviewers + dedup triage
 crev run --schema thorough --base main
+
+# Full codebase analysis
+crev run --schema security --analyze
 ```
 
 ## Install
 
 ```bash
-npm install -g crev
+npm install -g @caiokf/crev
+```
+
+Or with Homebrew:
+
+```bash
+brew install caiokf/tap/crev
 ```
 
 Or use without installing:
 
 ```bash
-npx crev init
-npx crev run --schema quick --base main
+npx @caiokf/crev init
+npx @caiokf/crev run --schema quick --base main
 ```
 
 ## Quick Start
@@ -56,17 +61,26 @@ crev run --schema quick --base main
 # Review a specific PR
 crev run --schema quick --pr 42
 
-# Review a specific commit
-crev run --schema quick --base-commit abc1234
+# Review uncommitted changes
+crev run --schema quick --type uncommitted
+
+# Full codebase analysis (no diff)
+crev run --schema security --analyze
+
+# Check runtime health
+crev doctor
+
+# Smoke test all runtimes
+crev doctor --smoke
 ```
 
 ## How It Works
 
 1. **Define a schema** -- Pick which runtimes, models, and prompts to use
 2. **crev generates the diff** -- From your branch, PR, or commit
-3. **Reviewers run in parallel** -- Each runtime gets the diff and a structured prompt
+3. **Reviewers run in parallel** -- Each runtime gets the diff and reads files from the codebase
 4. **Output is normalized** -- All results are merged into a single JSON review
-5. **Optional triage** -- An AI pass deduplicates and prioritizes findings
+5. **Optional triage** -- A devil's advocate AI pass deduplicates and prioritizes findings
 
 ```yaml
 # .crev/schemas/standard.yaml
@@ -95,6 +109,8 @@ reviewers:
 
 triage:
   enabled: true
+  runtime: claude
+  model: opus
 ```
 
 Each reviewer can use either an inline `prompt` or an `agent` field pointing to any external file:
@@ -104,7 +120,7 @@ reviewers:
   - name: Security
     runtime: claude
     model: opus
-    agent: ../.claude/agents/security-reviewer.md
+    agent: .crev/agents/security-reviewer.md
 ```
 
 ## Supported Runtimes
@@ -121,22 +137,24 @@ reviewers:
 | MastraCode | `mastracode` | Subscription |
 | Pi | `pi` | Subscription |
 
-Run `crev doctor` to check which runtimes are available.
+Run `crev doctor` to check which runtimes are available. Add `--smoke` to verify end-to-end functionality.
 
 ## Commands
 
 | Command | Description |
 |---|---|
 | `crev init` | Interactive setup |
-| `crev run` | Execute a review |
-| `crev doctor` | Check runtime health |
+| `crev run --schema <name>` | Execute a review |
+| `crev run --analyze` | Full codebase analysis (no diff) |
+| `crev doctor [--smoke]` | Check runtime health (optionally run smoke tests) |
+| `crev stats --schema <name>` | Reviewer effectiveness stats |
 | `crev list` | List schemas and runtimes |
-| `crev schema show <name>` | Display schema details |
-| `crev schema validate` | Validate schemas |
 | `crev show [file]` | Pretty-print a review file (default: latest) |
 | `crev diff` | Preview diff that would be reviewed |
-| `crev update` | Regenerate AI tool skills |
+| `crev schema show <name>` | Display schema details |
+| `crev schema validate` | Validate schemas |
 | `crev schema init <name>` | Scaffold a new schema |
+| `crev update` | Regenerate AI tool skills |
 | `crev help <topic>` | Detailed help (run, schema) |
 
 ## Project Structure

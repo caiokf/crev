@@ -14,7 +14,7 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Run a review                | \`crev run --schema <name> --base main\`                   |
 | Review a PR                 | \`crev run --schema <name> --pr 42\`                       |
 | Review uncommitted changes  | \`crev run --schema <name> --type uncommitted\`            |
-| Review entire codebase      | \`crev run --schema <name> --type current-state\`          |
+| Analyze entire codebase     | \`crev run --schema <name> --analyze\`                     |
 | CI mode (no TUI)            | \`crev run --schema <name> --plain --json\`                |
 | Subset of reviewers         | \`crev run --schema <name> --reviewers "Security,Arch"\`   |
 | Preview prompts only        | \`crev run --schema <name> --prompt-only\`                 |
@@ -73,10 +73,9 @@ reviewers:
   - name: Architecture
     runtime: claude
     model: opus
-    scope: codebase            # review full source files, not just diff
-    context:                   # extra files/globs included as context
-      - packages/cli/src/bin.ts
-      - packages/cli/src/commands/*.ts
+    prompt: >
+      You are a senior software architect reviewing code changes.
+      Focus on coupling, abstraction quality, API design, and dependency direction.
 triage:
   enabled: true
   runtime: claude
@@ -85,8 +84,7 @@ triage:
 
 Per-reviewer fields:
 - \`prompt\` / \`agent\`: mutually exclusive. CodeRabbit accepts neither.
-- \`scope\`: \`diff\` (default) reviews the diff only. \`codebase\` includes full source of changed files.
-- \`context\`: array of file paths or globs. Contents are appended to the prompt as additional context.
+- Reviewers have full filesystem access and can read any file in the repository during review.
 
 ### Schema Authoring: Black-Box Approach
 

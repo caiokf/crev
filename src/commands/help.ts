@@ -71,8 +71,9 @@ ${chalk.bold("FLAGS")}
   --schema <name>          Which review schema to use (from .crev/schemas/)
   --base <branch>          Git base branch for diff
   --base-commit <sha>      Specific commit hash
-  --type <type>            "all" | "committed" | "uncommitted" | "current-state"
+  --type <type>            "all" | "committed" | "uncommitted"
   --pr <number>            GitHub PR number
+  --analyze                Full codebase analysis (no diff)
   --reviewers <list>       Comma-separated reviewer names to run
   --slug <name>            Override artifact name
   --description <text>     Metadata
@@ -85,7 +86,7 @@ ${chalk.bold("EXAMPLES")}
   crev run --schema quick --base main
   crev run --schema standard --pr 42
   crev run --schema security --reviewers "Security,Architect"
-  crev run --schema security --type current-state  # Full codebase review
+  crev run --schema security --analyze  # Full codebase analysis
   crev run --schema quick --plain --json  # CI mode
   crev run --schema quick --review-file .crev/reviews/existing.json
 `)
@@ -108,8 +109,6 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
   Optional fields per reviewer:
     prompt: string        # Inline prompt text
     agent: string         # Path to an external agent file (any path)
-    context: string[]     # Extra files/globs to include as context
-    scope: diff|codebase  # What to review: diff (default) or full codebase
 
   Optional top-level fields:
     description: string   # What this schema reviews for
@@ -117,7 +116,6 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
       enabled: boolean
       runtime: string
       model: string
-      context: string[]   # Paths to context files
 
 ${chalk.bold("SCHEMA COMMANDS")}
   crev schema init <name>          Create a new schema
@@ -142,10 +140,9 @@ ${chalk.bold("EXAMPLE")}
     - name: Architecture
       runtime: claude
       model: opus
-      scope: codebase
-      context:
-        - packages/cli/src/bin.ts
-        - packages/cli/src/commands/*.ts
+      prompt: >
+        You are a senior software architect reviewing code changes.
+        Focus on coupling, abstraction quality, API design, and dependency direction.
   triage:
     enabled: true
     runtime: claude
@@ -179,8 +176,8 @@ function getFullReference(): Record<string, unknown> {
     runtimes: Object.entries(VALID_MODELS).map(([name, models]) => ({ name, models })),
     schemaFormat: {
       required: ["reviewers"],
-      reviewerFields: ["name", "runtime", "model", "prompt?", "agent?", "context?", "scope?"],
-      triageFields: ["enabled", "runtime", "model", "context?"],
+      reviewerFields: ["name", "runtime", "model", "prompt?", "agent?"],
+      triageFields: ["enabled", "runtime", "model"],
     },
   }
 }
