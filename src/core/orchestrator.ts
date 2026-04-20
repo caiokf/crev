@@ -1,7 +1,7 @@
+import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
-import { glob } from "glob"
 import { getRuntime, type RuntimeExecutionRequest } from "@caiokf/valet"
 import chalk from "chalk"
 import type { Config } from "./config.js"
@@ -68,7 +68,7 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
   return result
 }
 
-function filterReviewers(reviewers: ReviewerConfig[], filter?: string[]): ReviewerConfig[] {
+export function filterReviewers(reviewers: ReviewerConfig[], filter?: string[]): ReviewerConfig[] {
   if (!filter || filter.length === 0) return reviewers
 
   const filterLower = filter.map((f) => f.toLowerCase().trim())
@@ -212,7 +212,6 @@ async function runTriagePass(
           enabled: true,
           runtime: schemaTriage.runtime ?? opts.config.triage.runtime,
           model: schemaTriage.model ?? opts.config.triage.model,
-          context: schemaTriage.context ?? opts.config.triage.context,
         },
       }
     : opts.config
@@ -274,15 +273,10 @@ async function runSingleReviewer(
     }
   }
 
-  const scope = reviewer.scope ?? "diff"
-  const isCurrentState = opts.diff.type === "current-state"
-  const sourceSection = isCurrentState
-    ? buildCurrentStateReference(opts.diff, scope === "codebase")
-    : scope === "codebase"
-      ? buildCodebaseReference(opts.diff)
-      : buildDiffReference(opts.diff.diffFile)
-
-  const contextSection = await resolveContextFiles(reviewer.context)
+  const isAnalyze = opts.diff.type === "analyze"
+  const sourceSection = isAnalyze
+    ? buildAnalyzeReference(opts.diff)
+    : buildDiffReference(opts.diff.diffFile)
 
   const promptWithSource = prompt.includes("{{diff}}")
     ? prompt.replaceAll("{{diff}}", () => sourceSection)
@@ -290,7 +284,6 @@ async function runSingleReviewer(
 
   const fullPrompt = [
     promptWithSource,
-    ...(contextSection ? ["", "---", "", "Additional context files:", "", contextSection] : []),
     "",
     "Respond with valid JSON matching this schema:",
     outputFormat,
@@ -333,68 +326,18 @@ export function buildDiffReference(diffFile: string): string {
   ].join("\n")
 }
 
-export function buildCurrentStateReference(diff: DiffInput, inlineSource: boolean): string {
+export function buildAnalyzeReference(diff: DiffInput): string {
   const files = extractChangedFiles(diff.diffContent)
-
-  if (inlineSource) {
-    const sections: string[] = [
-      "Review all files in this repository for issues.",
-      "This is a full codebase review, not a diff review.",
-      "",
-    ]
-
-    const sourceFiles = files.filter((f) => {
-      const resolved = path.resolve(f)
-      return fs.existsSync(resolved)
-    })
-
-    if (sourceFiles.length > 0) {
-      sections.push("Full source of all tracked files:", "")
-      for (const file of sourceFiles) {
-        const content = fs.readFileSync(path.resolve(file), "utf-8")
-        sections.push(`--- ${file} ---`, content, "")
-      }
-    }
-
-    return sections.join("\n")
-  }
 
   return [
     "Review all files in this repository for issues.",
-    "This is a full codebase review, not a diff review.",
+    "This is a full codebase analysis, not a diff review.",
     "",
     "Files to review:",
     ...files.map((f) => `- ${f}`),
     "",
     "Read each file from the filesystem to review its contents.",
   ].join("\n")
-}
-
-export function buildCodebaseReference(diff: DiffInput): string {
-  const files = extractChangedFiles(diff.diffContent)
-
-  const sections: string[] = [
-    "The diff that triggered this review is at:",
-    diff.diffFile,
-    "",
-    "Read the diff file above for the exact changes.",
-    "",
-  ]
-
-  const sourceFiles = files.filter((f) => {
-    const resolved = path.resolve(f)
-    return fs.existsSync(resolved)
-  })
-
-  if (sourceFiles.length > 0) {
-    sections.push("Full source of the changed files:", "")
-    for (const file of sourceFiles) {
-      const content = fs.readFileSync(path.resolve(file), "utf-8")
-      sections.push(`--- ${file} ---`, content, "")
-    }
-  }
-
-  return sections.join("\n")
 }
 
 export function extractChangedFiles(diffContent: string): string[] {
@@ -406,25 +349,6 @@ export function extractChangedFiles(diffContent: string): string[] {
     }
   }
   return [...files]
-}
-
-async function resolveContextFiles(patterns?: string[]): Promise<string | null> {
-  if (!patterns || patterns.length === 0) return null
-
-  const sections: string[] = []
-
-  for (const pattern of patterns) {
-    const matches = await glob(pattern, { nodir: true })
-    for (const file of matches.sort()) {
-      const resolved = path.resolve(file)
-      if (fs.existsSync(resolved)) {
-        const content = fs.readFileSync(resolved, "utf-8")
-        sections.push(`--- ${file} ---`, content, "")
-      }
-    }
-  }
-
-  return sections.length > 0 ? sections.join("\n") : null
 }
 
 function buildResult(
@@ -459,7 +383,8 @@ function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir
     String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0"),
   ].join("-")
 
-  const filename = `${datePart}-${slug}.json`
+  const suffix = crypto.randomBytes(3).toString("hex")
+  const filename = `${datePart}-${slug}-${suffix}.json`
   const filePath = path.join(outputDir, filename)
 
   fs.writeFileSync(filePath, JSON.stringify(result, null, 2), "utf-8")
@@ -530,7 +455,7 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
   return resolvedPath
 }
 
-function recomputeSummary(reviews: NormalizedReview[]): ReviewResult["summary"] {
+export function recomputeSummary(reviews: NormalizedReview[]): ReviewResult["summary"] {
   const allIssues = reviews.flatMap((r) => r.issues)
   const bySeverity: Record<string, number> = {}
   const byCategory: Record<string, number> = {}
