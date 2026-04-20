@@ -73,7 +73,7 @@ describe("buildDiffReference", () => {
 })
 
 describe("buildAnalyzeReference", () => {
-  it("lists files and instructs reading from filesystem", () => {
+  it("instructs reading all files from filesystem without inlining file lists", () => {
     const diff = {
       diffContent: `diff --git a/src/app.ts b/src/app.ts\ndiff --git a/src/util.ts b/src/util.ts`,
       diffFile: "/tmp/test.diff",
@@ -81,12 +81,13 @@ describe("buildAnalyzeReference", () => {
     }
     const result = buildAnalyzeReference(diff)
     expect(result).toContain("full codebase analysis")
-    expect(result).toContain("- src/app.ts")
-    expect(result).toContain("- src/util.ts")
+    expect(result).not.toContain("Files to review:")
+    expect(result).not.toContain("- src/app.ts")
+    expect(result).not.toContain("- src/util.ts")
     expect(result).toContain("Read each file from the filesystem")
   })
 
-  it("returns empty file list for empty diff", () => {
+  it("keeps the same instructions for empty diff", () => {
     const diff = {
       diffContent: "",
       diffFile: "/tmp/test.diff",
@@ -94,7 +95,7 @@ describe("buildAnalyzeReference", () => {
     }
     const result = buildAnalyzeReference(diff)
     expect(result).toContain("full codebase analysis")
-    expect(result).not.toContain("- ")
+    expect(result).toContain("Read each file from the filesystem")
   })
 })
 
@@ -169,6 +170,42 @@ describe("buildPromptOnlyResult", () => {
     expect(result.prompts[0].model).toBe("sonnet")
     expect(result.prompts[0].prompt).toContain("/tmp/test.diff")
     expect(result.prompts[0].prompt).toContain("Respond with valid JSON matching this schema")
+  })
+
+  it("loads reviewer agent prompt content", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-prompt-only-agent-"))
+    const agentPath = path.join(tmpDir, "security.md")
+    fs.writeFileSync(agentPath, "You are a security specialist.")
+
+    try {
+      const result = buildPromptOnlyResult({
+        schema: {
+          reviewers: [
+            {
+              name: "Security",
+              runtime: "claude",
+              model: "sonnet",
+              agent: agentPath,
+            },
+          ],
+        },
+        schemaName: "security",
+        schemaHash: "def67890",
+        config: {} as any,
+        diff: {
+          diffContent: "diff --git a/src/app.ts b/src/app.ts",
+          diffFile: "/tmp/test.diff",
+          type: "all",
+        },
+        slug: "feature-branch",
+        crevDir: "/tmp",
+      })
+
+      expect(result.prompts).toHaveLength(1)
+      expect(result.prompts[0].prompt).toContain("You are a security specialist.")
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true })
+    }
   })
 })
 
