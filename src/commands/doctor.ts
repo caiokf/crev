@@ -124,17 +124,30 @@ export function registerDoctorCommand(program: Command): void {
         }
       })
 
+      let smokeResults: SmokeResult[] | undefined
+      if (opts.smoke) {
+        const readyRuntimes = allRuntimes.filter((rt) => {
+          const health = allHealthResults.find((h) => h.name === rt.name)
+          return health?.installed && health?.authenticated !== "no"
+        })
+
+        if (readyRuntimes.length > 0) {
+          smokeResults = await runSmokeTests(readyRuntimes, config, jsonOutput)
+        } else {
+          smokeResults = []
+        }
+      }
+
       if (jsonOutput) {
-        console.log(
-          JSON.stringify({
-            runtimes: healthResults.map((h) => ({
-              ...h,
-              usedIn: runtimeUsage.get(h.name) ?? [],
-            })),
-            schemas: schemaReadiness,
-            project: projectChecks,
-          }, null, 2),
-        )
+        const payload = buildDoctorJsonPayload({
+          healthResults,
+          runtimeUsage,
+          schemaReadiness,
+          projectChecks,
+          includeSmoke: opts.smoke ?? false,
+          smokeResults,
+        })
+        console.log(JSON.stringify(payload, null, 2))
         return
       }
 
@@ -202,27 +215,16 @@ export function registerDoctorCommand(program: Command): void {
 
       // Smoke test
       if (opts.smoke) {
-        const readyRuntimes = allRuntimes.filter((rt) => {
-          const health = allHealthResults.find((h) => h.name === rt.name)
-          return health?.installed && health?.authenticated !== "no"
-        })
-
-        if (readyRuntimes.length === 0) {
+        if (!smokeResults || smokeResults.length === 0) {
           console.log(`\n  ${chalk.dim("No runtimes available for smoke test")}`)
         } else {
-          const smokeResults = await runSmokeTests(readyRuntimes, config, jsonOutput)
-
-          if (jsonOutput) {
-            console.log(JSON.stringify({ smoke: smokeResults }, null, 2))
-          } else {
-            console.log(`\n  ${chalk.bold("Smoke Test")}`)
-            console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
-            for (const r of smokeResults) {
-              const icon = r.pass ? chalk.green("✓") : chalk.red("✗")
-              const time = chalk.dim(`${(r.durationMs / 1000).toFixed(1)}s`)
-              const detail = r.pass ? time : `${time} ${chalk.dim(r.error ?? "")}`
-              console.log(`  ${r.runtime.padEnd(14)} ${r.model.padEnd(22)} ${icon} ${detail}`)
-            }
+          console.log(`\n  ${chalk.bold("Smoke Test")}`)
+          console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
+          for (const r of smokeResults) {
+            const icon = r.pass ? chalk.green("✓") : chalk.red("✗")
+            const time = chalk.dim(`${(r.durationMs / 1000).toFixed(1)}s`)
+            const detail = r.pass ? time : `${time} ${chalk.dim(r.error ?? "")}`
+            console.log(`  ${r.runtime.padEnd(14)} ${r.model.padEnd(22)} ${icon} ${detail}`)
           }
         }
       }
@@ -232,6 +234,41 @@ export function registerDoctorCommand(program: Command): void {
 }
 
 type ProjectCheck = { name: string; ok: boolean; detail: string }
+
+type SchemaReadiness = {
+  name: string
+  ready: boolean
+  issues: string[]
+}
+
+type DoctorJsonPayload = {
+  runtimes: Array<RuntimeHealth & { usedIn: string[] }>
+  schemas: SchemaReadiness[]
+  project: ProjectCheck[]
+  smoke?: SmokeResult[]
+}
+
+export function buildDoctorJsonPayload(input: {
+  healthResults: RuntimeHealth[]
+  runtimeUsage: Map<string, string[]>
+  schemaReadiness: SchemaReadiness[]
+  projectChecks: ProjectCheck[]
+  includeSmoke: boolean
+  smokeResults?: SmokeResult[]
+}): DoctorJsonPayload {
+  const payload: DoctorJsonPayload = {
+    runtimes: input.healthResults.map((h) => ({
+      ...h,
+      usedIn: input.runtimeUsage.get(h.name) ?? [],
+    })),
+    schemas: input.schemaReadiness,
+    project: input.projectChecks,
+  }
+
+  if (input.includeSmoke) payload.smoke = input.smokeResults ?? []
+
+  return payload
+}
 
 function checkProjectSetup(crevDir: string): ProjectCheck[] {
   const checks: ProjectCheck[] = []
@@ -407,4 +444,3 @@ async function runSmokeTests(
 
   return results.sort((a, b) => a.runtime.localeCompare(b.runtime))
 }
-
