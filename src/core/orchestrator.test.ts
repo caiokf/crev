@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
-import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, validateReviewFilePath, filterReviewers, recomputeSummary } from "./orchestrator.js"
+import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, validateReviewFilePath, filterReviewers, recomputeSummary, buildPromptOnlyResult } from "./orchestrator.js"
 import type { ReviewerConfig } from "./schema.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 
@@ -118,6 +118,45 @@ describe("filterReviewers", () => {
     const result = filterReviewers(reviewers, ["  security  "])
     expect(result).toHaveLength(1)
     expect(result[0].name).toBe("Security")
+  })
+})
+
+describe("buildPromptOnlyResult", () => {
+  it("returns generated prompts and metadata without running reviewers", () => {
+    const result = buildPromptOnlyResult({
+      schema: {
+        reviewers: [
+          {
+            name: "Engineer",
+            runtime: "claude",
+            model: "sonnet",
+            prompt: "Please review this diff:\n{{diff}}",
+          },
+        ],
+      },
+      schemaName: "quick",
+      schemaHash: "abc12345",
+      config: {} as any,
+      diff: {
+        diffContent: "diff --git a/src/app.ts b/src/app.ts",
+        diffFile: "/tmp/test.diff",
+        type: "all",
+        base: "main",
+      },
+      slug: "feature-branch",
+      crevDir: "/tmp",
+    })
+
+    expect(result.metadata.schema).toBe("quick")
+    expect(result.metadata.schemaHash).toBe("abc12345")
+    expect(result.metadata.diffType).toBe("all")
+    expect(result.metadata.diffBase).toBe("main")
+    expect(result.prompts).toHaveLength(1)
+    expect(result.prompts[0].reviewer).toBe("Engineer")
+    expect(result.prompts[0].runtime).toBe("claude")
+    expect(result.prompts[0].model).toBe("sonnet")
+    expect(result.prompts[0].prompt).toContain("/tmp/test.diff")
+    expect(result.prompts[0].prompt).toContain("Respond with valid JSON matching this schema")
   })
 })
 
