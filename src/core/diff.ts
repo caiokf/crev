@@ -11,6 +11,7 @@ const MAX_BUFFER = 50 * 1024 * 1024
 export type DiffOptions = {
   slug: string
   source: DiffSource
+  analyze?: boolean
   exclude?: string[]
   crevDir: string
 }
@@ -18,23 +19,23 @@ export type DiffOptions = {
 export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
   let diffContent: string
 
-  switch (opts.source.kind) {
-    case "pr":
-      diffContent = await getPrDiff(String(opts.source.pr))
-      break
-    case "commit":
-      diffContent = await getCommitDiff(opts.source.baseCommit)
-      break
-    case "branch":
-      diffContent = opts.source.type === "current-state"
-        ? await getCurrentStateDiff()
-        : await getBranchDiff(opts.source.base, opts.source.type)
-      break
-    case "local":
-      diffContent = opts.source.type === "current-state"
-        ? await getCurrentStateDiff()
-        : await getTypeDiff(opts.source.type)
-      break
+  if (opts.analyze) {
+    diffContent = await getAnalyzeDiff()
+  } else {
+    switch (opts.source.kind) {
+      case "pr":
+        diffContent = await getPrDiff(String(opts.source.pr))
+        break
+      case "commit":
+        diffContent = await getCommitDiff(opts.source.baseCommit)
+        break
+      case "branch":
+        diffContent = await getBranchDiff(opts.source.base, opts.source.type)
+        break
+      case "local":
+        diffContent = await getTypeDiff(opts.source.type)
+        break
+    }
   }
 
   if (opts.exclude && opts.exclude.length > 0) {
@@ -51,7 +52,7 @@ export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
     diffFile,
     base: opts.source.kind === "branch" ? opts.source.base : undefined,
     baseCommit: opts.source.kind === "commit" ? opts.source.baseCommit : undefined,
-    type: opts.source.kind === "pr" ? "all" : opts.source.type,
+    type: opts.analyze ? "analyze" : (opts.source.kind === "pr" ? "all" : opts.source.type),
   }
 }
 
@@ -102,21 +103,20 @@ async function getCommitDiff(baseCommit: string): Promise<string> {
   return stdout
 }
 
-async function getCurrentStateDiff(): Promise<string> {
+async function getAnalyzeDiff(): Promise<string> {
   // Check if HEAD exists (repo might have no commits yet)
   try {
     await execFileAsync("git", ["rev-parse", "--verify", "HEAD"])
   } catch {
     throw new Error(
-      "Cannot diff current state: this repository has no commits yet.\n" +
-      "Make at least one commit before running crev with --type current-state."
+      "Cannot analyze: this repository has no commits yet.\n" +
+      "Make at least one commit before running crev with --analyze."
     )
   }
 
-  // Instead of diffing the entire repo against an empty tree (which can exceed
-  // buffer limits on large repos), produce synthetic diff headers from the file
-  // list. This keeps extractChangedFiles() and filterDiff() working while
-  // staying lightweight. Reviewers will read the actual files directly.
+  // Produce synthetic diff headers from the file list so
+  // extractChangedFiles() and filterDiff() still work.
+  // Reviewers will read the actual files directly from the filesystem.
   const { stdout } = await execFileAsync("git", ["ls-tree", "-r", "--name-only", "HEAD"])
   const files = stdout.trim().split("\n").filter(Boolean)
   return files.map((f) => `diff --git a/${f} b/${f}`).join("\n")
@@ -169,7 +169,7 @@ function extractFilePath(diffLine: string): string | null {
   return match?.[1] ?? null
 }
 
-function matchesGlob(filePath: string, pattern: string): boolean {
+export function matchesGlob(filePath: string, pattern: string): boolean {
   if (pattern.startsWith("**/")) {
     const suffix = pattern.slice(3)
     if (suffix.startsWith("*.")) {

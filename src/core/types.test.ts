@@ -59,18 +59,18 @@ describe("RawRunFlags validation", () => {
     expect(result.success).toBe(false)
   })
 
-  it("rejects --type current-state with --base", () => {
-    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", base: "main" })
+  it("rejects --analyze with --base", () => {
+    const result = RawRunFlags.safeParse({ ...valid, analyze: true, base: "main" })
     expect(result.success).toBe(false)
   })
 
-  it("rejects --type current-state with --pr", () => {
-    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", pr: 42 })
+  it("rejects --analyze with --pr", () => {
+    const result = RawRunFlags.safeParse({ ...valid, analyze: true, pr: 42 })
     expect(result.success).toBe(false)
   })
 
-  it("rejects --type current-state with --base-commit", () => {
-    const result = RawRunFlags.safeParse({ ...valid, type: "current-state", baseCommit: "abc123" })
+  it("rejects --analyze with --base-commit", () => {
+    const result = RawRunFlags.safeParse({ ...valid, analyze: true, baseCommit: "abc123" })
     expect(result.success).toBe(false)
   })
 
@@ -159,9 +159,10 @@ describe("RawRunFlags validation", () => {
     expect(result.reviewers).toEqual(["Security", "Architect"])
   })
 
-  it("--type current-state → DiffSource { kind: 'local', type: 'current-state' }", () => {
-    const result = RawRunFlags.parse({ ...valid, type: "current-state" })
-    expect(result.diff).toEqual({ kind: "local", type: "current-state" })
+  it("--analyze sets analyze: true on the command", () => {
+    const result = RawRunFlags.parse({ ...valid, analyze: true })
+    expect(result.analyze).toBe(true)
+    expect(result.diff).toEqual({ kind: "local", type: "all" })
   })
 
   it("schema is required", () => {

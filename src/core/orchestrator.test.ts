@@ -2,7 +2,9 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
 import fs from "node:fs"
 import path from "node:path"
 import os from "node:os"
-import { extractChangedFiles, buildCodebaseReference, buildDiffReference, validateReviewFilePath } from "./orchestrator.js"
+import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, validateReviewFilePath, filterReviewers, recomputeSummary } from "./orchestrator.js"
+import type { ReviewerConfig } from "./schema.js"
+import type { NormalizedReview, ReviewIssue } from "./types.js"
 
 describe("extractChangedFiles", () => {
   it("extracts file paths from standard git diff", () => {
@@ -60,77 +62,137 @@ describe("buildDiffReference", () => {
   })
 })
 
-describe("buildCodebaseReference", () => {
-  let tmpDir: string
-
-  beforeEach(() => {
-    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
+describe("buildAnalyzeReference", () => {
+  it("lists files and instructs reading from filesystem", () => {
+    const diff = {
+      diffContent: `diff --git a/src/app.ts b/src/app.ts\ndiff --git a/src/util.ts b/src/util.ts`,
+      diffFile: "/tmp/test.diff",
+      type: "analyze" as const,
+    }
+    const result = buildAnalyzeReference(diff)
+    expect(result).toContain("full codebase analysis")
+    expect(result).toContain("- src/app.ts")
+    expect(result).toContain("- src/util.ts")
+    expect(result).toContain("Read each file from the filesystem")
   })
 
-  afterEach(() => {
-    fs.rmSync(tmpDir, { recursive: true, force: true })
-  })
-
-  it("always includes the diff file reference", () => {
+  it("returns empty file list for empty diff", () => {
     const diff = {
       diffContent: "",
       diffFile: "/tmp/test.diff",
-      type: "all" as const,
+      type: "analyze" as const,
     }
-    const result = buildCodebaseReference(diff)
-    expect(result).toContain("/tmp/test.diff")
-    expect(result).toContain("Read the diff file above")
+    const result = buildAnalyzeReference(diff)
+    expect(result).toContain("full codebase analysis")
+    expect(result).not.toContain("- ")
+  })
+})
+
+describe("filterReviewers", () => {
+  const reviewers: ReviewerConfig[] = [
+    { name: "Security", runtime: "claude", model: "opus" },
+    { name: "Engineer", runtime: "claude", model: "sonnet" },
+    { name: "Architect", runtime: "gemini", model: "gemini-2.5-pro" },
+  ]
+
+  it("returns all reviewers when no filter", () => {
+    expect(filterReviewers(reviewers)).toEqual(reviewers)
+    expect(filterReviewers(reviewers, [])).toEqual(reviewers)
   })
 
-  it("inlines full source of changed files that exist", () => {
-    const filePath = path.join(tmpDir, "test.ts")
-    fs.writeFileSync(filePath, "const x = 1;\n", "utf-8")
-
-    const diff = {
-      diffContent: `diff --git a/${filePath} b/${filePath}\n+const x = 1;`,
-      diffFile: "/tmp/test.diff",
-      type: "all" as const,
-    }
-    const result = buildCodebaseReference(diff)
-    expect(result).toContain("const x = 1;")
-    expect(result).toContain(`--- ${filePath} ---`)
+  it('["all"] returns all reviewers', () => {
+    expect(filterReviewers(reviewers, ["all"])).toEqual(reviewers)
   })
 
-  it("skips files that do not exist on disk", () => {
-    const diff = {
-      diffContent: `diff --git a/nonexistent/file.ts b/nonexistent/file.ts\n+code`,
-      diffFile: "/tmp/test.diff",
-      type: "all" as const,
-    }
-    const result = buildCodebaseReference(diff)
-    expect(result).not.toContain("--- nonexistent/file.ts ---")
-    expect(result).toContain("/tmp/test.diff")
+  it("case-insensitive match", () => {
+    const result = filterReviewers(reviewers, ["security"])
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("Security")
   })
 
-  it("includes diff reference even when no source files found", () => {
-    const diff = {
-      diffContent: `diff --git a/gone.ts b/gone.ts\n+code`,
-      diffFile: "/tmp/test.diff",
-      type: "all" as const,
-    }
-    const result = buildCodebaseReference(diff)
-    expect(result).toContain("/tmp/test.diff")
-    expect(result).toContain("Read the diff file above")
+  it("filter with no matches returns empty", () => {
+    expect(filterReviewers(reviewers, ["Nonexistent"])).toEqual([])
   })
 
-  it("preserves exact file paths in section headers", () => {
-    const filePath = path.join(tmpDir, "src", "deep", "file.ts")
-    fs.mkdirSync(path.dirname(filePath), { recursive: true })
-    fs.writeFileSync(filePath, "export default 42;\n", "utf-8")
+  it("trims whitespace in filter values", () => {
+    const result = filterReviewers(reviewers, ["  security  "])
+    expect(result).toHaveLength(1)
+    expect(result[0].name).toBe("Security")
+  })
+})
 
-    const relativePath = filePath
-    const diff = {
-      diffContent: `diff --git a/${relativePath} b/${relativePath}\n+export default 42;`,
-      diffFile: "/tmp/test.diff",
-      type: "all" as const,
-    }
-    const result = buildCodebaseReference(diff)
-    expect(result).toContain(`--- ${relativePath} ---`)
+describe("recomputeSummary", () => {
+  const makeIssue = (overrides: Partial<ReviewIssue> = {}): ReviewIssue => ({
+    id: "test--1",
+    reviewer: "Test",
+    runtime: "claude",
+    model: "opus",
+    severity: "medium",
+    category: "bug",
+    title: "Test issue",
+    description: "desc",
+    ...overrides,
+  })
+
+  const makeReview = (overrides: Partial<NormalizedReview> = {}): NormalizedReview => ({
+    reviewer: "Test",
+    runtime: "claude",
+    model: "opus",
+    durationMs: 1000,
+    exitCode: 0,
+    rawLength: 100,
+    issues: [],
+    ...overrides,
+  })
+
+  it("zero reviews returns empty summary", () => {
+    const summary = recomputeSummary([])
+    expect(summary.totalIssues).toBe(0)
+    expect(summary.bySeverity).toEqual({})
+    expect(summary.byCategory).toEqual({})
+    expect(summary.byReviewer).toEqual({})
+    expect(summary.triage).toBeUndefined()
+  })
+
+  it("mixed severities and categories are counted correctly", () => {
+    const reviews = [makeReview({
+      issues: [
+        makeIssue({ severity: "high", category: "security" }),
+        makeIssue({ id: "test--2", severity: "low", category: "style" }),
+        makeIssue({ id: "test--3", severity: "high", category: "bug" }),
+      ],
+    })]
+    const summary = recomputeSummary(reviews)
+    expect(summary.totalIssues).toBe(3)
+    expect(summary.bySeverity).toEqual({ high: 2, low: 1 })
+    expect(summary.byCategory).toEqual({ security: 1, style: 1, bug: 1 })
+  })
+
+  it("multiple reviewers counted in byReviewer", () => {
+    const reviews = [
+      makeReview({ reviewer: "Security", issues: [makeIssue({ reviewer: "Security" })] }),
+      makeReview({ reviewer: "Engineer", issues: [makeIssue({ id: "eng--1", reviewer: "Engineer" }), makeIssue({ id: "eng--2", reviewer: "Engineer" })] }),
+    ]
+    const summary = recomputeSummary(reviews)
+    expect(summary.byReviewer).toEqual({ Security: 1, Engineer: 2 })
+  })
+
+  it("issues with triage produce triage summary", () => {
+    const reviews = [makeReview({
+      issues: [
+        makeIssue({ triage: { verdict: "actionable", reasoning: "real" } }),
+        makeIssue({ id: "test--2", triage: { verdict: "dismissed", reasoning: "noise" } }),
+        makeIssue({ id: "test--3", triage: { verdict: "deferred", reasoning: "later" } }),
+      ],
+    })]
+    const summary = recomputeSummary(reviews)
+    expect(summary.triage).toEqual({ actionable: 1, deferred: 1, dismissed: 1 })
+  })
+
+  it("issues without triage return undefined triage", () => {
+    const reviews = [makeReview({ issues: [makeIssue()] })]
+    const summary = recomputeSummary(reviews)
+    expect(summary.triage).toBeUndefined()
   })
 })
 

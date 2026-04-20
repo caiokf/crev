@@ -18,8 +18,9 @@ export function registerRunCommand(program: Command): void {
     .option("--schema <name>", "Which review schema to use")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
-    .option("--type <type>", "Diff type: all, committed, uncommitted, current-state", "all")
+    .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
     .option("--pr <number>", "GitHub PR number")
+    .option("--analyze", "Full codebase analysis (no diff)")
     .option("--reviewers <list>", "Comma-separated reviewer names")
     .option("--slug <name>", "Override artifact name")
     .option("--description <text>", "Metadata description")
@@ -42,6 +43,7 @@ export function registerRunCommand(program: Command): void {
         base: opts.base,
         baseCommit: opts.baseCommit,
         type: opts.type,
+        analyze: opts.analyze ?? false,
         pr: opts.pr ? Number(opts.pr) : undefined,
         reviewers: opts.reviewers,
         slug: opts.slug,
@@ -69,6 +71,7 @@ export function registerRunCommand(program: Command): void {
       const diff = await resolveDiff({
         slug,
         source: cmd.diff,
+        analyze: cmd.analyze,
         exclude: config.diff.exclude,
         crevDir,
       })

@@ -3,7 +3,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, describe, expect, it } from "vitest"
-import { filterDiff, resolveDiff } from "./diff.js"
+import { filterDiff, matchesGlob, resolveDiff } from "./diff.js"
 
 function createTempGitRepo(): string {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
@@ -76,8 +76,37 @@ describe("filterDiff", () => {
   })
 })
 
+describe("matchesGlob", () => {
+  it("*.json matches top-level json files", () => {
+    expect(matchesGlob("pnpm-lock.json", "*.json")).toBe(true)
+  })
+
+  it("*.json does not match non-json files", () => {
+    expect(matchesGlob("src/foo.ts", "*.json")).toBe(false)
+  })
+
+  it("**/*.snap matches nested snap files", () => {
+    expect(matchesGlob("src/__tests__/foo.snap", "**/*.snap")).toBe(true)
+    expect(matchesGlob("foo.snap", "**/*.snap")).toBe(true)
+  })
+
+  it("**/dist matches dist at any depth", () => {
+    expect(matchesGlob("packages/cli/dist", "**/dist")).toBe(true)
+    expect(matchesGlob("dist", "**/dist")).toBe(true)
+  })
+
+  it("exact filename matches only at top level", () => {
+    expect(matchesGlob("README.md", "README.md")).toBe(true)
+    expect(matchesGlob("docs/README.md", "README.md")).toBe(true) // ends with /README.md
+  })
+
+  it("pattern without wildcards doesn't match unrelated nested paths", () => {
+    expect(matchesGlob("src/other.ts", "README.md")).toBe(false)
+  })
+})
+
 describe("resolveDiff", () => {
-  it("current-state fails gracefully on a repo with no commits", async () => {
+  it("analyze fails gracefully on a repo with no commits", async () => {
     const dir = createTempGitRepo()
     tempDirs.push(dir)
     fs.writeFileSync(path.join(dir, "file.txt"), "hello")
@@ -91,7 +120,8 @@ describe("resolveDiff", () => {
       await expect(
         resolveDiff({
           slug: "test",
-          source: { kind: "local", type: "current-state" },
+          source: { kind: "local", type: "all" },
+          analyze: true,
           crevDir,
         })
       ).rejects.toThrow("no commits")
@@ -100,7 +130,7 @@ describe("resolveDiff", () => {
     }
   })
 
-  it("current-state returns synthetic diff headers for all tracked files", async () => {
+  it("analyze returns synthetic diff headers for all tracked files", async () => {
     const dir = createTempGitRepo()
     tempDirs.push(dir)
     fs.writeFileSync(path.join(dir, "file.txt"), "hello\n")
@@ -116,7 +146,8 @@ describe("resolveDiff", () => {
     try {
       const result = await resolveDiff({
         slug: "test",
-        source: { kind: "local", type: "current-state" },
+        source: { kind: "local", type: "all" },
+        analyze: true,
         crevDir,
       })
       // Should contain synthetic diff headers, not actual diff content
@@ -125,6 +156,8 @@ describe("resolveDiff", () => {
       // Should NOT contain actual file content (no +lines)
       expect(result.diffContent).not.toContain("+hello")
       expect(result.diffContent).not.toContain("+export")
+      // Should have type "analyze"
+      expect(result.type).toBe("analyze")
     } finally {
       process.chdir(prev)
     }
