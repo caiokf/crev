@@ -123,6 +123,7 @@ export function registerRunCommand(program: Command): void {
             crevDir,
             description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
             reviewerFilter: cmd.reviewers,
+            analyze: cmd.analyze,
           })
           console.log(JSON.stringify(promptPreview, null, 2))
           return
@@ -147,6 +148,7 @@ export function registerRunCommand(program: Command): void {
           crevDir,
           description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
           reviewerFilter: cmd.reviewers,
+          analyze: cmd.analyze,
           plain: cmd.plain || cmd.output.kind === "plain",
           silent: cmd.output.kind === "json",
           reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,

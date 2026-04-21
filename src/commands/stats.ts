@@ -3,7 +3,7 @@ import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
-import type { ReviewResult, ReviewIssue } from "../core/types.js"
+import type { ReviewResult } from "../core/types.js"
 
 type ReviewerStats = {
   reviewer: string
@@ -93,7 +93,7 @@ export function registerStatsCommand(program: Command): void {
         } else {
           // Default: show only the latest revision
           const latest = revisions[revisions.length - 1]
-          printRevision(schema, latest, runs.length, true)
+          printRevision(schema, latest, true)
         }
       }
     })
@@ -276,7 +276,7 @@ function printHistory(schema: string, revisions: RevisionGroup[]): void {
   }
 }
 
-function printRevision(schema: string, rev: RevisionGroup, totalRunsAllRevisions: number, isDefault: boolean): void {
+function printRevision(schema: string, rev: RevisionGroup, isDefault: boolean): void {
   console.log()
   if (isDefault) {
     console.log(`  ${chalk.bold(`Schema: ${schema}`)} ${chalk.dim(`(${rev.schemaHash})`)} — ${rev.runs} run${rev.runs !== 1 ? "s" : ""}`)
@@ -307,7 +307,6 @@ function printRevision(schema: string, rev: RevisionGroup, totalRunsAllRevisions
 function printReviewerTable(stats: ReviewerStats[], hasTriage: boolean): void {
   if (stats.length === 0) return
 
-  const runtimeLabel = (s: ReviewerStats) => chalk.dim(`${s.runtime}/${s.model}`)
   const nameWidth = Math.max(10, ...stats.map((s) => s.reviewer.length)) + 2
   const rtWidth = Math.max(8, ...stats.map((s) => `${s.runtime}/${s.model}`.length)) + 2
 

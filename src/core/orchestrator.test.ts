@@ -1,7 +1,5 @@
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest"
-import fs from "node:fs"
+import { describe, expect, it } from "vitest"
 import path from "node:path"
-import os from "node:os"
 import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, validateReviewFilePath, filterReviewers, recomputeSummary, buildPromptOnlyResult } from "./orchestrator.js"
 import type { ReviewerConfig } from "./schema.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
@@ -67,7 +65,7 @@ describe("buildAnalyzeReference", () => {
     const diff = {
       diffContent: `diff --git a/src/app.ts b/src/app.ts\ndiff --git a/src/util.ts b/src/util.ts`,
       diffFile: "/tmp/test.diff",
-      type: "analyze" as const,
+      type: "all" as const,
     }
     const result = buildAnalyzeReference(diff)
     expect(result).toContain("full codebase analysis")
@@ -80,7 +78,7 @@ describe("buildAnalyzeReference", () => {
     const diff = {
       diffContent: "",
       diffFile: "/tmp/test.diff",
-      type: "analyze" as const,
+      type: "all" as const,
     }
     const result = buildAnalyzeReference(diff)
     expect(result).toContain("full codebase analysis")

@@ -156,8 +156,8 @@ describe("resolveDiff", () => {
       // Should NOT contain actual file content (no +lines)
       expect(result.diffContent).not.toContain("+hello")
       expect(result.diffContent).not.toContain("+export")
-      // Should have type "analyze"
-      expect(result.type).toBe("analyze")
+      // Analyze mode uses "all" as the DiffInput type
+      expect(result.type).toBe("all")
     } finally {
       process.chdir(prev)
     }

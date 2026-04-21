@@ -13,7 +13,6 @@ const sampleIssue: ReviewIssue = {
   category: "security",
   title: "XSS vulnerability",
   description: "User input not sanitized",
-  status: "open",
 }
 
 describe("buildTriagePrompt", () => {

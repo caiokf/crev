@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -122,7 +123,8 @@ ${raw.slice(0, 100_000)}`
 
   const normalizerRuntime = config.normalizer.runtime
   const normalizerModel = config.normalizer.model
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-normalizer-${process.pid}.txt`)
+  const suffix = crypto.randomBytes(4).toString("hex")
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-normalizer-${process.pid}-${suffix}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {

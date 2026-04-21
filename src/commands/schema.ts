@@ -75,9 +75,6 @@ export function registerSchemaCommand(program: Command): void {
           console.log(`    enabled: ${s.triage.enabled ? chalk.green("yes") : chalk.dim("no")}`)
           if (s.triage.enabled) {
             console.log(`    runtime: ${s.triage.runtime}/${s.triage.model}`)
-            if (s.triage.context && s.triage.context.length > 0) {
-              console.log(`    context: ${s.triage.context.join(", ")}`)
-            }
           }
         }
         console.log()

@@ -52,7 +52,7 @@ export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
     diffFile,
     base: opts.source.kind === "branch" ? opts.source.base : undefined,
     baseCommit: opts.source.kind === "commit" ? opts.source.baseCommit : undefined,
-    type: opts.analyze ? "analyze" : (opts.source.kind === "pr" ? "all" : opts.source.type),
+    type: opts.analyze ? "all" : (opts.source.kind === "pr" ? "all" : opts.source.type),
   }
 }
 

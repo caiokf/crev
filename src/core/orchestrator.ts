@@ -26,6 +26,7 @@ export type OrchestrateOptions = {
   crevDir: string
   description?: string
   reviewerFilter?: string[]
+  analyze?: boolean
   plain?: boolean
   promptOnly?: boolean
   silent?: boolean
@@ -104,11 +105,11 @@ export function buildPromptOnlyResult(opts: OrchestrateOptions): PromptOnlyResul
       schema: opts.schemaName,
       schemaHash: opts.schemaHash,
       diffBase: opts.diff.base,
-      diffType: opts.diff.type,
+      diffType: opts.analyze ? "analyze" : opts.diff.type,
       description: opts.description,
     },
     prompts: reviewers.map((reviewer) => {
-      const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat)
+      const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
       return {
         reviewer: reviewer.name,
         runtime: reviewer.runtime,
@@ -161,7 +162,14 @@ async function executeReviewersPlain(
     return result
   })
 
-  return Promise.all(promises)
+  const settled = await Promise.allSettled(promises)
+  const results: NormalizedReview[] = []
+  for (const entry of settled) {
+    if (entry.status === "fulfilled") {
+      results.push(entry.value)
+    }
+  }
+  return results
 }
 
 async function executeReviewersWithTui(
@@ -269,7 +277,7 @@ async function runTriagePass(
   const result = await runTriage({
     issues: allIssues,
     diffContent: opts.diff.diffContent,
-    diffType: opts.diff.type,
+    diffType: opts.analyze ? "analyze" : opts.diff.type,
     config: effectiveConfig,
   })
 
@@ -302,7 +310,7 @@ async function runSingleReviewer(
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
   const runtime = getRuntime(reviewer.runtime)
-  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat)
+  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
   const model = built.model
   const fullPrompt = built.fullPrompt
 
@@ -338,6 +346,7 @@ function buildReviewerPrompt(
   reviewer: ReviewerConfig,
   diff: DiffInput,
   outputFormat: string,
+  analyze?: boolean,
 ): { model: string; fullPrompt: string } {
   const runtime = getRuntime(reviewer.runtime)
   const model = reviewer.model === "default" ? runtime.defaultModel : reviewer.model
@@ -352,7 +361,7 @@ function buildReviewerPrompt(
     }
   }
 
-  const sourceSection = diff.type === "analyze"
+  const sourceSection = analyze
     ? buildAnalyzeReference(diff)
     : buildDiffReference(diff.diffFile)
 
@@ -416,7 +425,7 @@ function buildResult(
       schema: opts.schemaName,
       schemaHash: opts.schemaHash,
       diffBase: opts.diff.base,
-      diffType: opts.diff.type,
+      diffType: opts.analyze ? "analyze" : opts.diff.type,
       description: opts.description,
     },
     reviews,
@@ -538,7 +547,11 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
 
   let existing: ReviewResult
   try {
-    existing = JSON.parse(fs.readFileSync(resolvedPath, "utf-8")) as ReviewResult
+    const parsed = JSON.parse(fs.readFileSync(resolvedPath, "utf-8"))
+    if (!parsed || !Array.isArray(parsed.reviews)) {
+      throw new Error("file does not contain a valid ReviewResult (missing reviews array)")
+    }
+    existing = parsed as ReviewResult
   } catch (err) {
     throw new Error(`--review-file ${existingFilePath} contains invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
   }
@@ -555,10 +568,7 @@ function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: string):
         ...newReview.issues.map((newIssue) => {
           const existing = existingIssueMap.get(newIssue.id)
           if (existing) {
-            const preserved: Record<string, unknown> = {}
-            if (existing.status) preserved.status = existing.status
-            if (existing.triage && !newIssue.triage) preserved.triage = existing.triage
-            if (Object.keys(preserved).length > 0) return { ...newIssue, ...preserved }
+            if (existing.triage && !newIssue.triage) return { ...newIssue, triage: existing.triage }
           }
           return newIssue
         }),
