@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { buildSelectionPrompt, parseSelectionResponse, parseShortstat } from "./auto-schema.js"
-import type { SchemaCandidate } from "./auto-schema.js"
+import { buildSelectionPrompt, parseSelectionResponse, parseShortstat } from "./schema-auto-select.js"
+import type { SchemaCandidate } from "./schema-auto-select.js"
 
 const candidates: SchemaCandidate[] = [
   { name: "quick", description: "Fast single-reviewer check for small changes (1 reviewers: Engineer)" },

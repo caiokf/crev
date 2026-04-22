@@ -192,7 +192,7 @@ async function selectWithLlm(
   const prompt = buildSelectionPrompt(candidates, stats, analyze)
   const runtime = config.normalizer.runtime
   const model = config.normalizer.model
-  const promptFile = path.join(os.tmpdir(), `crev-auto-schema-${process.pid}-${uniqueSuffix()}.txt`)
+  const promptFile = path.join(os.tmpdir(), `crev-schema-auto-select-${process.pid}-${uniqueSuffix()}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {
