@@ -308,18 +308,18 @@ async function runTriagePass(
     config: effectiveConfig,
   })
 
-  for (const triaged of result.triaged) {
-    const original = allIssues.find((i) => i.id === triaged.id)
-    if (!original) continue
-    if (triaged.triage) {
-      original.triage = triaged.triage
-    }
-    if (triaged.severity !== original.severity) {
-      original.severity = triaged.severity
-    }
-    if (triaged.category !== original.category) {
-      original.category = triaged.category
-    }
+  const triagedMap = new Map(result.triaged.map((t) => [t.id, t]))
+  for (const review of reviews) {
+    review.issues = review.issues.map((issue) => {
+      const triaged = triagedMap.get(issue.id)
+      if (!triaged) return issue
+      return {
+        ...issue,
+        severity: triaged.severity,
+        category: triaged.category,
+        triage: triaged.triage ?? issue.triage,
+      }
+    })
   }
 
   const { actionable, deferred, dismissed } = result.summary
