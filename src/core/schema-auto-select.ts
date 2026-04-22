@@ -1,13 +1,12 @@
 import { execFile } from "node:child_process"
 import fs from "node:fs"
 import { promisify } from "node:util"
-import { getRuntime } from "@caiokf/valet"
 import YAML from "yaml"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
+import { callLlm } from "./llm.js"
 import { listAllSchemas, resolveSchemaPath } from "./schema.js"
 import type { DiffSource } from "./types.js"
-import { withTempPromptFile } from "./temp-prompt.js"
 import { errorMessage } from "../util/cli-errors.js"
 
 const execFileAsync = promisify(execFile)
@@ -193,19 +192,8 @@ async function selectWithLlm(
   const model = config.normalizer.model
 
   try {
-    return await withTempPromptFile("crev-schema-auto-select", prompt, async (promptFile) => {
-      const rt = getRuntime(runtime)
-      const result = await rt.execute({
-        taskName: "Auto-Schema",
-        model,
-        prompt,
-        promptFile,
-        diff: { diffContent: "", diffFile: "", type: "all" },
-        outputFormat: "",
-      })
-
-      return parseSelectionResponse(result.raw, candidates)
-    })
+    const raw = await callLlm({ taskName: "Auto-Schema", runtime, model, prompt })
+    return parseSelectionResponse(raw, candidates)
   } catch (err) {
     // Fallback: pick the first schema alphabetically
     const fallback = candidates[0].name

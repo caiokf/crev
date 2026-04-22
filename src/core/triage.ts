@@ -1,9 +1,8 @@
-import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
+import { callLlm } from "./llm.js"
 import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
 import { REVIEW_CATEGORY_SET, REVIEW_SEVERITY_SET, TRIAGE_VERDICT_SET, MAX_DIFF_CHARS } from "./taxonomy.js"
-import { withTempPromptFile } from "./temp-prompt.js"
 import { errorMessage } from "../util/cli-errors.js"
 
 type TriageInput = {
@@ -225,19 +224,8 @@ export type RawTriageVerdict = {
 async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
   try {
-    return await withTempPromptFile("crev-prompt-triage", prompt, async (promptFile) => {
-      const rt = getRuntime(runtime)
-      const result = await rt.execute({
-        taskName: "Triage",
-        model,
-        prompt,
-        promptFile,
-        diff: { diffContent: "", diffFile: "", type: "all" },
-        outputFormat: "",
-      })
-
-      return parseTriageResponse(result.raw)
-    })
+    const raw = await callLlm({ taskName: "Triage", runtime, model, prompt })
+    return parseTriageResponse(raw)
   } catch (err) {
     console.error(`Warning: Triage failed (${runtime}/${model}): ${errorMessage(err)}`)
     return []

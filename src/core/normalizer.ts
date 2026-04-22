@@ -1,9 +1,8 @@
-import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
+import { callLlm } from "./llm.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 import { REVIEW_CATEGORIES, REVIEW_SEVERITIES, MAX_RAW_CHARS } from "./taxonomy.js"
-import { withTempPromptFile } from "./temp-prompt.js"
 import { errorMessage } from "../util/cli-errors.js"
 import { slugify } from "../util/paths.js"
 
@@ -121,20 +120,14 @@ ${raw.slice(0, MAX_RAW_CHARS)}`
   const normalizerModel = config.normalizer.model
 
   try {
-    return await withTempPromptFile("crev-prompt-normalizer", prompt, async (promptFile) => {
-      const rt = getRuntime(normalizerRuntime)
-      const result = await rt.execute({
-        taskName: "Normalizer",
-        model: normalizerModel,
-        prompt,
-        promptFile,
-        diff: { diffContent: "", diffFile: "", type: "all" },
-        outputFormat: "",
-      })
-
-      const parsed = tryParseIssues(result.raw, reviewer, runtime, model)
-      return parsed.parsed ? parsed.issues : []
+    const raw = await callLlm({
+      taskName: "Normalizer",
+      runtime: normalizerRuntime,
+      model: normalizerModel,
+      prompt,
     })
+    const parsed = tryParseIssues(raw, reviewer, runtime, model)
+    return parsed.parsed ? parsed.issues : []
   } catch (err) {
     console.error(`Warning: Normalizer failed for "${reviewer}" (${normalizerRuntime}/${normalizerModel}): ${errorMessage(err)}`)
     return []
