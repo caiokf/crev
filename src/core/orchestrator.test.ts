@@ -145,6 +145,8 @@ describe("buildPromptOnlyResult", () => {
       },
       slug: "feature-branch",
       crevDir: "/tmp",
+      output: { kind: "prompt-only", format: "json" },
+      target: { kind: "fresh" },
     })
 
     expect(result.metadata.schema).toBe("quick")
@@ -183,6 +185,8 @@ describe("UNTRUSTED_INPUT_WARNING", () => {
       },
       slug: "test",
       crevDir: "/tmp",
+      output: { kind: "prompt-only", format: "json" },
+      target: { kind: "fresh" },
     })
 
     expect(result.prompts[0].prompt).toContain("untrusted input")

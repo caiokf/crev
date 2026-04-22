@@ -12,7 +12,7 @@ import { buildReviewerPrompt, getOutputFormat } from "./prompt.js"
 import { withResilience } from "./resilience.js"
 import { runTriage } from "./triage.js"
 import { UserCancelledError } from "./types.js"
-import type { NormalizedReview, ReviewResult } from "./types.js"
+import type { NormalizedReview, ReviewResult, OutputMode, ReviewTarget } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../tui/multi-spinner.js"
 import type { DiffInput } from "@caiokf/valet"
@@ -30,13 +30,10 @@ export type OrchestrateOptions = {
   diff: DiffInput
   slug: string
   crevDir: string
-  description?: string
   reviewerFilter?: string[]
   analyze?: boolean
-  plain?: boolean
-  promptOnly?: boolean
-  silent?: boolean
-  reviewFile?: string
+  output: OutputMode
+  target: ReviewTarget
 }
 
 export type PromptOnlyResult = {
@@ -59,7 +56,10 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
   const outputFormat = getOutputFormat()
   const timestamp = new Date().toISOString()
 
-  if (!opts.plain && !opts.promptOnly && !opts.silent) {
+  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+  const isPlain = opts.output.kind === "plain"
+
+  if (!isQuiet) {
     const msg = `Running ${reviewers.length} reviewer${reviewers.length > 1 ? "s" : ""} from schema ${opts.schemaName}`
     process.stdout.write(`${msg}\n`)
   }
@@ -73,13 +73,13 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
     const result = buildResult(reviews, opts, timestamp)
 
-    const output = opts.reviewFile
-      ? { jsonPath: mergeAndWriteOutput(result, opts.reviewFile) }
+    const output = opts.target.kind === "merge"
+      ? { jsonPath: mergeAndWriteOutput(result, opts.target.reviewFile) }
       : writeOutput(result, opts.config, opts.slug, opts.crevDir)
 
-    if (!opts.promptOnly && !opts.silent) {
+    if (!isQuiet) {
       const displayPath = formatOutputPath(output, opts.config.output.format)
-      printSummary(result, displayPath, opts.plain)
+      printSummary(result, displayPath, isPlain)
     }
 
     cleanupDiffFile(opts.diff)
@@ -117,7 +117,7 @@ export function buildPromptOnlyResult(opts: OrchestrateOptions): PromptOnlyResul
       schemaHash: opts.schemaHash,
       diffBase: opts.diff.base,
       diffType: opts.analyze ? "analyze" : opts.diff.type,
-      description: opts.description,
+      description: opts.target.kind === "fresh" ? opts.target.description : undefined,
     },
     prompts: reviewers.map((reviewer) => {
       const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
@@ -143,7 +143,7 @@ async function executeReviewers(
   opts: OrchestrateOptions,
   outputFormat: string,
 ): Promise<ReviewersResult> {
-  if (opts.plain || opts.promptOnly || opts.silent) {
+  if (opts.output.kind !== "tui") {
     return { reviews: await executeReviewersPlain(reviewers, opts, outputFormat), spinner: null }
   }
 
@@ -159,14 +159,16 @@ async function executeReviewersPlain(
   opts: OrchestrateOptions,
   outputFormat: string,
 ): Promise<NormalizedReview[]> {
+  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+
   const promises = reviewers.map(async (reviewer) => {
-    if (!opts.promptOnly && !opts.silent) {
+    if (!isQuiet) {
       console.log(`Starting: ${reviewer.name} (${reviewer.runtime}/${resolveModelAlias(opts.config, reviewer.model)})`)
     }
 
     const result = await runSingleReviewer(reviewer, opts, outputFormat)
 
-    if (!opts.promptOnly && !opts.silent) {
+    if (!isQuiet) {
       const elapsed = (result.durationMs / 1000).toFixed(1)
       const issueCount = result.issues.length
       console.log(`Completed: ${reviewer.name} - ${issueCount} issue${issueCount !== 1 ? "s" : ""} (${elapsed}s)`)
@@ -291,9 +293,11 @@ async function runTriagePass(
 
   const triageDetail = `${effectiveConfig.triage.runtime}/${effectiveConfig.triage.model}`
 
+  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+
   if (spinner) {
     spinner.addEntry("Triage", triageDetail)
-  } else if (!opts.promptOnly && !opts.silent) {
+  } else if (!isQuiet) {
     console.log(`Triage: analyzing ${allIssues.length} issues...`)
   }
 
@@ -326,7 +330,7 @@ async function runTriagePass(
       elapsed: result.durationMs / 1000,
       resultText,
     })
-  } else if (!opts.promptOnly && !opts.silent) {
+  } else if (!isQuiet) {
     const elapsed = (result.durationMs / 1000).toFixed(1)
     console.log(`Triage complete: ${resultText} (${elapsed}s)`)
   }

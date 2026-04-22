@@ -27,7 +27,7 @@ export function buildResult(
       schemaHash: opts.schemaHash,
       diffBase: opts.diff.base,
       diffType: opts.analyze ? "analyze" : opts.diff.type,
-      description: opts.description,
+      description: opts.target.kind === "fresh" ? opts.target.description : undefined,
     },
     reviews,
     summary: recomputeSummary(reviews),

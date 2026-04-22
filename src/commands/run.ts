@@ -134,20 +134,23 @@ export function registerRunCommand(program: Command): void {
         return
       }
 
+      const orchestrateOpts = {
+        schema,
+        schemaName: resolvedSchemaName,
+        schemaHash,
+        config,
+        diff,
+        slug,
+        crevDir,
+        reviewerFilter: cmd.reviewers,
+        analyze: cmd.analyze,
+        output: cmd.output,
+        target: cmd.target,
+      }
+
       if (cmd.output.kind === "prompt-only") {
         try {
-          const promptPreview = buildPromptOnlyResult({
-            schema,
-            schemaName: resolvedSchemaName,
-            schemaHash,
-            config,
-            diff,
-            slug,
-            crevDir,
-            description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
-            reviewerFilter: cmd.reviewers,
-            analyze: cmd.analyze,
-          })
+          const promptPreview = buildPromptOnlyResult(orchestrateOpts)
           console.log(JSON.stringify(promptPreview, null, 2))
           return
         } catch (err) {
@@ -161,21 +164,7 @@ export function registerRunCommand(program: Command): void {
 
       let result
       try {
-        result = await orchestrate({
-          schema,
-          schemaName: resolvedSchemaName,
-          schemaHash,
-          config,
-          diff,
-          slug,
-          crevDir,
-          description: cmd.target.kind === "fresh" ? cmd.target.description : undefined,
-          reviewerFilter: cmd.reviewers,
-          analyze: cmd.analyze,
-          plain: cmd.plain || cmd.output.kind === "plain",
-          silent: cmd.output.kind === "json",
-          reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
-        })
+        result = await orchestrate(orchestrateOpts)
       } catch (err) {
         cleanupDiffFile(diff)
         if (err instanceof UserCancelledError) {
