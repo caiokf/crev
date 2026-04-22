@@ -28,6 +28,7 @@
       "enum": [
         "claude",
         "codex",
+        "copilot",
         "gemini",
         "kimi",
         "coderabbit",
@@ -268,11 +269,13 @@
           "type": "string",
           "description": "Model to use for triage"
         },
-        "context": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": [],
-          "description": "Additional context files to include in triage"
+        "deduplicate": {
+          "type": "boolean",
+          "description": "Mark duplicate issues across reviewers during triage"
+        },
+        "recategorize": {
+          "type": "boolean",
+          "description": "Allow triage to correct misclassified severity/category"
         }
       },
       "if": {

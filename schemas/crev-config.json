@@ -90,10 +90,15 @@
         }
       }
     },
+    "failback": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Failback chains mapping runtime/model to fallback runtime/model (e.g. claude/opus: claude/sonnet)"
+    },
     "normalizer": {
       "type": "object",
       "additionalProperties": false,
-      "description": "Normalizer settings for deduplicating review findings",
+      "description": "Normalizer settings for extracting structured JSON from raw review output",
       "properties": {
         "enabled": {
           "type": "boolean",
@@ -132,11 +137,15 @@
           "default": "opus",
           "description": "Model to use for triage"
         },
-        "context": {
-          "type": "array",
-          "items": { "type": "string" },
-          "default": [],
-          "description": "Additional context files to include in triage"
+        "deduplicate": {
+          "type": "boolean",
+          "default": false,
+          "description": "Mark duplicate issues across reviewers during triage"
+        },
+        "recategorize": {
+          "type": "boolean",
+          "default": false,
+          "description": "Allow triage to correct misclassified severity/category"
         },
         "prompt": {
           "type": "string",

@@ -61,24 +61,29 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
   const { reviews, spinner } = await executeReviewers(reviewers, opts, outputFormat)
 
-  await runTriagePass(reviews, opts, spinner)
+  try {
+    await runTriagePass(reviews, opts, spinner)
 
-  spinner?.stop()
+    spinner?.stop()
 
-  const result = buildResult(reviews, opts, timestamp)
+    const result = buildResult(reviews, opts, timestamp)
 
-  const output = opts.reviewFile
-    ? { jsonPath: mergeAndWriteOutput(result, opts.reviewFile) }
-    : writeOutput(result, opts.config, opts.slug, opts.crevDir)
+    const output = opts.reviewFile
+      ? { jsonPath: mergeAndWriteOutput(result, opts.reviewFile) }
+      : writeOutput(result, opts.config, opts.slug, opts.crevDir)
 
-  if (!opts.promptOnly && !opts.silent) {
-    const displayPath = formatOutputPath(output, opts.config.output.format)
-    printSummary(result, displayPath, opts.plain)
+    if (!opts.promptOnly && !opts.silent) {
+      const displayPath = formatOutputPath(output, opts.config.output.format)
+      printSummary(result, displayPath, opts.plain)
+    }
+
+    cleanupDiffFile(opts.diff)
+
+    return result
+  } catch (err) {
+    spinner?.stop()
+    throw err
   }
-
-  cleanupDiffFile(opts.diff)
-
-  return result
 }
 
 export function filterReviewers(reviewers: ReviewerConfig[], filter?: string[]): ReviewerConfig[] {
@@ -165,9 +170,13 @@ async function executeReviewersPlain(
 
   const settled = await Promise.allSettled(promises)
   const results: NormalizedReview[] = []
-  for (const entry of settled) {
+  for (let i = 0; i < settled.length; i++) {
+    const entry = settled[i]
     if (entry.status === "fulfilled") {
       results.push(entry.value)
+    } else {
+      const name = reviewers[i].name
+      console.error(`Warning: ${name} failed: ${entry.reason instanceof Error ? entry.reason.message : String(entry.reason)}`)
     }
   }
   return results

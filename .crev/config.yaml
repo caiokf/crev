@@ -1,4 +1,4 @@
-# yaml-language-server: $schema=../packages/cli/schemas/crev-config.json
+# yaml-language-server: $schema=../schemas/crev-config.json
 defaults:
   schema: quick
   type: all

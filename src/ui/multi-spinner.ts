@@ -164,7 +164,10 @@ export function createMultiSpinner(
   }
 
   stream.write(HIDE_CURSOR)
-  process.on("exit", () => stream.write(SHOW_CURSOR))
+  process.on("exit", () => {
+    stream.write(SHOW_CURSOR)
+    teardownKeyboard()
+  })
   setupKeyboard()
   render()
   const interval = setInterval(render, 80)
