@@ -15,7 +15,7 @@ export function registerDoctorCommand(program: Command): void {
     .command("doctor")
     .description("Health check for runtimes and schemas")
     .option("--all", "Check all known runtimes, not just those in schemas")
-    .option("--smoke", "Run a smoke test through each installed runtime")
+    .option("--ping", "Send a test prompt through each runtime to verify end-to-end")
     .option("--json", "Machine-readable JSON output")
     .action(async (opts) => {
       const crevDir = findCrevDir()
@@ -124,17 +124,17 @@ export function registerDoctorCommand(program: Command): void {
         }
       })
 
-      let smokeResults: SmokeResult[] | undefined
-      if (opts.smoke) {
+      let pingResults: PingResult[] | undefined
+      if (opts.ping) {
         const readyRuntimes = allRuntimes.filter((rt) => {
           const health = allHealthResults.find((h) => h.name === rt.name)
           return health?.installed && health?.authenticated !== "no"
         })
 
         if (readyRuntimes.length > 0) {
-          smokeResults = await runSmokeTests(readyRuntimes, config, jsonOutput)
+          pingResults = await runPingTests(readyRuntimes, config, jsonOutput)
         } else {
-          smokeResults = []
+          pingResults = []
         }
       }
 
@@ -144,8 +144,8 @@ export function registerDoctorCommand(program: Command): void {
           runtimeUsage,
           schemaReadiness,
           projectChecks,
-          includeSmoke: opts.smoke ?? false,
-          smokeResults,
+          includePing: opts.ping ?? false,
+          pingResults,
         })
         console.log(JSON.stringify(payload, null, 2))
         return
@@ -213,14 +213,14 @@ export function registerDoctorCommand(program: Command): void {
         }
       }
 
-      // Smoke test
-      if (opts.smoke) {
-        if (!smokeResults || smokeResults.length === 0) {
-          console.log(`\n  ${chalk.dim("No runtimes available for smoke test")}`)
+      // Ping test
+      if (opts.ping) {
+        if (!pingResults || pingResults.length === 0) {
+          console.log(`\n  ${chalk.dim("No runtimes available for ping test")}`)
         } else {
-          console.log(`\n  ${chalk.bold("Smoke Test")}`)
+          console.log(`\n  ${chalk.bold("Ping")}`)
           console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
-          for (const r of smokeResults) {
+          for (const r of pingResults) {
             const icon = r.pass ? chalk.green("✓") : chalk.red("✗")
             const time = chalk.dim(`${(r.durationMs / 1000).toFixed(1)}s`)
             const detail = r.pass ? time : `${time} ${chalk.dim(r.error ?? "")}`
@@ -245,7 +245,7 @@ type DoctorJsonPayload = {
   runtimes: Array<RuntimeHealth & { usedIn: string[] }>
   schemas: SchemaReadiness[]
   project: ProjectCheck[]
-  smoke?: SmokeResult[]
+  ping?: PingResult[]
 }
 
 export function buildDoctorJsonPayload(input: {
@@ -253,8 +253,8 @@ export function buildDoctorJsonPayload(input: {
   runtimeUsage: Map<string, string[]>
   schemaReadiness: SchemaReadiness[]
   projectChecks: ProjectCheck[]
-  includeSmoke: boolean
-  smokeResults?: SmokeResult[]
+  includePing: boolean
+  pingResults?: PingResult[]
 }): DoctorJsonPayload {
   const payload: DoctorJsonPayload = {
     runtimes: input.healthResults.map((h) => ({
@@ -265,7 +265,7 @@ export function buildDoctorJsonPayload(input: {
     project: input.projectChecks,
   }
 
-  if (input.includeSmoke) payload.smoke = input.smokeResults ?? []
+  if (input.includePing) payload.ping = input.pingResults ?? []
 
   return payload
 }
@@ -358,7 +358,7 @@ function formatRuntimeLine(health: RuntimeHealth, config: Config, cols: number, 
   return line
 }
 
-type SmokeResult = {
+type PingResult = {
   runtime: string
   model: string
   pass: boolean
@@ -366,13 +366,13 @@ type SmokeResult = {
   error?: string
 }
 
-async function runSmokeTests(
+async function runPingTests(
   runtimes: RuntimeAdapter[],
   config: Config,
   jsonOutput: boolean,
-): Promise<SmokeResult[]> {
-  const SMOKE_PROMPT = 'Respond with exactly this text and nothing else: hello smoke-test'
-  const results: SmokeResult[] = []
+): Promise<PingResult[]> {
+  const PING_PROMPT = 'Respond with exactly this text and nothing else: hello ping-test'
+  const results: PingResult[] = []
 
   const isTTY = process.stdout.isTTY && !jsonOutput
 
@@ -385,22 +385,22 @@ async function runSmokeTests(
     }))
 
   if (isTTY) {
-    process.stdout.write(`\n  ${chalk.dim(`Running smoke tests... 0/${tasks.length}`)}`)
+    process.stdout.write(`\n  ${chalk.dim(`Running ping tests... 0/${tasks.length}`)}`)
   }
 
   let done = 0
   await Promise.all(
     tasks.map(async ({ runtime, model }) => {
-      const promptFile = path.join(os.tmpdir(), `crev-smoke-${runtime.name}-${process.pid}.txt`)
-      fs.writeFileSync(promptFile, SMOKE_PROMPT, "utf-8")
+      const promptFile = path.join(os.tmpdir(), `crev-ping-${runtime.name}-${process.pid}.txt`)
+      fs.writeFileSync(promptFile, PING_PROMPT, "utf-8")
 
       const start = performance.now()
       try {
         const rtConfig = getRuntimeConfig(config, runtime.name)
         const result = await runtime.execute({
-          taskName: "smoke-test",
+          taskName: "ping-test",
           model,
-          prompt: SMOKE_PROMPT,
+          prompt: PING_PROMPT,
           promptFile,
           diff: { diffContent: "", diffFile: "", type: "all" },
           outputFormat: "",
@@ -412,7 +412,7 @@ async function runSmokeTests(
         })
 
         const durationMs = performance.now() - start
-        const pass = result.exitCode === 0 && result.raw.toLowerCase().includes("hello smoke-test")
+        const pass = result.exitCode === 0 && result.raw.toLowerCase().includes("hello ping-test")
         results.push({
           runtime: runtime.name,
           model,
@@ -432,7 +432,7 @@ async function runSmokeTests(
         try { fs.unlinkSync(promptFile) } catch {}
         done++
         if (isTTY) {
-          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Running smoke tests... ${done}/${tasks.length}`)}`)
+          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Running ping tests... ${done}/${tasks.length}`)}`)
         }
       }
     }),

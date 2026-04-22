@@ -29,44 +29,44 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage,
       schemaReadiness,
       projectChecks,
-      includeSmoke: false,
+      includePing: false,
     })
 
     expect(payload.runtimes[0].usedIn).toEqual(["quick"])
   })
 
-  it("does not include smoke when includeSmoke is false", () => {
+  it("does not include ping when includePing is false", () => {
     const payload = buildDoctorJsonPayload({
       healthResults,
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
-      includeSmoke: false,
+      includePing: false,
     })
 
-    expect("smoke" in payload).toBe(false)
+    expect("ping" in payload).toBe(false)
   })
 
-  it("includes empty smoke list when includeSmoke is true and results are missing", () => {
+  it("includes empty ping list when includePing is true and results are missing", () => {
     const payload = buildDoctorJsonPayload({
       healthResults,
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
-      includeSmoke: true,
+      includePing: true,
     })
 
-    expect(payload.smoke).toEqual([])
+    expect(payload.ping).toEqual([])
   })
 
-  it("includes provided smoke results when includeSmoke is true", () => {
+  it("includes provided ping results when includePing is true", () => {
     const payload = buildDoctorJsonPayload({
       healthResults,
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
-      includeSmoke: true,
-      smokeResults: [
+      includePing: true,
+      pingResults: [
         {
           runtime: "claude",
           model: "sonnet",
@@ -76,7 +76,7 @@ describe("buildDoctorJsonPayload", () => {
       ],
     })
 
-    expect(payload.smoke).toEqual([
+    expect(payload.ping).toEqual([
       {
         runtime: "claude",
         model: "sonnet",

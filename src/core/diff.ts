@@ -1,9 +1,11 @@
 import { execFile } from "node:child_process"
 import fs from "node:fs"
+import os from "node:os"
 import path from "node:path"
 import { promisify } from "node:util"
 import type { DiffInput } from "@caiokf/valet"
 import type { DiffSource } from "./types.js"
+import { uniqueSuffix } from "../util/paths.js"
 
 const execFileAsync = promisify(execFile)
 const MAX_BUFFER = 50 * 1024 * 1024
@@ -42,9 +44,7 @@ export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
     diffContent = filterDiff(diffContent, opts.exclude)
   }
 
-  const diffDir = path.join(opts.crevDir, "diffs")
-  fs.mkdirSync(diffDir, { recursive: true })
-  const diffFile = path.join(diffDir, `${buildDatedSlug(opts.slug)}.diff`)
+  const diffFile = path.join(os.tmpdir(), `crev-diff-${opts.slug}-${process.pid}-${uniqueSuffix()}.diff`)
   fs.writeFileSync(diffFile, diffContent, "utf-8")
 
   return {
@@ -54,18 +54,6 @@ export async function resolveDiff(opts: DiffOptions): Promise<DiffInput> {
     baseCommit: opts.source.kind === "commit" ? opts.source.baseCommit : undefined,
     type: opts.analyze ? "all" : (opts.source.kind === "pr" ? "all" : opts.source.type),
   }
-}
-
-function buildDatedSlug(slug: string): string {
-  const now = new Date()
-  const datePart = [
-    now.getFullYear(),
-    String(now.getMonth() + 1).padStart(2, "0"),
-    String(now.getDate()).padStart(2, "0"),
-    String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0"),
-  ].join("-")
-
-  return `${datePart}-${slug}`
 }
 
 export function cleanupDiffFile(diff: DiffInput): void {
