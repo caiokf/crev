@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest"
 import path from "node:path"
-import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, validateReviewFilePath, filterReviewers, recomputeSummary, buildPromptOnlyResult, UNTRUSTED_INPUT_WARNING } from "./orchestrator.js"
+import { filterReviewers, buildPromptOnlyResult } from "./orchestrator.js"
+import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
+import { validateReviewFilePath, recomputeSummary } from "./output.js"
 import type { ReviewerConfig } from "./schema.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
 
