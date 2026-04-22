@@ -98,14 +98,18 @@ export function loadSchemaFile(schemaPath: string, aliases?: Record<string, stri
   const content = fs.readFileSync(schemaPath, "utf-8")
   try {
     const parsed = YAML.parse(content)
-    if (aliases && parsed?.reviewers) {
-      for (const reviewer of parsed.reviewers) {
-        if (reviewer.model && aliases[reviewer.model]) {
+    const validated = ValidatedSchemaFile.parse(parsed)
+    if (aliases) {
+      for (const reviewer of validated.reviewers) {
+        if (aliases[reviewer.model]) {
           reviewer.model = aliases[reviewer.model]
         }
       }
+      if (validated.triage?.model && aliases[validated.triage.model]) {
+        validated.triage.model = aliases[validated.triage.model]
+      }
     }
-    return ValidatedSchemaFile.parse(parsed)
+    return validated
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     throw new Error(`Invalid schema file "${schemaPath}": ${reason}`)
