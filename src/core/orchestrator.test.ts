@@ -1,10 +1,20 @@
-import { describe, expect, it } from "vitest"
+import fs from "node:fs"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import path from "node:path"
-import { filterReviewers, buildPromptOnlyResult } from "./orchestrator.js"
+import { filterReviewers, buildPromptOnlyResult, orchestrate } from "./orchestrator.js"
 import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
 import { validateReviewFilePath, recomputeSummary } from "./output.js"
+import { UserCancelledError } from "./types.js"
 import type { ReviewerConfig } from "./schema.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
+
+const valetMocks = vi.hoisted(() => ({
+  getRuntime: vi.fn(),
+}))
+
+vi.mock("@caiokf/valet", () => ({
+  getRuntime: valetMocks.getRuntime,
+}))
 
 describe("extractChangedFiles", () => {
   it("extracts file paths from standard git diff", () => {
@@ -302,5 +312,201 @@ describe("validateReviewFilePath", () => {
   it("accepts absolute paths inside the project", () => {
     const result = validateReviewFilePath("/project/reviews/test.json", "/project")
     expect(result).toBe("/project/reviews/test.json")
+  })
+})
+
+describe("orchestrate", () => {
+  let tmpDir: string
+
+  const makeConfig = () => ({
+    defaults: { schema: "quick", type: "all", base: "main" },
+    runtimes: {},
+    aliases: {},
+    diff: { exclude: [] },
+    output: { dir: "", format: "json" as const },
+    normalizer: { enabled: false, runtime: "claude", model: "haiku" },
+    failback: {},
+    triage: {
+      enabled: false,
+      runtime: "claude",
+      model: "opus",
+      deduplicate: false,
+      recategorize: false,
+      prompt: "",
+    },
+  })
+
+  const makeOpts = (overrides = {}) => {
+    const config = makeConfig()
+    config.output.dir = tmpDir
+    return {
+      schema: {
+        reviewers: [
+          { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review for bugs." },
+        ],
+      },
+      schemaName: "quick",
+      schemaHash: "abc123",
+      config,
+      diff: {
+        diffContent: "diff --git a/src/app.ts b/src/app.ts",
+        diffFile: "/tmp/test.diff",
+        type: "all" as const,
+      },
+      slug: "test",
+      crevDir: tmpDir,
+      output: { kind: "plain" as const },
+      target: { kind: "fresh" as const },
+      ...overrides,
+    }
+  }
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    tmpDir = fs.mkdtempSync("/tmp/crev-orch-test-")
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    vi.spyOn(process.stdout, "write").mockImplementation(() => true)
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it("runs reviewers and writes output for a successful single-reviewer run", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({
+          issues: [
+            { id: "bug-1", title: "Bug", severity: "high", category: "bug", description: "found one", file: "src/app.ts", line: 10 },
+          ],
+        }),
+        durationMs: 1234,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await orchestrate(makeOpts())
+
+    expect(result.reviews).toHaveLength(1)
+    expect(result.reviews[0].issues).toHaveLength(1)
+    expect(result.reviews[0].issues[0].title).toBe("Bug")
+    expect(result.summary.totalIssues).toBe(1)
+    expect(result.metadata.schema).toBe("quick")
+  })
+
+  it("handles all reviewers failing gracefully", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockRejectedValue(new Error("runtime exploded")),
+    })
+
+    const result = await orchestrate(makeOpts())
+
+    expect(result.reviews).toEqual([])
+    expect(result.summary.totalIssues).toBe(0)
+  })
+
+  it("handles multi-reviewer run with partial failure", async () => {
+    let callCount = 0
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockImplementation(() => {
+        callCount++
+        if (callCount === 1) {
+          return Promise.resolve({
+            raw: JSON.stringify({ issues: [{ id: "1", title: "Found", severity: "low", category: "style", description: "ok" }] }),
+            durationMs: 100,
+            exitCode: 0,
+          })
+        }
+        return Promise.reject(new Error("second reviewer failed"))
+      }),
+    })
+
+    const opts = makeOpts({
+      schema: {
+        reviewers: [
+          { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review." },
+          { name: "Security", runtime: "claude", model: "opus", prompt: "Check security." },
+        ],
+      },
+    })
+
+    const result = await orchestrate(opts)
+
+    expect(result.reviews).toHaveLength(1)
+    expect(result.reviews[0].reviewer).toBe("Engineer")
+    expect(result.summary.totalIssues).toBe(1)
+  })
+
+  it("runs triage pass when schema triage is enabled", async () => {
+    const executeCall = vi.fn()
+
+    // First call: reviewer execution. Second call: triage.
+    let callIndex = 0
+    executeCall.mockImplementation(() => {
+      callIndex++
+      if (callIndex === 1) {
+        return Promise.resolve({
+          raw: JSON.stringify({ issues: [{ id: "bug-1", title: "Bug", severity: "high", category: "bug", description: "desc" }] }),
+          durationMs: 100,
+          exitCode: 0,
+        })
+      }
+      // Triage call
+      return Promise.resolve({
+        raw: JSON.stringify({
+          triage: [{ id: "engineer--bug-1", verdict: "dismissed", reasoning: "Not a real bug" }],
+        }),
+        durationMs: 50,
+        exitCode: 0,
+      })
+    })
+
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: executeCall,
+    })
+
+    const opts = makeOpts({
+      schema: {
+        reviewers: [
+          { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review." },
+        ],
+        triage: { enabled: true, runtime: "claude", model: "opus" },
+      },
+    })
+
+    const result = await orchestrate(opts)
+
+    expect(result.reviews[0].issues[0].triage?.verdict).toBe("dismissed")
+    expect(result.summary.triage?.dismissed).toBe(1)
+  })
+
+  it("suppresses output in json mode", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({ issues: [] }),
+        durationMs: 100,
+        exitCode: 0,
+      }),
+    })
+
+    const stdoutSpy = vi.spyOn(process.stdout, "write")
+
+    await orchestrate(makeOpts({ output: { kind: "json" } }))
+
+    // In json/silent mode, the orchestrator should not write the "Running N reviewers" header
+    const calls = stdoutSpy.mock.calls.map(([arg]) => String(arg))
+    expect(calls.some((c) => c.includes("Running"))).toBe(false)
   })
 })
