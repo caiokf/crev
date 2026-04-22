@@ -3,21 +3,28 @@ import path from "node:path"
 import chalk from "chalk"
 import type { Config } from "./config.js"
 import { getOutputDir } from "./config.js"
-import type { NormalizedReview, ReviewResult } from "./types.js"
+import type { NormalizedReview, ReviewResult, ReviewTarget } from "./types.js"
 import { SEVERITY_ORDER, SEVERITY_COLORS } from "../tui/theme.js"
 import { uniqueSuffix } from "../util/paths.js"
 import { errorMessage } from "../util/cli-errors.js"
-
-import type { OrchestrateOptions } from "./orchestrator.js"
 
 export type OutputPaths = {
   jsonPath: string
   markdownPath?: string
 }
 
+export type BuildResultInput = {
+  slug: string
+  schemaName: string
+  schemaHash?: string
+  diff: { base?: string; type: string }
+  analyze?: boolean
+  target: ReviewTarget
+}
+
 export function buildResult(
   reviews: NormalizedReview[],
-  opts: OrchestrateOptions,
+  opts: BuildResultInput,
   timestamp: string,
 ): ReviewResult {
   return {
