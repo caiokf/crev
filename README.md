@@ -71,7 +71,7 @@ crev run --schema security --analyze
 crev doctor
 
 # Smoke test all runtimes
-crev doctor --smoke
+crev doctor --ping
 ```
 
 ## How It Works
@@ -102,7 +102,7 @@ reviewers:
 
   - name: Architect
     runtime: codex
-    model: o3
+    model: gpt-5.4
     prompt: >
       You are a senior software architect reviewing code changes.
       Focus on coupling, abstraction quality, and scalability concerns.
@@ -129,15 +129,16 @@ reviewers:
 |---|---|---|
 | Claude Code | `claude` | Subscription or `ANTHROPIC_API_KEY` |
 | Codex | `codex` | `OPENAI_API_KEY` |
+| Copilot | `copilot` | `gh auth login` |
 | Gemini CLI | `gemini` | `GEMINI_API_KEY` or `GOOGLE_API_KEY` |
 | Kimi | `kimi` | `MOONSHOT_API_KEY` |
 | CodeRabbit | `cr` | `cr auth status` |
-| OpenCode | `opencode` | `~/.opencode/config.json` |
+| OpenCode | `opencode` | `~/.local/share/opencode/auth.json` |
 | Droid | `droid` | Subscription |
 | MastraCode | `mastracode` | Subscription |
 | Pi | `pi` | Subscription |
 
-Run `crev doctor` to check which runtimes are available. Add `--smoke` to verify end-to-end functionality.
+Run `crev doctor` to check which runtimes are available. Add `--ping` to verify end-to-end functionality.
 
 ## Commands
 
@@ -146,8 +147,9 @@ Run `crev doctor` to check which runtimes are available. Add `--smoke` to verify
 | `crev init` | Interactive setup |
 | `crev run --schema <name>` | Execute a review |
 | `crev run --analyze` | Full codebase analysis (no diff) |
-| `crev doctor [--smoke]` | Check runtime health (optionally run smoke tests) |
+| `crev doctor [--ping]` | Check runtime health (optionally run ping tests) |
 | `crev stats --schema <name>` | Reviewer effectiveness stats |
+| `crev config [--layers]` | Show resolved configuration |
 | `crev list` | List schemas and runtimes |
 | `crev show [file]` | Pretty-print a review file (default: latest) |
 | `crev diff` | Preview diff that would be reviewed |

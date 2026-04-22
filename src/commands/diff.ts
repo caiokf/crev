@@ -41,12 +41,19 @@ export function registerDiffCommand(program: Command): void {
             ? { kind: "branch", base: opts.base, type: opts.type }
             : { kind: "local", type: opts.type }
 
-      const diff = await resolveDiff({
-        slug: "preview",
-        source,
-        exclude: config.diff.exclude,
-        crevDir,
-      })
+      let diff
+      try {
+        diff = await resolveDiff({
+          slug: "preview",
+          source,
+          exclude: config.diff.exclude,
+          crevDir,
+        })
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        console.error(chalk.red(`Error: failed to generate diff: ${reason}`))
+        process.exit(1)
+      }
 
       const lines = diff.diffContent.split("\n").length
       console.log(chalk.bold(`Diff: ${lines} lines`))

@@ -109,13 +109,20 @@ export function registerRunCommand(program: Command): void {
 
       const slug = cmd.target.kind === "fresh" ? (cmd.target.slug ?? generateSlug()) : path.basename(cmd.target.reviewFile, ".json")
 
-      const diff = await resolveDiff({
-        slug,
-        source: cmd.diff,
-        analyze: cmd.analyze,
-        exclude: config.diff.exclude,
-        crevDir,
-      })
+      let diff
+      try {
+        diff = await resolveDiff({
+          slug,
+          source: cmd.diff,
+          analyze: cmd.analyze,
+          exclude: config.diff.exclude,
+          crevDir,
+        })
+      } catch (err) {
+        const reason = err instanceof Error ? err.message : String(err)
+        console.error(chalk.red(`Error: failed to generate diff: ${reason}`))
+        process.exit(1)
+      }
 
       if (!diff.diffContent.trim() && cmd.output.kind !== "prompt-only") {
         cleanupDiffFile(diff)

@@ -133,9 +133,8 @@ async function getTypeDiff(type: "all" | "committed" | "uncommitted"): Promise<s
       const { stdout } = await execFileAsync("git", ["diff", "HEAD~1..HEAD"], { maxBuffer: MAX_BUFFER })
       return stdout
     } catch {
-      // Initial commit — no HEAD~1, diff against empty tree
-      const { stdout: emptyTree } = await execFileAsync("git", ["hash-object", "-t", "tree", "/dev/null"])
-      const { stdout } = await execFileAsync("git", ["diff", `${emptyTree.trim()}..HEAD`], { maxBuffer: MAX_BUFFER })
+      // Initial commit — no HEAD~1, show the initial commit as a full diff
+      const { stdout } = await execFileAsync("git", ["diff-tree", "-p", "--root", "HEAD"], { maxBuffer: MAX_BUFFER })
       return stdout
     }
   }

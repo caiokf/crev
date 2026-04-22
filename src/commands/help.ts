@@ -31,11 +31,13 @@ function printGeneralHelp(): void {
     ["crev run --schema <name>", "Execute a review"],
     ["crev show [file.json]", "Pretty-print a review (default: latest)"],
     ["crev diff [flags]", "Preview what diff would be reviewed"],
-    ["crev doctor [--all] [--json]", "Health check"],
+    ["crev stats", "Aggregate stats across reviews"],
+    ["crev config [--layers]", "Show resolved configuration"],
+    ["crev doctor [--all] [--json] [--ping]", "Health check"],
     ["crev list [--schemas|--runtimes]", "Discover what's available"],
     ["crev schema init <name>", "Scaffold empty schema"],
     ["crev schema show <name>", "Display schema details"],
-    ["crev schema validate [file|--all]", "Validate schemas"],
+    ["crev schema validate <file> [--all]", "Validate schemas"],
     ["crev init [path]", "Interactive setup"],
     ["crev update [path]", "Regenerate AI tool skills"],
     ["crev help [run|schema]", "Detailed help"],
@@ -161,15 +163,17 @@ ${chalk.bold("AVAILABLE RUNTIMES")}
 function getFullReference(): Record<string, unknown> {
   return {
     commands: [
-      { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--base-commit", "--pr", "--type", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
+      { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--base-commit", "--pr", "--type", "--analyze", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
       { name: "show", description: "Pretty-print review artifact (default: latest)", flags: ["--json"] },
-      { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr"] },
-      { name: "doctor", description: "Health check", flags: ["--all", "--json"] },
+      { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr", "--analyze"] },
+      { name: "stats", description: "Aggregate stats across reviews", flags: ["--schema", "--json", "--history"] },
+      { name: "config", description: "Show resolved configuration", flags: ["--layers"] },
+      { name: "doctor", description: "Health check", flags: ["--all", "--json", "--ping"] },
       { name: "list", description: "List schemas/runtimes", flags: ["--schemas", "--runtimes", "--json"] },
-      { name: "schema init", description: "Scaffold empty schema" },
+      { name: "schema init", description: "Scaffold empty schema", flags: ["--tools", "--schemas"] },
       { name: "schema show", description: "Show schema details", flags: ["--json"] },
       { name: "schema validate", description: "Validate schemas", flags: ["--all", "--json"] },
-      { name: "init", description: "Interactive setup" },
+      { name: "init", description: "Interactive setup", flags: ["--tools", "--schemas"] },
       { name: "update", description: "Regenerate AI tool skills" },
       { name: "help", description: "Show help", flags: ["--json"] },
     ],
@@ -177,7 +181,7 @@ function getFullReference(): Record<string, unknown> {
     schemaFormat: {
       required: ["reviewers"],
       reviewerFields: ["name", "runtime", "model", "prompt?", "agent?"],
-      triageFields: ["enabled", "runtime", "model"],
+      triageFields: ["enabled", "runtime", "model", "deduplicate?", "recategorize?"],
     },
   }
 }
