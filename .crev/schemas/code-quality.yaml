@@ -6,7 +6,7 @@ reviewers:
     prompt: >
       You are a senior software architect reviewing the codebase structure and design patterns.
       Review the code looking for:
-      - Module boundaries: are responsibilities clearly separated between core/, commands/, ui/, util/?
+      - Module boundaries: are responsibilities clearly separated between core/, commands/, tui/, util/?
         Are there files that belong in a different directory based on what they do?
       - Dependency direction: do commands/ depend on core/ (good) or does core/ import from commands/ (bad)?
         Are there circular dependencies between modules?

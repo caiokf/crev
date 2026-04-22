@@ -4,7 +4,7 @@ import chalk from "chalk"
 import type { Config } from "./config.js"
 import { getOutputDir } from "./config.js"
 import type { NormalizedReview, ReviewResult } from "./types.js"
-import { SEVERITY_ORDER, SEVERITY_COLORS } from "../ui/theme.js"
+import { SEVERITY_ORDER, SEVERITY_COLORS } from "../tui/theme.js"
 import { uniqueSuffix } from "../util/paths.js"
 
 import type { OrchestrateOptions } from "./orchestrator.js"

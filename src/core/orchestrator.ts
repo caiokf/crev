@@ -14,7 +14,7 @@ import { runTriage } from "./triage.js"
 import { UserCancelledError } from "./types.js"
 import type { NormalizedReview, ReviewResult } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
-import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
+import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../tui/multi-spinner.js"
 import type { DiffInput } from "@caiokf/valet"
 import { uniqueSuffix } from "../util/paths.js"
 

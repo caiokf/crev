@@ -10,7 +10,7 @@ import type { Config } from "../core/config.js"
 import { collectRuntimeHealth, checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
 import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
-import { visibleLength, padVisible, truncateVisible } from "../ui/ansi.js"
+import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
 
 export function registerDoctorCommand(program: Command): void {
   program

@@ -4,7 +4,7 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
-import { SEVERITY_COLORS } from "../ui/theme.js"
+import { SEVERITY_COLORS } from "../tui/theme.js"
 
 export function registerShowCommand(program: Command): void {
   program

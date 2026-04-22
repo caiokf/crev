@@ -20,7 +20,7 @@ src/
 │   ├── json-extract.ts       # Robust JSON extraction from free-text
 │   └── types.ts              # Core types: RunCommand, ReviewResult, DiffSource
 ├── templates/                # Starter schemas, config, and skill templates
-├── ui/                       # TUI components (multi-spinner, ANSI utils)
+├── tui/                      # TUI components (multi-spinner, ANSI utils)
 └── util/                     # Helpers (path resolution, AI tool detection)
 
 web/                          # Vue 3 docs site (Cloudflare Pages) — separate from CLI
