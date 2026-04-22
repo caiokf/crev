@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { ref, onMounted, watch } from "vue"
 import { RouterLink, useRoute } from "vue-router"
-
-export type NavSection = { id: string; label: string }
+import type { NavSection } from "../data/nav"
 
 const props = defineProps<{
   sections: NavSection[]
