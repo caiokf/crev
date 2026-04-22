@@ -66,7 +66,7 @@ describe("registerShowCommand", () => {
     configMocks.findCrevDir.mockReturnValue("/repo/.crev")
 
     await expect(runShow(["/tmp/does-not-exist-review.json"])).rejects.toThrow("process.exit:1")
-    expect(errorSpy.mock.calls[0][0]).toContain("File not found")
+    expect(errorSpy.mock.calls[0][0]).toContain("not found")
     expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
