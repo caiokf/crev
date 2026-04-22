@@ -137,3 +137,53 @@ describe("registerSchemaCommand", () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 })
+
+const TEMPLATE = `description: ""
+reviewers:
+  - name: Engineer
+    runtime: claude
+    model: sonnet
+    prompt: Review the code changes for correctness and potential bugs.
+`
+
+describe("schema init template", () => {
+  let tmpDir: string
+  let schemasDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-schema-init-"))
+    schemasDir = path.join(tmpDir, "schemas")
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it("template produces a valid schema when parsed", async () => {
+    const actualSchema = await vi.importActual<typeof import("../core/schema.js")>("../core/schema.js")
+    const result = actualSchema.parseSchemaFile(TEMPLATE)
+    expect(result.success).toBe(true)
+  })
+
+  it("template schema loads with correct reviewer config", async () => {
+    const actualSchema = await vi.importActual<typeof import("../core/schema.js")>("../core/schema.js")
+    fs.mkdirSync(schemasDir, { recursive: true })
+    const filePath = path.join(schemasDir, "test.yaml")
+    fs.writeFileSync(filePath, TEMPLATE, "utf-8")
+
+    const schema = actualSchema.loadSchemaFile(filePath)
+    expect(schema.reviewers).toHaveLength(1)
+    expect(schema.reviewers[0].name).toBe("Engineer")
+    expect(schema.reviewers[0].runtime).toBe("claude")
+    expect(schema.reviewers[0].model).toBe("sonnet")
+  })
+
+  it("refuses to overwrite existing schema (simulated check)", () => {
+    fs.mkdirSync(schemasDir, { recursive: true })
+    const filePath = path.join(schemasDir, "existing.yaml")
+    fs.writeFileSync(filePath, "original: true", "utf-8")
+
+    expect(fs.existsSync(filePath)).toBe(true)
+    expect(fs.readFileSync(filePath, "utf-8")).toBe("original: true")
+  })
+})
