@@ -1,5 +1,14 @@
-import { describe, expect, it } from "vitest"
-import { prefixId, tryParseIssues } from "./normalizer.js"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { prefixId, tryParseIssues, normalizeOutput } from "./normalizer.js"
+import type { Config } from "./config.js"
+
+const valetMocks = vi.hoisted(() => ({
+  getRuntime: vi.fn(),
+}))
+
+vi.mock("@caiokf/valet", () => ({
+  getRuntime: valetMocks.getRuntime,
+}))
 
 describe("tryParseIssues", () => {
   it("parses valid JSON with issues array", () => {
@@ -118,5 +127,112 @@ describe("prefixId", () => {
 
   it("does not match partial prefix from different reviewer", () => {
     expect(prefixId("security-analyst--1", "Security")).toBe("security--security-analyst--1")
+  })
+})
+
+describe("normalizeOutput", () => {
+  const baseConfig = {
+    defaults: { schema: "quick", type: "all", base: "main" },
+    runtimes: {},
+    aliases: {},
+    diff: { exclude: [] },
+    output: { dir: ".crev/reviews", format: "json" },
+    normalizer: { enabled: true, runtime: "claude", model: "haiku" },
+    failback: {},
+    triage: {
+      enabled: false,
+      runtime: "claude",
+      model: "opus",
+      deduplicate: false,
+      recategorize: false,
+      prompt: "",
+    },
+  } as Config
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("returns issues directly when raw output is valid JSON", async () => {
+    const raw = JSON.stringify({
+      issues: [
+        { id: "bug-1", title: "Bug", severity: "high", category: "bug", description: "desc" },
+      ],
+    })
+    const result = await normalizeOutput("Test", "claude", "opus", raw, 1000, 0, baseConfig)
+
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].id).toBe("test--bug-1")
+    expect(result.reviewer).toBe("Test")
+  })
+
+  it("falls back to normalizer LLM when direct parse fails", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({
+          issues: [
+            { id: "extracted-1", title: "Extracted", severity: "low", category: "style", description: "found" },
+          ],
+        }),
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await normalizeOutput("Test", "claude", "opus", "not json at all", 1000, 0, baseConfig)
+
+    expect(result.issues).toHaveLength(1)
+    expect(result.issues[0].id).toBe("test--extracted-1")
+    expect(valetMocks.getRuntime).toHaveBeenCalledWith("claude")
+  })
+
+  it("returns empty issues when normalizer is disabled and direct parse fails", async () => {
+    const config = { ...baseConfig, normalizer: { ...baseConfig.normalizer, enabled: false } }
+    const result = await normalizeOutput("Test", "claude", "opus", "not json", 1000, 0, config)
+
+    expect(result.issues).toEqual([])
+    expect(valetMocks.getRuntime).not.toHaveBeenCalled()
+  })
+
+  it("returns empty issues when normalizer runtime throws", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockRejectedValue(new Error("normalizer crashed")),
+    })
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const result = await normalizeOutput("Test", "claude", "opus", "not json", 1000, 0, baseConfig)
+
+    expect(result.issues).toEqual([])
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("normalizer crashed"))
+  })
+
+  it("returns empty issues when normalizer returns unparseable output", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: "still not json after normalization",
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await normalizeOutput("Test", "claude", "opus", "not json", 1000, 0, baseConfig)
+
+    expect(result.issues).toEqual([])
+  })
+
+  it("preserves metadata fields in all paths", async () => {
+    const raw = JSON.stringify({ issues: [] })
+    const result = await normalizeOutput("Security", "gemini", "2.5-pro", raw, 5000, 0, baseConfig)
+
+    expect(result.reviewer).toBe("Security")
+    expect(result.runtime).toBe("gemini")
+    expect(result.model).toBe("2.5-pro")
+    expect(result.durationMs).toBe(5000)
+    expect(result.exitCode).toBe(0)
+    expect(result.rawLength).toBe(raw.length)
   })
 })
