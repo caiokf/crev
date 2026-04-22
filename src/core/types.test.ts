@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { RawRunFlags, UserCancelledError } from "./types.js"
+import { RawDiffFlags, RawRunFlags, UserCancelledError } from "./types.js"
 
 describe("UserCancelledError", () => {
   it("is an instance of Error", () => {
@@ -184,5 +184,27 @@ describe("RawRunFlags validation", () => {
   it("schema is required", () => {
     const result = RawRunFlags.safeParse({})
     expect(result.success).toBe(false)
+  })
+})
+
+describe("RawDiffFlags validation", () => {
+  it("rejects mutually exclusive source flags", () => {
+    const result = RawDiffFlags.safeParse({ pr: 1, base: "main" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects invalid --type values", () => {
+    const result = RawDiffFlags.safeParse({ type: "weird" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects --pr combined with non-all type", () => {
+    const result = RawDiffFlags.safeParse({ pr: 12, type: "committed" })
+    expect(result.success).toBe(false)
+  })
+
+  it("transforms valid flags into DiffSource", () => {
+    const parsed = RawDiffFlags.parse({ baseCommit: "abc123", type: "all" })
+    expect(parsed).toEqual({ kind: "commit", baseCommit: "abc123", type: "all" })
   })
 })

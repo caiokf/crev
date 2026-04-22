@@ -16,6 +16,7 @@ export type DiffSource =
   | { kind: "local"; type: DiffType }
 
 export type DiffType = "all" | "committed" | "uncommitted"
+export const VALID_DIFF_TYPES: DiffType[] = ["all", "committed", "uncommitted"]
 
 // ── Output mode: mutually exclusive ──
 
@@ -42,6 +43,50 @@ export interface RunCommand {
   plain: boolean
   analyze: boolean
 }
+
+export const RawDiffFlags = z
+  .object({
+    base: z.string().optional(),
+    baseCommit: z.string().optional(),
+    pr: z.coerce.number().positive().optional(),
+    type: z.string().default("all"),
+  })
+  .superRefine((f, ctx) => {
+    if ([f.pr, f.base, f.baseCommit].filter(Boolean).length > 1) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["pr"],
+        message: "--pr, --base, and --base-commit are mutually exclusive",
+      })
+    }
+
+    if (!VALID_DIFF_TYPES.includes(f.type as DiffType)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["type"],
+        message: `Invalid --type "${f.type}". Must be one of: ${VALID_DIFF_TYPES.join(", ")}`,
+      })
+    }
+
+    if (f.pr && f.type !== "all") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["type"],
+        message: "--type cannot be used with --pr (PR diffs are fetched from GitHub)",
+      })
+    }
+  })
+  .transform(
+    (f): DiffSource => (
+      f.pr
+        ? { kind: "pr", pr: f.pr }
+        : f.baseCommit
+          ? { kind: "commit", baseCommit: f.baseCommit, type: f.type as DiffType }
+          : f.base
+            ? { kind: "branch", base: f.base, type: f.type as DiffType }
+            : { kind: "local", type: f.type as DiffType }
+    ),
+  )
 
 // ── Zod validation: flat flags → discriminated unions ──
 

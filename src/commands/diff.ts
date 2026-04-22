@@ -2,7 +2,8 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
-import type { DiffSource } from "../core/types.js"
+import { RawDiffFlags } from "../core/types.js"
+import { exitWithError } from "../util/cli-errors.js"
 
 export function registerDiffCommand(program: Command): void {
   program
@@ -13,33 +14,19 @@ export function registerDiffCommand(program: Command): void {
     .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
     .option("--pr <number>", "GitHub PR number")
     .action(async (opts) => {
-      const specified = [opts.pr, opts.base, opts.baseCommit].filter(Boolean).length
-      if (specified > 1) {
-        console.error(chalk.red("Error: --pr, --base, and --base-commit are mutually exclusive"))
-        process.exit(1)
-      }
-
-      const validTypes = ["all", "committed", "uncommitted"]
-      if (!validTypes.includes(opts.type)) {
-        console.error(chalk.red(`Error: Invalid --type "${opts.type}". Must be one of: ${validTypes.join(", ")}`))
-        process.exit(1)
-      }
-
-      if (opts.pr && opts.type !== "all") {
-        console.error(chalk.red("Error: --type cannot be used with --pr (PR diffs are fetched from GitHub)"))
-        process.exit(1)
+      const parsed = RawDiffFlags.safeParse({
+        base: opts.base,
+        baseCommit: opts.baseCommit,
+        pr: opts.pr,
+        type: opts.type,
+      })
+      if (!parsed.success) {
+        exitWithError(chalk.red(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`))
       }
 
       const crevDir = findCrevDir()
       const config = loadLayeredConfig(crevDir)
-
-      const source: DiffSource = opts.pr
-        ? { kind: "pr", pr: Number(opts.pr) }
-        : opts.baseCommit
-          ? { kind: "commit", baseCommit: opts.baseCommit, type: opts.type }
-          : opts.base
-            ? { kind: "branch", base: opts.base, type: opts.type }
-            : { kind: "local", type: opts.type }
+      const source = parsed.data
 
       let diff
       try {
@@ -51,8 +38,7 @@ export function registerDiffCommand(program: Command): void {
         })
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)
-        console.error(chalk.red(`Error: failed to generate diff: ${reason}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: failed to generate diff: ${reason}`))
       }
 
       const lines = diff.diffContent.split("\n").length
