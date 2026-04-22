@@ -160,17 +160,17 @@ ${chalk.bold("AVAILABLE RUNTIMES")}
   console.log()
 }
 
-function getFullReference(): Record<string, unknown> {
+export function getFullReference(): Record<string, unknown> {
   return {
     commands: [
       { name: "run", description: "Execute a review", flags: ["--schema", "--base", "--base-commit", "--pr", "--type", "--analyze", "--reviewers", "--slug", "--description", "--review-file", "--plain", "--json", "--prompt-only"] },
       { name: "show", description: "Pretty-print review artifact (default: latest)", flags: ["--json"] },
-      { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr", "--analyze"] },
+      { name: "diff", description: "Preview diff", flags: ["--base", "--base-commit", "--type", "--pr"] },
       { name: "stats", description: "Aggregate stats across reviews", flags: ["--schema", "--json", "--history"] },
-      { name: "config", description: "Show resolved configuration", flags: ["--layers"] },
+      { name: "config", description: "Show resolved configuration", flags: ["--layers", "--json"] },
       { name: "doctor", description: "Health check", flags: ["--all", "--json", "--ping"] },
       { name: "list", description: "List schemas/runtimes", flags: ["--schemas", "--runtimes", "--json"] },
-      { name: "schema init", description: "Scaffold empty schema", flags: ["--tools", "--schemas"] },
+      { name: "schema init", description: "Scaffold empty schema", flags: [] },
       { name: "schema show", description: "Show schema details", flags: ["--json"] },
       { name: "schema validate", description: "Validate schemas", flags: ["--all", "--json"] },
       { name: "init", description: "Interactive setup", flags: ["--tools", "--schemas"] },
