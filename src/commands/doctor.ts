@@ -4,13 +4,15 @@ import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
 import { getAllRuntimes, type RuntimeHealth, type RuntimeAdapter } from "@caiokf/valet"
-import { findCrevDir, loadLayeredConfig, getRuntimeConfig } from "../core/config.js"
-import { resolveModelAlias } from "../core/config.js"
+import { findCrevDir, loadLayeredConfig, getRuntimeConfig, resolveModelAlias } from "../core/config.js"
 import type { Config } from "../core/config.js"
-import { collectRuntimeHealth, checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
+import { checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
 import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
+
+const ANSI_ESCAPE_REGEX = /\u001b\[[0-?]*[ -/]*[@-~]/g
+const ANSI_OSC_REGEX = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
 
 export function registerDoctorCommand(program: Command): void {
   program
@@ -25,40 +27,76 @@ export function registerDoctorCommand(program: Command): void {
       const cols = process.stdout.columns ?? 80
 
       const schemas = listAllSchemas(crevDir)
-      const config = loadLayeredConfig(crevDir)
-      const isTTY = process.stdout.isTTY && !jsonOutput
-
-      // Collect runtime health via shared service
-      if (isTTY) {
-        const total = getAllRuntimes().length
-        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${total}`)}`)
+      const runtimeUsage = new Map<string, string[]>()
+      const referencedRuntimes = new Set<string>()
+      for (const name of schemas) {
+        try {
+          const schemaPath = resolveSchemaPath(name, crevDir)
+          if (!schemaPath) continue
+          const schema = loadSchemaFile(schemaPath)
+          for (const reviewer of schema.reviewers) {
+            referencedRuntimes.add(reviewer.runtime)
+            addRuntimeUsage(runtimeUsage, reviewer.runtime, name)
+          }
+          if (schema.triage?.enabled && schema.triage.runtime) {
+            referencedRuntimes.add(schema.triage.runtime)
+            addRuntimeUsage(runtimeUsage, schema.triage.runtime, name)
+          }
+        } catch {
+          // Skip schemas that cannot be loaded
+        }
       }
 
-      const allHealthResults = await collectRuntimeHealth(
-        isTTY ? (checked, total) => {
-          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${total}`)}`)
-        } : undefined,
+      const config = loadLayeredConfig(crevDir)
+
+      // By default, check only runtimes referenced by schemas. --all checks every runtime.
+      const allRuntimes = getAllRuntimes()
+      const runtimesToCheck = selectRuntimesToCheck(allRuntimes, referencedRuntimes, opts.all ?? false)
+      const allHealthResults: RuntimeHealth[] = new Array(runtimesToCheck.length)
+
+      const isTTY = process.stdout.isTTY && !jsonOutput
+      let checked = 0
+
+      if (isTTY) {
+        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${runtimesToCheck.length}`)}`)
+      }
+
+      await Promise.all(
+        runtimesToCheck.map(async (runtime, i) => {
+          try {
+            allHealthResults[i] = sanitizeRuntimeHealth(await runtime.healthCheck())
+          } catch (e) {
+            allHealthResults[i] = sanitizeRuntimeHealth({
+              name: runtime.name,
+              command: runtime.name,
+              installed: false,
+              version: null,
+              authenticated: "unknown",
+              authDetail: String(e),
+              error: String(e),
+            })
+          }
+          checked++
+          if (isTTY) {
+            process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${runtimesToCheck.length}`)}`)
+          }
+        }),
       )
 
       if (isTTY) {
         process.stdout.write("\r\x1B[2K")
       }
 
-      // By default show installed runtimes, --all shows everything
-      const healthResults = opts.all
-        ? allHealthResults
-        : allHealthResults.filter((h) => h.installed)
+      const healthResults = allHealthResults
+      const healthByRuntime = new Map(allHealthResults.map((h) => [h.name, h] as const))
 
       const projectChecks = checkProjectSetup(crevDir)
-      const schemaReadiness = checkSchemaReadiness(crevDir, allHealthResults)
-
-      // Build runtime usage map for JSON output
-      const runtimeUsage = buildRuntimeUsageMap(crevDir, schemas)
+      const schemaReadiness = checkSchemaReadiness(crevDir, healthResults)
 
       let pingResults: PingResult[] | undefined
       if (opts.ping) {
-        const readyRuntimes = getAllRuntimes().filter((rt) => {
-          const health = allHealthResults.find((h) => h.name === rt.name)
+        const readyRuntimes = runtimesToCheck.filter((rt) => {
+          const health = healthByRuntime.get(rt.name)
           return health?.installed && health?.authenticated !== "no"
         })
 
@@ -182,7 +220,7 @@ export function buildDoctorJsonPayload(input: {
   const payload: DoctorJsonPayload = {
     runtimes: input.healthResults.map((h) => ({
       ...h,
-      usedIn: input.runtimeUsage.get(h.name) ?? [],
+      usedIn: [...new Set(input.runtimeUsage.get(h.name) ?? [])],
     })),
     schemas: input.schemaReadiness,
     project: input.projectChecks,
@@ -193,23 +231,42 @@ export function buildDoctorJsonPayload(input: {
   return payload
 }
 
-function buildRuntimeUsageMap(crevDir: string, schemas: string[]): Map<string, string[]> {
-  const usage = new Map<string, string[]>()
-  for (const name of schemas) {
-    try {
-      const schemaPath = resolveSchemaPath(name, crevDir)
-      if (!schemaPath) continue
-      const schema = loadSchemaFile(schemaPath)
-      for (const reviewer of schema.reviewers) {
-        const list = usage.get(reviewer.runtime) ?? []
-        list.push(name)
-        usage.set(reviewer.runtime, list)
-      }
-    } catch {
-      // Skip schemas that can't be loaded
-    }
+function addRuntimeUsage(runtimeUsage: Map<string, string[]>, runtime: string, schemaName: string): void {
+  const list = runtimeUsage.get(runtime) ?? []
+  if (!list.includes(schemaName)) list.push(schemaName)
+  runtimeUsage.set(runtime, list)
+}
+
+export function selectRuntimesToCheck<T extends { name: string }>(
+  allRuntimes: ReadonlyArray<T>,
+  referencedRuntimes: ReadonlySet<string>,
+  includeAll: boolean,
+): T[] {
+  if (includeAll) return [...allRuntimes]
+  if (referencedRuntimes.size === 0) return []
+  return allRuntimes.filter((runtime) => referencedRuntimes.has(runtime.name))
+}
+
+function sanitizeRuntimeText(value: string | null | undefined): string | null {
+  if (!value) return null
+  const stripped = value
+    .replace(ANSI_OSC_REGEX, "")
+    .replace(ANSI_ESCAPE_REGEX, "")
+    .replace(/[\u0000-\u001f\u007f]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+
+  if (!stripped) return null
+  return stripped.slice(0, 240)
+}
+
+export function sanitizeRuntimeHealth(health: RuntimeHealth): RuntimeHealth {
+  return {
+    ...health,
+    version: sanitizeRuntimeText(health.version),
+    authDetail: sanitizeRuntimeText(health.authDetail),
+    error: sanitizeRuntimeText(health.error),
   }
-  return usage
 }
 
 /**

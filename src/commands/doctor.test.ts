@@ -1,6 +1,6 @@
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { buildDoctorJsonPayload } from "./doctor.js"
+import { buildDoctorJsonPayload, sanitizeRuntimeHealth, selectRuntimesToCheck } from "./doctor.js"
 
 const valetMocks = vi.hoisted(() => ({
   getAllRuntimes: vi.fn(),
@@ -14,7 +14,6 @@ const configMocks = vi.hoisted(() => ({
 }))
 
 const healthMocks = vi.hoisted(() => ({
-  collectRuntimeHealth: vi.fn(),
   checkSchemaReadiness: vi.fn(),
   checkProjectSetup: vi.fn(),
 }))
@@ -37,7 +36,6 @@ vi.mock("../core/config.js", () => ({
 }))
 
 vi.mock("../core/health.js", () => ({
-  collectRuntimeHealth: healthMocks.collectRuntimeHealth,
   checkSchemaReadiness: healthMocks.checkSchemaReadiness,
   checkProjectSetup: healthMocks.checkProjectSetup,
 }))
@@ -78,33 +76,56 @@ describe("registerDoctorCommand --ping", () => {
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
     configMocks.findCrevDir.mockReturnValue("/repo/.crev")
     configMocks.loadLayeredConfig.mockReturnValue({ aliases: {}, runtimes: {} })
-    configMocks.getRuntimeConfig.mockReturnValue({})
-    configMocks.resolveModelAlias.mockReturnValue("sonnet")
-    schemaMocks.listAllSchemas.mockReturnValue([])
-    healthMocks.collectRuntimeHealth.mockResolvedValue(healthResults)
+    configMocks.getRuntimeConfig.mockReturnValue({ env: {}, args: [] })
+    configMocks.resolveModelAlias.mockImplementation((_config, model: string) => model)
+    schemaMocks.listAllSchemas.mockReturnValue(["quick"])
+    schemaMocks.resolveSchemaPath.mockReturnValue("/repo/.crev/schemas/quick.yaml")
+    schemaMocks.loadSchemaFile.mockReturnValue({
+      reviewers: [{ name: "Engineer", runtime: "claude" }],
+    })
     healthMocks.checkSchemaReadiness.mockReturnValue(schemaReadiness)
     healthMocks.checkProjectSetup.mockReturnValue(projectChecks)
-    valetMocks.getAllRuntimes.mockReturnValue([
-      { name: "claude", supportsCustomPrompt: true, defaultModel: "sonnet" },
-    ])
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
-  it("filters runtimes correctly for ping without crashing", async () => {
+  it("includes ping results when runtime is healthy", async () => {
+    valetMocks.getAllRuntimes.mockReturnValue([
+      {
+        name: "claude",
+        supportsCustomPrompt: true,
+        defaultModel: "sonnet",
+        healthCheck: vi.fn().mockResolvedValue(healthResults[0]),
+        execute: vi.fn().mockResolvedValue({
+          raw: "hello ping-test",
+          exitCode: 0,
+          durationMs: 10,
+        }),
+      },
+    ])
+
     const program = new Command()
     registerDoctorCommand(program)
     await program.parseAsync(["doctor", "--ping", "--json"], { from: "user" })
 
     const output = JSON.parse(logSpy.mock.calls[0][0] as string)
     expect(output.ping).toBeDefined()
+    expect(output.ping).toHaveLength(1)
+    expect(output.ping[0].runtime).toBe("claude")
+    expect(output.ping[0].pass).toBe(true)
   })
 
   it("returns empty ping results when no runtimes are ready", async () => {
-    healthMocks.collectRuntimeHealth.mockResolvedValue([
-      { ...healthResults[0], installed: false, authenticated: "no" },
+    valetMocks.getAllRuntimes.mockReturnValue([
+      {
+        name: "claude",
+        supportsCustomPrompt: true,
+        defaultModel: "sonnet",
+        healthCheck: vi.fn().mockResolvedValue({ ...healthResults[0], installed: false, authenticated: "no" }),
+        execute: vi.fn(),
+      },
     ])
 
     const program = new Command()
@@ -128,6 +149,19 @@ describe("buildDoctorJsonPayload", () => {
     })
 
     expect(payload.runtimes[0].usedIn).toEqual(["quick"])
+  })
+
+  it("deduplicates usedIn runtime usage entries", () => {
+    const runtimeUsage = new Map<string, string[]>([["claude", ["quick", "quick", "standard"]]])
+    const payload = buildDoctorJsonPayload({
+      healthResults,
+      runtimeUsage,
+      schemaReadiness,
+      projectChecks,
+      includePing: false,
+    })
+
+    expect(payload.runtimes[0].usedIn).toEqual(["quick", "standard"])
   })
 
   it("does not include ping when includePing is false", () => {
@@ -179,5 +213,42 @@ describe("buildDoctorJsonPayload", () => {
         durationMs: 123,
       },
     ])
+  })
+})
+
+describe("sanitizeRuntimeHealth", () => {
+  it("normalizes control-sequence-heavy fields to single-line readable text", () => {
+    const raw = {
+      name: "mastracode",
+      command: "mastracode",
+      installed: true,
+      version: "v0.1\n\u001b[31mRED\u001b[0m\tok",
+      authenticated: "unknown" as const,
+      authDetail: "line1\r\nline2",
+      error: "\u001b[2Kerr",
+    }
+
+    const sanitized = sanitizeRuntimeHealth(raw)
+    expect(sanitized.version).toBe("v0.1 RED ok")
+    expect(sanitized.authDetail).toBe("line1 line2")
+    expect(sanitized.error).toBe("err")
+  })
+})
+
+describe("selectRuntimesToCheck", () => {
+  const runtimes = [
+    { name: "claude" },
+    { name: "gemini" },
+    { name: "codex" },
+  ] as const
+
+  it("checks only schema-referenced runtimes by default", () => {
+    const selected = selectRuntimesToCheck(runtimes, new Set(["gemini", "claude"]), false)
+    expect(selected.map((r) => r.name)).toEqual(["claude", "gemini"])
+  })
+
+  it("checks all runtimes when --all is enabled", () => {
+    const selected = selectRuntimesToCheck(runtimes, new Set(["gemini"]), true)
+    expect(selected.map((r) => r.name)).toEqual(["claude", "gemini", "codex"])
   })
 })
