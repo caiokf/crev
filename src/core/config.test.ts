@@ -120,13 +120,16 @@ describe("getOutputDir", () => {
 
 describe("loadAgentPrompt", () => {
   let tmpDir: string
+  let prevCwd: string
 
   beforeEach(() => {
     tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-test-"))
     fs.mkdirSync(path.join(tmpDir, "agents"), { recursive: true })
+    prevCwd = process.cwd()
   })
 
   afterEach(() => {
+    process.chdir(prevCwd)
     fs.rmSync(tmpDir, { recursive: true })
   })
 
@@ -140,6 +143,22 @@ describe("loadAgentPrompt", () => {
   it("returns null for missing agent", () => {
     const prompt = loadAgentPrompt(path.join(tmpDir, "agents", "missing.md"))
     expect(prompt).toBeNull()
+  })
+
+  it("resolves relative agent paths from project root when crev is run in a subdirectory", () => {
+    const projectRoot = tmpDir
+    const crevDir = path.join(projectRoot, ".crev")
+    const schemaPath = path.join(crevDir, "schemas", "custom.yaml")
+    const subDir = path.join(projectRoot, "packages", "cli")
+    fs.mkdirSync(path.dirname(schemaPath), { recursive: true })
+    fs.mkdirSync(path.join(projectRoot, ".crev", "agents"), { recursive: true })
+    fs.mkdirSync(subDir, { recursive: true })
+    fs.writeFileSync(path.join(projectRoot, ".crev", "agents", "security.md"), "You are a security reviewer.")
+
+    process.chdir(subDir)
+
+    const prompt = loadAgentPrompt(".crev/agents/security.md", { crevDir, schemaPath })
+    expect(prompt).toBe("You are a security reviewer.")
   })
 })
 

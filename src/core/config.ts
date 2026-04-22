@@ -4,6 +4,7 @@ import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
 import { annotatedMerge, deepMerge, type ProvenanceMap } from "./merge.js"
+import { resolveAgentPath, type AgentPathContext } from "./agent-path.js"
 
 const runtimeConfigSchema = z.object({
   command: z.string().optional(),
@@ -192,8 +193,8 @@ export function getOutputDir(config: Config, crevDir: string): string {
   return path.resolve(path.dirname(crevDir), config.output.dir)
 }
 
-export function loadAgentPrompt(agentPath: string): string | null {
-  const resolved = path.resolve(agentPath)
+export function loadAgentPrompt(agentPath: string, ctx: AgentPathContext = {}): string | null {
+  const resolved = resolveAgentPath(agentPath, ctx)
   if (!fs.existsSync(resolved)) return null
   return fs.readFileSync(resolved, "utf-8").trim()
 }

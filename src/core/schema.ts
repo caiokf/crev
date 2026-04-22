@@ -4,6 +4,7 @@ import { z } from "zod"
 import YAML from "yaml"
 import { getAllRuntimes, getRuntimeNames } from "@caiokf/valet"
 import { getUserCrevDir } from "./config.js"
+import { resolveAgentPath, type AgentPathContext } from "./agent-path.js"
 
 // Single source of truth: derived from runtime adapters
 export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(
@@ -191,11 +192,12 @@ export function resolveSchemaPath(schemaName: string, crevDir: string): string |
 
 export async function validateAgentRefs(
   schema: SchemaFileType,
+  ctx: AgentPathContext = {},
 ): Promise<ValidationIssue[]> {
   const issues: ValidationIssue[] = []
   for (const reviewer of schema.reviewers) {
     if (reviewer.agent) {
-      const resolved = path.resolve(reviewer.agent)
+      const resolved = resolveAgentPath(reviewer.agent, ctx)
       if (!fs.existsSync(resolved)) {
         issues.push({
           severity: "error",

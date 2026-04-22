@@ -178,6 +178,7 @@ export type ReviewIssue = {
   line?: number
   severity: "low" | "medium" | "high" | "critical"
   category: "bug" | "security" | "performance" | "style" | "compliance" | "architecture"
+  status?: "open" | "fixed" | "wont-fix"
   title: string
   description: string
   triage?: TriageVerdict

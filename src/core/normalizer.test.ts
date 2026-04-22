@@ -96,6 +96,17 @@ Done!`
     }
   })
 
+  it("defaults missing status to open", () => {
+    const json = JSON.stringify({
+      issues: [{ id: "1", title: "Test", severity: "low", category: "bug", description: "" }],
+    })
+    const result = tryParseIssues(json, "Test", "claude", "sonnet")
+    expect(result.parsed).toBe(true)
+    if (result.parsed) {
+      expect(result.issues[0].status).toBe("open")
+    }
+  })
+
   it("assigns sequential IDs when none provided", () => {
     const json = JSON.stringify({
       issues: [

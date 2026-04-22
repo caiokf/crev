@@ -1,4 +1,5 @@
 import fs from "node:fs"
+import os from "node:os"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { filterReviewers, buildPromptOnlyResult, orchestrate } from "./orchestrator.js"
@@ -73,7 +74,7 @@ describe("buildDiffReference", () => {
 })
 
 describe("buildAnalyzeReference", () => {
-  it("instructs reading all files from filesystem without inlining file lists", () => {
+  it("lists files and instructs reading them from filesystem", () => {
     const diff = {
       diffContent: `diff --git a/src/app.ts b/src/app.ts\ndiff --git a/src/util.ts b/src/util.ts`,
       diffFile: "/tmp/test.diff",
@@ -81,9 +82,9 @@ describe("buildAnalyzeReference", () => {
     }
     const result = buildAnalyzeReference(diff)
     expect(result).toContain("full codebase analysis")
-    expect(result).not.toContain("Files to review:")
-    expect(result).not.toContain("- src/app.ts")
-    expect(result).not.toContain("- src/util.ts")
+    expect(result).toContain("Files to review:")
+    expect(result).toContain("- src/app.ts")
+    expect(result).toContain("- src/util.ts")
     expect(result).toContain("Read each file from the filesystem")
   })
 
@@ -199,6 +200,8 @@ describe("buildPromptOnlyResult", () => {
         },
         slug: "feature-branch",
         crevDir: "/tmp",
+        output: { kind: "prompt-only", format: "json" },
+        target: { kind: "fresh" },
       })
 
       expect(result.prompts).toHaveLength(1)

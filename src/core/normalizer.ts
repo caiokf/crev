@@ -53,6 +53,7 @@ export function tryParseIssues(raw: string, reviewer: string, runtime: string, m
       line: typeof item.line === "number" ? item.line : undefined,
       severity: normalizeSeverity(String(item.severity ?? "medium")),
       category: normalizeCategory(String(item.category ?? "bug")),
+      status: normalizeStatus(String(item.status ?? "open")),
       title: String(item.title ?? "Untitled issue"),
       description: String(item.description ?? ""),
     }
@@ -68,6 +69,12 @@ function normalizeSeverity(s: string): ReviewIssue["severity"] {
 function normalizeCategory(c: string): ReviewIssue["category"] {
   const lower = c.toLowerCase()
   return (REVIEW_CATEGORIES.find((v) => v === lower) ?? "bug") as ReviewIssue["category"]
+}
+
+function normalizeStatus(s: string): NonNullable<ReviewIssue["status"]> {
+  const valid = ["open", "fixed", "wont-fix"] as const
+  const lower = s.toLowerCase()
+  return (valid.find((v) => v === lower) ?? "open") as NonNullable<ReviewIssue["status"]>
 }
 
 export function prefixId(id: string, reviewer: string): string {
@@ -99,6 +106,7 @@ Return ONLY a JSON object with this exact structure:
       "line": 42,
       "severity": "low | medium | high | critical",
       "category": "bug | security | performance | style | compliance | architecture",
+      "status": "open | fixed | wont-fix",
       "title": "Short title",
       "description": "Detailed description"
     }
