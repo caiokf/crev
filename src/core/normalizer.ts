@@ -1,11 +1,9 @@
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
-import { extractJsonObject } from "./json-extract.js"
+import { extractAndParse } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
-import { uniqueSuffix } from "../util/paths.js"
+import { REVIEW_CATEGORIES, REVIEW_SEVERITIES } from "./taxonomy.js"
+import { withTempPromptFile } from "./temp-prompt.js"
 
 export async function normalizeOutput(
   reviewerName: string,
@@ -41,44 +39,35 @@ export async function normalizeOutput(
 export type ParseResult = { parsed: true; issues: ReviewIssue[] } | { parsed: false }
 
 export function tryParseIssues(raw: string, reviewer: string, runtime: string, model: string): ParseResult {
-  const jsonStr = extractJsonObject(raw, "issues")
-  if (!jsonStr) return { parsed: false }
+  const parsed = extractAndParse(raw, "issues")
+  if (!parsed || !Array.isArray(parsed.issues)) return { parsed: false }
 
-  try {
-    const parsed = JSON.parse(jsonStr) as { issues?: unknown[] }
-    if (!Array.isArray(parsed.issues)) return { parsed: false }
-
-    const issues = parsed.issues.map((issue, i) => {
-      const item = issue as Record<string, unknown>
-      return {
-        id: prefixId(String(item.id ?? `${i + 1}`), reviewer),
-        reviewer,
-        runtime,
-        model,
-        file: item.file ? String(item.file) : undefined,
-        line: typeof item.line === "number" ? item.line : undefined,
-        severity: normalizeSeverity(String(item.severity ?? "medium")),
-        category: normalizeCategory(String(item.category ?? "bug")),
-        title: String(item.title ?? "Untitled issue"),
-        description: String(item.description ?? ""),
-      }
-    })
-    return { parsed: true, issues }
-  } catch {
-    return { parsed: false }
-  }
+  const issues = (parsed.issues as unknown[]).map((issue, i) => {
+    const item = issue as Record<string, unknown>
+    return {
+      id: prefixId(String(item.id ?? `${i + 1}`), reviewer),
+      reviewer,
+      runtime,
+      model,
+      file: item.file ? String(item.file) : undefined,
+      line: typeof item.line === "number" ? item.line : undefined,
+      severity: normalizeSeverity(String(item.severity ?? "medium")),
+      category: normalizeCategory(String(item.category ?? "bug")),
+      title: String(item.title ?? "Untitled issue"),
+      description: String(item.description ?? ""),
+    }
+  })
+  return { parsed: true, issues }
 }
 
 function normalizeSeverity(s: string): ReviewIssue["severity"] {
-  const valid = ["low", "medium", "high", "critical"] as const
   const lower = s.toLowerCase()
-  return (valid.find((v) => v === lower) ?? "medium") as ReviewIssue["severity"]
+  return (REVIEW_SEVERITIES.find((v) => v === lower) ?? "medium") as ReviewIssue["severity"]
 }
 
 function normalizeCategory(c: string): ReviewIssue["category"] {
-  const valid = ["bug", "security", "performance", "style", "compliance", "architecture"] as const
   const lower = c.toLowerCase()
-  return (valid.find((v) => v === lower) ?? "bug") as ReviewIssue["category"]
+  return (REVIEW_CATEGORIES.find((v) => v === lower) ?? "bug") as ReviewIssue["category"]
 }
 
 export function prefixId(id: string, reviewer: string): string {
@@ -123,27 +112,24 @@ ${raw.slice(0, 100_000)}`
 
   const normalizerRuntime = config.normalizer.runtime
   const normalizerModel = config.normalizer.model
-  const suffix = uniqueSuffix()
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-normalizer-${process.pid}-${suffix}.txt`)
-  fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {
-    const rt = getRuntime(normalizerRuntime)
-    const result = await rt.execute({
-      taskName: "Normalizer",
-      model: normalizerModel,
-      prompt,
-      promptFile,
-      diff: { diffContent: "", diffFile: "", type: "all" },
-      outputFormat: "",
-    })
+    return await withTempPromptFile("crev-prompt-normalizer", prompt, async (promptFile) => {
+      const rt = getRuntime(normalizerRuntime)
+      const result = await rt.execute({
+        taskName: "Normalizer",
+        model: normalizerModel,
+        prompt,
+        promptFile,
+        diff: { diffContent: "", diffFile: "", type: "all" },
+        outputFormat: "",
+      })
 
-    const parsed = tryParseIssues(result.raw, reviewer, runtime, model)
-    return parsed.parsed ? parsed.issues : []
+      const parsed = tryParseIssues(result.raw, reviewer, runtime, model)
+      return parsed.parsed ? parsed.issues : []
+    })
   } catch (err) {
     console.error(`Warning: Normalizer failed for "${reviewer}" (${normalizerRuntime}/${normalizerModel}): ${err instanceof Error ? err.message : String(err)}`)
     return []
-  } finally {
-    try { fs.unlinkSync(promptFile) } catch {}
   }
 }

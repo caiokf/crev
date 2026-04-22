@@ -1,11 +1,9 @@
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
-import { extractJsonObject } from "./json-extract.js"
+import { extractAndParse } from "./json-extract.js"
 import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
-import { uniqueSuffix } from "../util/paths.js"
+import { REVIEW_CATEGORY_SET, REVIEW_SEVERITY_SET, TRIAGE_VERDICT_SET } from "./taxonomy.js"
+import { withTempPromptFile } from "./temp-prompt.js"
 
 type TriageInput = {
   issues: ReviewIssue[]
@@ -30,8 +28,8 @@ export type TriageFlags = {
   enrichComments: boolean
 }
 
-const VALID_SEVERITIES = new Set(["low", "medium", "high", "critical"])
-const VALID_CATEGORIES = new Set(["bug", "security", "performance", "style", "compliance", "architecture"])
+const VALID_SEVERITIES = REVIEW_SEVERITY_SET
+const VALID_CATEGORIES = REVIEW_CATEGORY_SET
 
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const start = performance.now()
@@ -225,61 +223,45 @@ export type RawTriageVerdict = {
 
 async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-triage-${process.pid}-${uniqueSuffix()}.txt`)
-  fs.writeFileSync(promptFile, prompt, "utf-8")
-
   try {
-    const rt = getRuntime(runtime)
-    const result = await rt.execute({
-      taskName: "Triage",
-      model,
-      prompt,
-      promptFile,
-      diff: { diffContent: "", diffFile: "", type: "all" },
-      outputFormat: "",
-    })
+    return await withTempPromptFile("crev-prompt-triage", prompt, async (promptFile) => {
+      const rt = getRuntime(runtime)
+      const result = await rt.execute({
+        taskName: "Triage",
+        model,
+        prompt,
+        promptFile,
+        diff: { diffContent: "", diffFile: "", type: "all" },
+        outputFormat: "",
+      })
 
-    return parseTriageResponse(result.raw)
+      return parseTriageResponse(result.raw)
+    })
   } catch (err) {
     console.error(`Warning: Triage failed (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
     return []
-  } finally {
-    try {
-      fs.unlinkSync(promptFile)
-    } catch {
-      // Best-effort cleanup
-    }
   }
 }
 
 export function parseTriageResponse(raw: string): RawTriageVerdict[] {
-  const jsonStr = extractJsonObject(raw, "triage")
-  if (!jsonStr) return []
+  const parsed = extractAndParse(raw, "triage")
+  if (!parsed || !Array.isArray(parsed.triage)) return []
 
-  try {
-    const parsed = JSON.parse(jsonStr) as { triage?: unknown[] }
-    if (!Array.isArray(parsed.triage)) return []
-
-    const validVerdicts = new Set(["actionable", "deferred", "dismissed"])
-
-    return parsed.triage
-      .map((item) => {
-        const v = item as Record<string, unknown>
-        const verdict = String(v.verdict ?? "actionable")
-        return {
-          id: String(v.id ?? ""),
-          verdict: (validVerdicts.has(verdict) ? verdict : "actionable") as RawTriageVerdict["verdict"],
-          reasoning: String(v.reasoning ?? ""),
-          duplicateOf: v.duplicateOf ? String(v.duplicateOf) : undefined,
-          correctedSeverity: v.correctedSeverity ? String(v.correctedSeverity) : undefined,
-          correctedCategory: v.correctedCategory ? String(v.correctedCategory) : undefined,
-          enrichment: parseEnrichment(v.enrichment),
-        }
-      })
-      .filter((v) => v.id)
-  } catch {
-    return []
-  }
+  return (parsed.triage as unknown[])
+    .map((item) => {
+      const v = item as Record<string, unknown>
+      const verdict = String(v.verdict ?? "actionable")
+      return {
+        id: String(v.id ?? ""),
+        verdict: (TRIAGE_VERDICT_SET.has(verdict) ? verdict : "actionable") as RawTriageVerdict["verdict"],
+        reasoning: String(v.reasoning ?? ""),
+        duplicateOf: v.duplicateOf ? String(v.duplicateOf) : undefined,
+        correctedSeverity: v.correctedSeverity ? String(v.correctedSeverity) : undefined,
+        correctedCategory: v.correctedCategory ? String(v.correctedCategory) : undefined,
+        enrichment: parseEnrichment(v.enrichment),
+      }
+    })
+    .filter((v) => v.id)
 }
 
 function parseEnrichment(value: unknown): TriageCommentEnrichment | undefined {

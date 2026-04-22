@@ -1,15 +1,13 @@
 import { execFile } from "node:child_process"
 import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { promisify } from "node:util"
 import { getRuntime } from "@caiokf/valet"
 import YAML from "yaml"
 import type { Config } from "./config.js"
-import { extractJsonObject } from "./json-extract.js"
+import { extractAndParse } from "./json-extract.js"
 import { listAllSchemas, resolveSchemaPath } from "./schema.js"
 import type { DiffSource } from "./types.js"
-import { uniqueSuffix } from "../util/paths.js"
+import { withTempPromptFile } from "./temp-prompt.js"
 
 const execFileAsync = promisify(execFile)
 
@@ -192,22 +190,21 @@ async function selectWithLlm(
   const prompt = buildSelectionPrompt(candidates, stats, analyze)
   const runtime = config.normalizer.runtime
   const model = config.normalizer.model
-  const promptFile = path.join(os.tmpdir(), `crev-schema-auto-select-${process.pid}-${uniqueSuffix()}.txt`)
-  fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {
-    const rt = getRuntime(runtime)
-    const result = await rt.execute({
-      taskName: "Auto-Schema",
-      model,
-      prompt,
-      promptFile,
-      diff: { diffContent: "", diffFile: "", type: "all" },
-      outputFormat: "",
-    })
+    return await withTempPromptFile("crev-schema-auto-select", prompt, async (promptFile) => {
+      const rt = getRuntime(runtime)
+      const result = await rt.execute({
+        taskName: "Auto-Schema",
+        model,
+        prompt,
+        promptFile,
+        diff: { diffContent: "", diffFile: "", type: "all" },
+        outputFormat: "",
+      })
 
-    const parsed = parseSelectionResponse(result.raw, candidates)
-    return parsed
+      return parseSelectionResponse(result.raw, candidates)
+    })
   } catch (err) {
     // Fallback: pick the first schema alphabetically
     const fallback = candidates[0].name
@@ -215,30 +212,17 @@ async function selectWithLlm(
       `Warning: Auto schema selection failed (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}. Using "${fallback}".`,
     )
     return { schema: fallback, reasoning: "Fallback after selection failure" }
-  } finally {
-    try {
-      fs.unlinkSync(promptFile)
-    } catch {
-      // Best-effort cleanup
-    }
   }
 }
 
 export function parseSelectionResponse(raw: string, candidates: SchemaCandidate[]): AutoSelectResult {
   const validNames = new Set(candidates.map((c) => c.name))
-  const jsonStr = extractJsonObject(raw, "schema")
+  const parsed = extractAndParse(raw, "schema")
 
-  if (jsonStr) {
-    try {
-      const parsed = JSON.parse(jsonStr) as { schema?: string; reasoning?: string }
-      if (parsed.schema && validNames.has(parsed.schema)) {
-        return {
-          schema: parsed.schema,
-          reasoning: String(parsed.reasoning ?? ""),
-        }
-      }
-    } catch {
-      // Fall through to fallback
+  if (parsed?.schema && validNames.has(String(parsed.schema))) {
+    return {
+      schema: String(parsed.schema),
+      reasoning: String(parsed.reasoning ?? ""),
     }
   }
 

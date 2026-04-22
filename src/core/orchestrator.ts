@@ -1,6 +1,3 @@
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { getRuntime, type RuntimeExecutionRequest } from "@caiokf/valet"
 import chalk from "chalk"
 import type { Config } from "./config.js"
@@ -16,7 +13,7 @@ import type { NormalizedReview, ReviewResult, OutputMode, ReviewTarget } from ".
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../tui/multi-spinner.js"
 import type { DiffInput } from "@caiokf/valet"
-import { uniqueSuffix } from "../util/paths.js"
+import { withTempPromptFile } from "./temp-prompt.js"
 
 // Re-export extracted modules for public API
 export { buildDiffReference, buildAnalyzeReference, extractChangedFiles, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
@@ -385,30 +382,26 @@ async function executeReviewer(
   const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
   const fullPrompt = built.fullPrompt
 
-  const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}-${uniqueSuffix()}.txt`)
-  fs.writeFileSync(promptFile, fullPrompt, "utf-8")
-
   const rtConfig = getRuntimeConfig(opts.config, runtimeName)
-  const request: RuntimeExecutionRequest = {
-    taskName: reviewer.name,
-    model,
-    prompt: fullPrompt,
-    promptFile,
-    diff: opts.diff,
-    outputFormat,
-    signal,
-    overrides: {
-      command: rtConfig.command,
-      env: rtConfig.env,
-      extraArgs: rtConfig.args,
-    },
-  }
+  const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
 
-  try {
+  return withTempPromptFile(`crev-prompt-${slug}`, fullPrompt, async (promptFile) => {
+    const request: RuntimeExecutionRequest = {
+      taskName: reviewer.name,
+      model,
+      prompt: fullPrompt,
+      promptFile,
+      diff: opts.diff,
+      outputFormat,
+      signal,
+      overrides: {
+        command: rtConfig.command,
+        env: rtConfig.env,
+        extraArgs: rtConfig.args,
+      },
+    }
+
     const rawResult = await runtime.execute(request)
     return normalizeOutput(reviewer.name, runtimeName, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
-  } finally {
-    try { fs.unlinkSync(promptFile) } catch {}
-  }
+  })
 }
