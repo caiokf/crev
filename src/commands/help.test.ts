@@ -1,5 +1,5 @@
 import { Command } from "commander"
-import { beforeEach, describe, expect, it, vi } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { VALID_MODELS } from "../core/schema.js"
 import { registerHelpCommand } from "./help.js"
 
@@ -14,6 +14,10 @@ describe("help command content", () => {
 
   beforeEach(() => {
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
   it("VALID_MODELS contains all expected runtimes", () => {
