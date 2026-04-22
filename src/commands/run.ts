@@ -3,6 +3,7 @@ import { execSync } from "node:child_process"
 import fs from "node:fs"
 import type { Command } from "commander"
 import chalk from "chalk"
+import { autoSelectSchema } from "../core/auto-schema.js"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { cleanupDiffFile, resolveDiff } from "../core/diff.js"
 import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
@@ -69,9 +70,24 @@ export function registerRunCommand(program: Command): void {
 
       const cmd = parsed.data
 
-      const schemaPath = resolveSchemaPath(cmd.schema, crevDir)
+      let resolvedSchemaName = cmd.schema
+      if (cmd.schema === "auto") {
+        try {
+          const selection = await autoSelectSchema(crevDir, config, cmd.diff, cmd.analyze)
+          resolvedSchemaName = selection.schema
+          if (!cmd.plain && cmd.output.kind !== "json" && cmd.output.kind !== "prompt-only") {
+            console.log(chalk.dim(`Auto-selected schema: ${resolvedSchemaName} (${selection.reasoning})`))
+          }
+        } catch (err) {
+          const reason = err instanceof Error ? err.message : String(err)
+          console.error(chalk.red(`Error: auto schema selection failed: ${reason}`))
+          process.exit(1)
+        }
+      }
+
+      const schemaPath = resolveSchemaPath(resolvedSchemaName, crevDir)
       if (!schemaPath) {
-        console.error(chalk.red(`Error: schema "${cmd.schema}" not found`))
+        console.error(chalk.red(`Error: schema "${resolvedSchemaName}" not found`))
         process.exit(1)
       }
       const schemaRaw = fs.readFileSync(schemaPath, "utf-8")
@@ -104,7 +120,7 @@ export function registerRunCommand(program: Command): void {
       if (!diff.diffContent.trim() && cmd.output.kind !== "prompt-only") {
         cleanupDiffFile(diff)
         if (cmd.output.kind === "json") {
-          console.log(JSON.stringify(buildEmptyResult(schemaName, schemaHash, slug, cmd, diff.type), null, 2))
+          console.log(JSON.stringify(buildEmptyResult(resolvedSchemaName, schemaHash, slug, cmd, diff.type), null, 2))
         } else {
           console.log("No diff content found. Nothing to review.")
         }
@@ -115,7 +131,7 @@ export function registerRunCommand(program: Command): void {
         try {
           const promptPreview = buildPromptOnlyResult({
             schema,
-            schemaName: cmd.schema,
+            schemaName: resolvedSchemaName,
             schemaHash,
             config,
             diff,
@@ -140,7 +156,7 @@ export function registerRunCommand(program: Command): void {
       try {
         result = await orchestrate({
           schema,
-          schemaName: cmd.schema,
+          schemaName: resolvedSchemaName,
           schemaHash,
           config,
           diff,
