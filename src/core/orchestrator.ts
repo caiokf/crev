@@ -1,4 +1,3 @@
-import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -16,6 +15,7 @@ import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../ui/multi-spinner.js"
 import { SEVERITY_ORDER, SEVERITY_COLORS } from "../ui/theme.js"
 import type { DiffInput } from "@caiokf/valet"
+import { uniqueSuffix } from "../util/paths.js"
 
 export type OrchestrateOptions = {
   schema: SchemaFileType
@@ -369,7 +369,7 @@ async function executeReviewer(
   const fullPrompt = built.fullPrompt
 
   const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}.txt`)
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}-${uniqueSuffix()}.txt`)
   fs.writeFileSync(promptFile, fullPrompt, "utf-8")
 
   const rtConfig = getRuntimeConfig(opts.config, runtimeName)
@@ -514,7 +514,7 @@ function writeOutput(result: ReviewResult, config: Config, slug: string, crevDir
     String(now.getHours()).padStart(2, "0") + String(now.getMinutes()).padStart(2, "0"),
   ].join("-")
 
-  const suffix = crypto.randomBytes(3).toString("hex")
+  const suffix = uniqueSuffix()
   const basename = `${datePart}-${slug}-${suffix}`
   const jsonPath = path.join(outputDir, `${basename}.json`)
 

@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { findProjectRoot } from "./paths.js"
+import { findProjectRoot, uniqueSuffix } from "./paths.js"
 
 describe("findProjectRoot", () => {
   let tmpDir: string
@@ -36,5 +36,17 @@ describe("findProjectRoot", () => {
     const emptyDir = path.join(tmpDir, "empty")
     fs.mkdirSync(emptyDir)
     expect(findProjectRoot(emptyDir)).toBe(emptyDir)
+  })
+})
+
+describe("uniqueSuffix", () => {
+  it("returns a 6-character hex string", () => {
+    const suffix = uniqueSuffix()
+    expect(suffix).toMatch(/^[0-9a-f]{6}$/)
+  })
+
+  it("generates different values on consecutive calls", () => {
+    const suffixes = new Set(Array.from({ length: 20 }, () => uniqueSuffix()))
+    expect(suffixes.size).toBe(20)
   })
 })

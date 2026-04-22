@@ -5,6 +5,7 @@ import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { ReviewIssue } from "./types.js"
+import { uniqueSuffix } from "../util/paths.js"
 
 type TriageInput = {
   issues: ReviewIssue[]
@@ -186,7 +187,7 @@ export type RawTriageVerdict = {
 
 async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
-  const promptFile = path.join(os.tmpdir(), `crev-prompt-triage-${process.pid}.txt`)
+  const promptFile = path.join(os.tmpdir(), `crev-prompt-triage-${process.pid}-${uniqueSuffix()}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {

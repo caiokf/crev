@@ -9,6 +9,7 @@ import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import { listAllSchemas, resolveSchemaPath } from "./schema.js"
 import type { DiffSource } from "./types.js"
+import { uniqueSuffix } from "../util/paths.js"
 
 const execFileAsync = promisify(execFile)
 
@@ -191,7 +192,7 @@ async function selectWithLlm(
   const prompt = buildSelectionPrompt(candidates, stats, analyze)
   const runtime = config.normalizer.runtime
   const model = config.normalizer.model
-  const promptFile = path.join(os.tmpdir(), `crev-auto-schema-${process.pid}.txt`)
+  const promptFile = path.join(os.tmpdir(), `crev-auto-schema-${process.pid}-${uniqueSuffix()}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
   try {

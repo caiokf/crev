@@ -94,7 +94,7 @@ export function registerRunCommand(program: Command): void {
       const schemaHash = crypto.createHash("sha256").update(schemaRaw).digest("hex").slice(0, 8)
       let schema: SchemaFileType
       try {
-        schema = loadSchemaFile(schemaPath)
+        schema = loadSchemaFile(schemaPath, config.aliases)
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)
         console.error(chalk.red(`Error: ${reason}`))
@@ -170,6 +170,7 @@ export function registerRunCommand(program: Command): void {
           reviewFile: cmd.target.kind === "merge" ? cmd.target.reviewFile : undefined,
         })
       } catch (err) {
+        cleanupDiffFile(diff)
         if (err instanceof UserCancelledError) {
           console.log(chalk.yellow("Review cancelled. No files saved."))
           return

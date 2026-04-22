@@ -94,10 +94,17 @@ export function parseSchemaFile(content: string): z.SafeParseReturnType<unknown,
   }
 }
 
-export function loadSchemaFile(schemaPath: string): SchemaFileType {
+export function loadSchemaFile(schemaPath: string, aliases?: Record<string, string>): SchemaFileType {
   const content = fs.readFileSync(schemaPath, "utf-8")
   try {
     const parsed = YAML.parse(content)
+    if (aliases && parsed?.reviewers) {
+      for (const reviewer of parsed.reviewers) {
+        if (reviewer.model && aliases[reviewer.model]) {
+          reviewer.model = aliases[reviewer.model]
+        }
+      }
+    }
     return ValidatedSchemaFile.parse(parsed)
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)

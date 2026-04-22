@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import fs from "node:fs"
 import path from "node:path"
 import chalk from "chalk"
@@ -29,6 +30,11 @@ export function getReviewsDir(crevDir: string): string {
 
 export function getDiffsDir(crevDir: string): string {
   return path.join(crevDir, "diffs")
+}
+
+/** Generate a short random hex suffix (e.g. "a3f1b2") for unique file names. */
+export function uniqueSuffix(): string {
+  return crypto.randomBytes(3).toString("hex")
 }
 
 export function writeIfNew(filePath: string, content: string): void {
