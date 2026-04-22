@@ -344,19 +344,17 @@ async function runSingleReviewer(
   outputFormat: string,
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
+  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
   const hasFailback = Object.keys(opts.config.failback).length > 0
 
   if (!hasFailback) {
-    return executeReviewer(reviewer, opts, outputFormat, reviewer.runtime, reviewer.model, signal)
+    return executeReviewer(reviewer, opts, built.fullPrompt, reviewer.runtime, built.model, signal)
   }
 
-  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
-  const baseModel = built.model
-
   const result = await withResilience(
-    (rt, mdl) => executeReviewer(reviewer, opts, outputFormat, rt, mdl, signal),
+    (rt, mdl) => executeReviewer(reviewer, opts, built.fullPrompt, rt, mdl, signal),
     reviewer.runtime,
-    baseModel,
+    built.model,
     opts.config,
     signal,
   )
@@ -374,15 +372,13 @@ async function runSingleReviewer(
 async function executeReviewer(
   reviewer: ReviewerConfig,
   opts: OrchestrateOptions,
-  outputFormat: string,
+  fullPrompt: string,
   runtimeName: string,
   modelName: string,
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
   const runtime = getRuntime(runtimeName)
   const model = modelName === DEFAULT_MODEL ? runtime.defaultModel : modelName
-  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
-  const fullPrompt = built.fullPrompt
 
   const rtConfig = getRuntimeConfig(opts.config, runtimeName)
   const slug = slugify(reviewer.name)
@@ -394,7 +390,7 @@ async function executeReviewer(
       prompt: fullPrompt,
       promptFile,
       diff: opts.diff,
-      outputFormat,
+      outputFormat: "",
       signal,
       overrides: {
         command: rtConfig.command,
