@@ -1,8 +1,16 @@
-import { describe, expect, it } from "vitest"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { buildTriagePrompt, parseTriageResponse, applyTriageVerdicts, runTriage } from "./triage.js"
 import type { RawTriageVerdict } from "./triage.js"
 import type { ReviewIssue } from "./types.js"
 import type { Config } from "./config.js"
+
+const valetMocks = vi.hoisted(() => ({
+  getRuntime: vi.fn(),
+}))
+
+vi.mock("@caiokf/valet", () => ({
+  getRuntime: valetMocks.getRuntime,
+}))
 
 const sampleIssue: ReviewIssue = {
   id: "security--xss-1",
@@ -340,6 +348,14 @@ describe("runTriage", () => {
     },
   } as Config
 
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
   it("returns empty result for zero issues", async () => {
     const result = await runTriage({
       issues: [],
@@ -349,5 +365,87 @@ describe("runTriage", () => {
     expect(result.triaged).toEqual([])
     expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
     expect(result.durationMs).toBeGreaterThanOrEqual(0)
+  })
+
+  it("applies verdicts from a successful triage runtime call", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({
+          triage: [
+            { id: "security--xss-1", verdict: "actionable", reasoning: "Real bug" },
+          ],
+        }),
+        durationMs: 100,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.summary.actionable).toBe(1)
+    expect(result.triaged[0].triage?.verdict).toBe("actionable")
+    expect(result.triaged[0].triage?.reasoning).toBe("Real bug")
+  })
+
+  it("returns issues unchanged with zeroed summary when runtime throws", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockRejectedValue(new Error("runtime crashed")),
+    })
+    const stderrSpy = vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.triaged).toHaveLength(1)
+    expect(result.triaged[0].triage).toBeUndefined()
+    expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
+    expect(stderrSpy).toHaveBeenCalledWith(expect.stringContaining("runtime crashed"))
+  })
+
+  it("returns issues unchanged when runtime returns malformed JSON", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: "this is not json at all",
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.triaged).toHaveLength(1)
+    expect(result.triaged[0].triage).toBeUndefined()
+    expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
+  })
+
+  it("returns issues unchanged when runtime returns empty triage array", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({ triage: [] }),
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.triaged).toHaveLength(1)
+    expect(result.triaged[0].triage).toBeUndefined()
+    expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
   })
 })
