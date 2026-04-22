@@ -1,4 +1,3 @@
-import crypto from "node:crypto"
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
@@ -6,6 +5,7 @@ import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
+import { uniqueSuffix } from "../util/paths.js"
 
 export async function normalizeOutput(
   reviewerName: string,
@@ -123,7 +123,7 @@ ${raw.slice(0, 100_000)}`
 
   const normalizerRuntime = config.normalizer.runtime
   const normalizerModel = config.normalizer.model
-  const suffix = crypto.randomBytes(4).toString("hex")
+  const suffix = uniqueSuffix()
   const promptFile = path.join(os.tmpdir(), `crev-prompt-normalizer-${process.pid}-${suffix}.txt`)
   fs.writeFileSync(promptFile, prompt, "utf-8")
 
