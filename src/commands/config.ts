@@ -3,29 +3,35 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import YAML from "yaml"
 import { findCrevDir, getConfigLayerPaths, loadAnnotatedConfig } from "../core/config.js"
+import { exitWithError, errorMessage } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 export function registerConfigCommand(program: Command): void {
   program
     .command("config")
-    .description("Show resolved configuration with source annotations")
-    .option("--json", "Machine-readable JSON output")
+    .description(COMMAND_DESCRIPTIONS.config)
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .option("--layers", "Show which config files are active")
     .action((opts) => {
-      const crevDir = findCrevDir()
+      try {
+        const crevDir = findCrevDir()
 
-      if (opts.layers) {
-        printLayers(crevDir, opts.json)
-        return
+        if (opts.layers) {
+          printLayers(crevDir, opts.json)
+          return
+        }
+
+        const { config, provenance } = loadAnnotatedConfig(crevDir)
+
+        if (opts.json) {
+          console.log(JSON.stringify({ config, provenance }, null, 2))
+          return
+        }
+
+        printAnnotatedYaml(config, provenance)
+      } catch (err) {
+        exitWithError(chalk.red(`Error: ${errorMessage(err)}`))
       }
-
-      const { config, provenance } = loadAnnotatedConfig(crevDir)
-
-      if (opts.json) {
-        console.log(JSON.stringify({ config, provenance }, null, 2))
-        return
-      }
-
-      printAnnotatedYaml(config, provenance)
     })
 }
 

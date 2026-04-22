@@ -3,14 +3,16 @@ import chalk from "chalk"
 import { getAllRuntimes } from "@caiokf/valet"
 import { findCrevDir } from "../core/config.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
+import { errorMessage } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 export function registerListCommand(program: Command): void {
   program
     .command("list")
-    .description("Discover schemas and runtimes")
+    .description(COMMAND_DESCRIPTIONS.list)
     .option("--schemas", "List schemas only")
     .option("--runtimes", "List runtimes only")
-    .option("--json", "Machine-readable JSON output")
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action((opts) => {
       const crevDir = findCrevDir()
       const jsonOutput = opts.json ?? false
@@ -29,7 +31,8 @@ export function registerListCommand(program: Command): void {
               description: schema.description ?? "",
               reviewers: schema.reviewers.length,
             }
-          } catch {
+          } catch (err) {
+            console.error(`Warning: Failed to load schema "${name}": ${errorMessage(err)}`)
             return { name, description: "error loading", reviewers: 0 }
           }
         })
