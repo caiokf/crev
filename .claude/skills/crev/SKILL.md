@@ -75,7 +75,7 @@ To add a personal schema available across all projects, place it in `~/.crev/sch
 1. Pick a schema: `crev list --schemas`
 2. Run: `crev run --schema <name> --base main`
 3. Read output from `.crev/reviews/<slug>.json`
-4. For each actionable issue: either fix it or post it to the PR as a comment
+4. For each issue: fix it or set `status: "wont-fix"` when intentionally not fixing
 5. Re-run to merge: `crev run --schema <name> --review-file .crev/reviews/<slug>.json`
 
 ### Reading Results
@@ -88,6 +88,7 @@ Output JSON structure:
 Each issue has:
 - `severity`: critical | high | medium | low
 - `category`: bug | security | performance | style | compliance | architecture
+- `status`: open | fixed | wont-fix (optional, defaults to open)
 - `triage.verdict`: actionable | deferred | dismissed (when triage enabled)
 - `triage.reasoning`: why triage decided that verdict
 - `triage.enrichment` (when `triage.enrichComments: true`):

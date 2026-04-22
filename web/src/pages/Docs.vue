@@ -679,6 +679,8 @@ jobs:
         <p class="lead">
           Running <code>crev init</code> generates a <code>SKILL.md</code> file
           for each coding agent you have installed (Claude Code, Codex CLI, etc.).
+          For Codex CLI projects, it also adds a managed <code>crev</code> section to
+          <code>AGENTS.md</code> so Codex can discover usage instructions directly.
           The agent reads this file automatically and knows how to run reviews,
           create schemas, show stats &mdash; no manual configuration needed.
         </p>
@@ -733,7 +735,7 @@ against a diff, normalizes findings, and optionally triages them.
 1. Pick a schema: `crev list --schemas`
 2. Run: `crev run --schema &lt;name&gt; --base main`
 3. Read output from `.crev/reviews/&lt;slug&gt;.json` (or `.md` if format is markdown/both)
-4. For each open issue: fix or mark as `wont-fix`
+4. For each issue: fix it or set `status: "wont-fix"` when intentionally not fixing
 5. Re-run to merge: `crev run --schema &lt;name&gt; --review-file ...`
 
 ### Reading Results
@@ -741,12 +743,12 @@ against a diff, normalizes findings, and optionally triages them.
 Output JSON structure:
 - `metadata` — slug, timestamp, schema used, diff info
 - `reviews[]` — per-reviewer: name, runtime, model, duration, issues
-- `summary` — totals by severity, category, status, reviewer, triage
+- `summary` — totals by severity, category, reviewer, triage
 
 Each issue has:
 - `severity`: critical | high | medium | low
 - `category`: bug | security | performance | style | compliance | architecture
-- `status`: open | fixed | wont-fix
+- `status`: open | fixed | wont-fix (optional, defaults to open)
 - `triage.verdict`: actionable | deferred | dismissed
 - `file`, `line`, `title`, `description`
 
