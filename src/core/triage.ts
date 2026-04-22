@@ -2,8 +2,9 @@ import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
-import { REVIEW_CATEGORY_SET, REVIEW_SEVERITY_SET, TRIAGE_VERDICT_SET } from "./taxonomy.js"
+import { REVIEW_CATEGORY_SET, REVIEW_SEVERITY_SET, TRIAGE_VERDICT_SET, MAX_DIFF_CHARS } from "./taxonomy.js"
 import { withTempPromptFile } from "./temp-prompt.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 type TriageInput = {
   issues: ReviewIssue[]
@@ -191,7 +192,7 @@ export function buildTriagePrompt(
 
 ${diffType === "analyze"
     ? `## Scope\nThis is a full codebase analysis, not a diff review. The issues below reference files in the repository.`
-    : `## The diff being reviewed\n\`\`\`diff\n${diffContent.slice(0, 80_000)}\n\`\`\``}
+    : `## The diff being reviewed\n\`\`\`diff\n${diffContent.slice(0, MAX_DIFF_CHARS)}\n\`\`\``}
 
 ## Issues found by reviewers (${issues.length} total)
 ${JSON.stringify(issuesSummary, null, 2)}
@@ -238,7 +239,7 @@ async function callTriageAgent(prompt: string, config: Config): Promise<RawTriag
       return parseTriageResponse(result.raw)
     })
   } catch (err) {
-    console.error(`Warning: Triage failed (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`Warning: Triage failed (${runtime}/${model}): ${errorMessage(err)}`)
     return []
   }
 }
