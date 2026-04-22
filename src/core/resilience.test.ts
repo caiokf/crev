@@ -53,6 +53,12 @@ describe("isRetryable", () => {
     expect(isRetryable(new Error("command not found: codex")).retryable).toBe(false)
   })
 
+  it("returns retryable for transient 'not found' errors (DNS, API 404)", () => {
+    expect(isRetryable(new Error("server not found")).retryable).toBe(true)
+    expect(isRetryable(new Error("resource not found")).retryable).toBe(true)
+    expect(isRetryable(new Error("endpoint not found")).retryable).toBe(true)
+  })
+
   it("returns retryable for non-Error values", () => {
     expect(isRetryable("some string error").retryable).toBe(true)
     expect(isRetryable(42).retryable).toBe(true)

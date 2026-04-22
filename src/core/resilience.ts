@@ -42,7 +42,7 @@ export function isRetryable(error: unknown): RetryableCheck {
     }
 
     // Command not found (runtime not installed)
-    if (msg.includes("enoent") || msg.includes("command not found") || msg.includes("not found")) {
+    if (msg.includes("enoent") || msg.includes("command not found")) {
       return { retryable: false, reason: "Runtime not installed" }
     }
   }
