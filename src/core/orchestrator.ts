@@ -8,6 +8,7 @@ import type { Config } from "./config.js"
 import { getOutputDir, loadAgentPrompt, resolveModelAlias, getRuntimeConfig, getOutputFormat } from "./config.js"
 import { cleanupDiffFile } from "./diff.js"
 import { normalizeOutput } from "./normalizer.js"
+import { withResilience } from "./resilience.js"
 import { runTriage } from "./triage.js"
 import { UserCancelledError } from "./types.js"
 import type { NormalizedReview, ReviewResult } from "./types.js"
@@ -318,16 +319,51 @@ async function runSingleReviewer(
   outputFormat: string,
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
-  const runtime = getRuntime(reviewer.runtime)
+  const hasFailback = Object.keys(opts.config.failback).length > 0
+
+  if (!hasFailback) {
+    return executeReviewer(reviewer, opts, outputFormat, reviewer.runtime, reviewer.model, signal)
+  }
+
   const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
-  const model = built.model
+  const baseModel = built.model
+
+  const result = await withResilience(
+    (rt, mdl) => executeReviewer(reviewer, opts, outputFormat, rt, mdl, signal),
+    reviewer.runtime,
+    baseModel,
+    opts.config,
+    signal,
+  )
+
+  if (result.fallback) {
+    const fb = result.fallback
+    console.error(
+      `Warning: ${reviewer.name} fell back from ${fb.originalRuntime}/${fb.originalModel} to ${result.runtime}/${result.model}: ${fb.reason}`,
+    )
+  }
+
+  return result
+}
+
+async function executeReviewer(
+  reviewer: ReviewerConfig,
+  opts: OrchestrateOptions,
+  outputFormat: string,
+  runtimeName: string,
+  modelName: string,
+  signal?: AbortSignal,
+): Promise<NormalizedReview> {
+  const runtime = getRuntime(runtimeName)
+  const model = modelName === "default" ? runtime.defaultModel : modelName
+  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
   const fullPrompt = built.fullPrompt
 
   const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
   const promptFile = path.join(os.tmpdir(), `crev-prompt-${slug}-${process.pid}.txt`)
   fs.writeFileSync(promptFile, fullPrompt, "utf-8")
 
-  const rtConfig = getRuntimeConfig(opts.config, reviewer.runtime)
+  const rtConfig = getRuntimeConfig(opts.config, runtimeName)
   const request: RuntimeExecutionRequest = {
     taskName: reviewer.name,
     model,
@@ -345,7 +381,7 @@ async function runSingleReviewer(
 
   try {
     const rawResult = await runtime.execute(request)
-    return normalizeOutput(reviewer.name, reviewer.runtime, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
+    return normalizeOutput(reviewer.name, runtimeName, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
   } finally {
     try { fs.unlinkSync(promptFile) } catch {}
   }

@@ -41,6 +41,7 @@ const configSchema = z.object({
       model: z.string().default("haiku"),
     })
     .default({}),
+  failback: z.record(z.string(), z.string()).default({}),
   triage: z
     .object({
       enabled: z.boolean().default(false),
