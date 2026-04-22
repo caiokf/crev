@@ -10,6 +10,7 @@ import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
 import { loadSchemaFile, resolveSchemaPath, type SchemaFileType } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
+import { exitWithError } from "../util/cli-errors.js"
 
 export function registerRunCommand(program: Command): void {
   program
@@ -34,8 +35,7 @@ export function registerRunCommand(program: Command): void {
 
       const schemaName = opts.schema ?? config.defaults.schema
       if (!schemaName) {
-        console.error(chalk.red("Error: --schema is required (no default configured in config.yaml)"))
-        process.exit(1)
+        exitWithError(chalk.red("Error: --schema is required (no default configured in config.yaml)"))
       }
 
       const effectiveBase = opts.base
@@ -64,8 +64,7 @@ export function registerRunCommand(program: Command): void {
       })
 
       if (!parsed.success) {
-        console.error(chalk.red(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`))
       }
 
       const cmd = parsed.data
@@ -80,15 +79,13 @@ export function registerRunCommand(program: Command): void {
           }
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err)
-          console.error(chalk.red(`Error: auto schema selection failed: ${reason}`))
-          process.exit(1)
+          exitWithError(chalk.red(`Error: auto schema selection failed: ${reason}`))
         }
       }
 
       const schemaPath = resolveSchemaPath(resolvedSchemaName, crevDir)
       if (!schemaPath) {
-        console.error(chalk.red(`Error: schema "${resolvedSchemaName}" not found`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: schema "${resolvedSchemaName}" not found`))
       }
       const schemaRaw = fs.readFileSync(schemaPath, "utf-8")
       const schemaHash = crypto.createHash("sha256").update(schemaRaw).digest("hex").slice(0, 8)
@@ -97,14 +94,12 @@ export function registerRunCommand(program: Command): void {
         schema = loadSchemaFile(schemaPath, config.aliases)
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)
-        console.error(chalk.red(`Error: ${reason}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: ${reason}`))
       }
 
       const reviewerFilterError = getReviewerFilterError(schema, cmd.reviewers)
       if (reviewerFilterError) {
-        console.error(chalk.red(`Error: ${reviewerFilterError}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: ${reviewerFilterError}`))
       }
 
       const slug = cmd.target.kind === "fresh" ? (cmd.target.slug ?? generateSlug()) : path.basename(cmd.target.reviewFile, ".json")
@@ -120,8 +115,7 @@ export function registerRunCommand(program: Command): void {
         })
       } catch (err) {
         const reason = err instanceof Error ? err.message : String(err)
-        console.error(chalk.red(`Error: failed to generate diff: ${reason}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: failed to generate diff: ${reason}`))
       }
 
       if (!diff.diffContent.trim() && cmd.output.kind !== "prompt-only") {
@@ -155,8 +149,7 @@ export function registerRunCommand(program: Command): void {
           return
         } catch (err) {
           const reason = err instanceof Error ? err.message : String(err)
-          console.error(chalk.red(`Error: ${reason}`))
-          process.exit(1)
+          exitWithError(chalk.red(`Error: ${reason}`))
         } finally {
           cleanupDiffFile(diff)
         }
@@ -172,8 +165,7 @@ export function registerRunCommand(program: Command): void {
           return
         }
         const reason = err instanceof Error ? err.message : String(err)
-        console.error(chalk.red(`Error: ${reason}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: ${reason}`))
       }
 
       if (cmd.output.kind === "json") {

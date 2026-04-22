@@ -4,6 +4,7 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { detectAITools } from "../util/detect-tools.js"
 import { writeSkill } from "../util/skills.js"
+import { exitWithError } from "../util/cli-errors.js"
 
 export function registerUpdateCommand(program: Command): void {
   program
@@ -14,8 +15,7 @@ export function registerUpdateCommand(program: Command): void {
       const crevDir = path.join(projectRoot, ".crev")
 
       if (!fs.existsSync(crevDir)) {
-        console.error(chalk.red("No .crev directory found. Run `crev init` first."))
-        process.exit(1)
+        exitWithError(chalk.red("No .crev directory found. Run `crev init` first."))
       }
 
       const tools = detectAITools(projectRoot)

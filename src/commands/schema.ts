@@ -5,6 +5,7 @@ import chalk from "chalk"
 import { findCrevDir } from "../core/config.js"
 import { listAllSchemas, resolveSchemaPath, parseSchemaFile, validateAgentRefs, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
+import { exitWithCode, exitWithError } from "../util/cli-errors.js"
 
 const TEMPLATE = `description: ""
 reviewers:
@@ -23,8 +24,7 @@ export function registerSchemaCommand(program: Command): void {
     .description("Scaffold an empty schema")
     .action((name) => {
       if (!/^[a-zA-Z0-9._-]{1,100}$/.test(name)) {
-        console.error(chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"))
-        process.exit(1)
+        exitWithError(chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"))
       }
 
       const crevDir = findCrevDir()
@@ -33,8 +33,7 @@ export function registerSchemaCommand(program: Command): void {
 
       const filePath = path.join(schemasDir, `${name}.yaml`)
       if (fs.existsSync(filePath)) {
-        console.error(chalk.red(`Error: Schema "${name}" already exists at ${filePath}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: Schema "${name}" already exists at ${filePath}`))
       }
 
       fs.writeFileSync(filePath, TEMPLATE, "utf-8")
@@ -51,8 +50,7 @@ export function registerSchemaCommand(program: Command): void {
       const schemaPath = resolveSchemaPath(schemaName, crevDir)
 
       if (!schemaPath) {
-        console.error(chalk.red(`Error: Schema "${schemaName}" not found`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: Schema "${schemaName}" not found`))
       }
 
       try {
@@ -84,8 +82,7 @@ export function registerSchemaCommand(program: Command): void {
         }
         console.log()
       } catch (e) {
-        console.error(chalk.red(`Error: ${e instanceof Error ? e.message : String(e)}`))
-        process.exit(1)
+        exitWithError(chalk.red(`Error: ${e instanceof Error ? e.message : String(e)}`))
       }
     })
 
@@ -120,8 +117,7 @@ export function registerSchemaCommand(program: Command): void {
         const schemaPath = path.resolve(file)
         results.push(await validateSingleSchema(schemaPath))
       } else {
-        console.error(chalk.red("Specify a schema file or use --all"))
-        process.exit(1)
+        exitWithError(chalk.red("Specify a schema file or use --all"))
       }
 
       if (jsonOutput) {
@@ -145,7 +141,7 @@ export function registerSchemaCommand(program: Command): void {
       }
 
       if (hasErrors) {
-        process.exit(1)
+        exitWithCode(1)
       }
     })
 }

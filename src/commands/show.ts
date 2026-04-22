@@ -5,6 +5,7 @@ import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
 import { SEVERITY_COLORS } from "../tui/theme.js"
+import { exitWithError, readFileOrDie } from "../util/cli-errors.js"
 
 export function registerShowCommand(program: Command): void {
   program
@@ -16,23 +17,16 @@ export function registerShowCommand(program: Command): void {
       const filePath = file ? path.resolve(file) : findLatestReview(crevDir)
 
       if (!filePath) {
-        console.error(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
-        process.exit(1)
+        exitWithError(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
       }
 
-      if (!fs.existsSync(filePath)) {
-        console.error(chalk.red(`Error: File not found: ${filePath}`))
-        process.exit(1)
-      }
-
-      const content = fs.readFileSync(filePath, "utf-8")
+      const content = readFileOrDie(filePath, "Review file")
       let result: ReviewResult
 
       try {
         result = JSON.parse(content) as ReviewResult
       } catch {
-        console.error(chalk.red("Error: Invalid JSON file"))
-        process.exit(1)
+        exitWithError(chalk.red("Error: Invalid JSON file"))
       }
 
       if (opts.json) {
