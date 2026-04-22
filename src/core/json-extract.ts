@@ -30,6 +30,22 @@ export function extractJsonObject(raw: string, key: string): string | null {
 }
 
 /**
+ * Extract a JSON object containing a given key and parse it.
+ * Returns null if extraction or parsing fails.
+ */
+export function extractAndParse(raw: string, key: string): Record<string, unknown> | null {
+  const jsonStr = extractJsonObject(raw, key)
+  if (!jsonStr) return null
+  try {
+    const parsed = JSON.parse(jsonStr)
+    if (parsed && typeof parsed === "object") return parsed as Record<string, unknown>
+    return null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Find the position of the closing `}` that matches the opening `{` at position 0.
  */
 function findMatchingBrace(s: string): number {
