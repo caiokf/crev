@@ -8,12 +8,14 @@ import { buildResult, writeOutput, mergeAndWriteOutput, formatOutputPath, printS
 import { buildReviewerPrompt, getOutputFormat } from "./prompt.js"
 import { withResilience } from "./resilience.js"
 import { runTriage } from "./triage.js"
+import { DEFAULT_MODEL } from "./taxonomy.js"
 import { UserCancelledError } from "./types.js"
 import type { NormalizedReview, ReviewResult, OutputMode, ReviewTarget } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
 import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type MultiSpinnerHandle } from "../tui/multi-spinner.js"
 import type { DiffInput } from "@caiokf/valet"
 import { withTempPromptFile } from "./temp-prompt.js"
+import { slugify } from "../util/paths.js"
 
 // Re-export extracted modules for public API
 export { buildDiffReference, buildAnalyzeReference, extractChangedFiles, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
@@ -378,12 +380,12 @@ async function executeReviewer(
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
   const runtime = getRuntime(runtimeName)
-  const model = modelName === "default" ? runtime.defaultModel : modelName
+  const model = modelName === DEFAULT_MODEL ? runtime.defaultModel : modelName
   const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
   const fullPrompt = built.fullPrompt
 
   const rtConfig = getRuntimeConfig(opts.config, runtimeName)
-  const slug = reviewer.name.toLowerCase().replace(/[^a-z0-9]+/g, "-")
+  const slug = slugify(reviewer.name)
 
   return withTempPromptFile(`crev-prompt-${slug}`, fullPrompt, async (promptFile) => {
     const request: RuntimeExecutionRequest = {

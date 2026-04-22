@@ -2,8 +2,10 @@ import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
-import { REVIEW_CATEGORIES, REVIEW_SEVERITIES } from "./taxonomy.js"
+import { REVIEW_CATEGORIES, REVIEW_SEVERITIES, MAX_RAW_CHARS } from "./taxonomy.js"
 import { withTempPromptFile } from "./temp-prompt.js"
+import { errorMessage } from "../util/cli-errors.js"
+import { slugify } from "../util/paths.js"
 
 export async function normalizeOutput(
   reviewerName: string,
@@ -78,10 +80,7 @@ function normalizeStatus(s: string): NonNullable<ReviewIssue["status"]> {
 }
 
 export function prefixId(id: string, reviewer: string): string {
-  const prefix = reviewer
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/-+$/, "")
+  const prefix = slugify(reviewer)
   if (id.startsWith(`${prefix}--`)) return id
   return `${prefix}--${id}`
 }
@@ -116,7 +115,7 @@ Return ONLY a JSON object with this exact structure:
 If there are no issues, return: { "issues": [] }
 
 Raw review output:
-${raw.slice(0, 100_000)}`
+${raw.slice(0, MAX_RAW_CHARS)}`
 
   const normalizerRuntime = config.normalizer.runtime
   const normalizerModel = config.normalizer.model
@@ -137,7 +136,7 @@ ${raw.slice(0, 100_000)}`
       return parsed.parsed ? parsed.issues : []
     })
   } catch (err) {
-    console.error(`Warning: Normalizer failed for "${reviewer}" (${normalizerRuntime}/${normalizerModel}): ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`Warning: Normalizer failed for "${reviewer}" (${normalizerRuntime}/${normalizerModel}): ${errorMessage(err)}`)
     return []
   }
 }
