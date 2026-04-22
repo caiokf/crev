@@ -40,8 +40,8 @@ reviewers:
       Only flag error messages and failure modes that hurt developer experience.
 
   - name: Config Coherence
-    runtime: gemini
-    model: gemini-2.5-pro
+    runtime: codex
+    model: gpt-5.4
     prompt: >
       You are a configuration systems expert auditing config/schema coherence.
       Review the codebase looking for:

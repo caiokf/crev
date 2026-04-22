@@ -62,8 +62,8 @@ reviewers:
       Only flag concrete duplication, dead code, and inconsistency.
 
   - name: File Organization
-    runtime: gemini
-    model: gemini-2.5-pro
+    runtime: codex
+    model: gpt-5.4
     prompt: >
       You are reviewing the project's file and folder organization.
       Review the directory structure looking for:

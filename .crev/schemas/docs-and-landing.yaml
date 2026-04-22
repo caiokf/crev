@@ -34,8 +34,8 @@ reviewers:
       Only flag help system inaccuracies and omissions.
 
   - name: Web Docs vs Code
-    runtime: gemini
-    model: gemini-2.5-pro
+    runtime: codex
+    model: gpt-5.4
     prompt: >
       You are auditing the web documentation site against actual codebase behavior.
       Compare web/src/pages/Docs.vue against src/core/ implementations.
