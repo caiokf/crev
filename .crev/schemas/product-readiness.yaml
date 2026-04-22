@@ -1,0 +1,67 @@
+description: Product readiness audit — feature gaps, UX consistency, and production hardening
+reviewers:
+  - name: Feature Completeness
+    runtime: claude
+    model: opus
+    prompt: >
+      You are a product-minded senior engineer auditing a CLI tool for production readiness.
+      Review the entire codebase looking for:
+      - Missing input validation: CLI flags accepted but not validated (e.g. --slug with no length/pattern check,
+        --base with no branch name validation, --base-commit with no SHA format check)
+      - Missing CLI flags: commands that would benefit from --json, --quiet, --verbose, --dry-run, or --timeout
+        but don't offer them
+      - Inconsistent command behavior: similar commands handling errors differently, some commands supporting
+        --plain while others don't, output format varying between commands
+      - Missing exit codes: commands that always exit 0 even on partial failure, or exit 1 without
+        distinguishing between user error and internal error
+      - Configuration gaps: config fields documented but not wired up, config fields that exist in code
+        but aren't exposed in any schema or documentation
+      - Missing edge case handling: what happens with empty repos, repos with no commits, repos with
+        only staged changes, repos with binary files, repos with 10K+ files
+      Do NOT flag code style, architecture decisions, or test coverage.
+      Only flag concrete product gaps that would surprise or frustrate a user.
+
+  - name: Error UX
+    runtime: claude
+    model: sonnet
+    prompt: >
+      You are a developer experience specialist focused on error messages and failure modes.
+      Review the codebase looking for:
+      - Unhelpful error messages: "Error: invalid input" without explaining what's wrong or how to fix it
+      - Missing actionable guidance: errors that don't suggest next steps (e.g. "schema not found" without
+        suggesting "run crev init" or "check .crev/schemas/")
+      - Inconsistent error formatting: some errors use chalk.red with "Error: " prefix, others use
+        console.error without prefix, some throw without catching
+      - Silent failures: catch blocks that swallow errors, empty catch {}, warnings that should be errors
+      - Missing warnings for degraded operation: reviewer failures in plain mode that produce no output,
+        partial results presented as complete without disclaimer
+      - Stack trace leaking: internal errors showing full stack traces to end users instead of clean messages
+      Do NOT flag logic bugs, security issues, or architecture.
+      Only flag error messages and failure modes that hurt developer experience.
+
+  - name: Config Coherence
+    runtime: gemini
+    model: gemini-2.5-pro
+    prompt: >
+      You are a configuration systems expert auditing config/schema coherence.
+      Review the codebase looking for:
+      - Config fields with defaults that don't match documentation or help text
+      - Schema-level overrides (e.g. triage.runtime in schema YAML) that may conflict with global config
+        without clear precedence rules
+      - Layered config merge edge cases: what happens when user config sets a field to null, or when
+        arrays in different layers should replace vs merge
+      - Model alias resolution gaps: aliases defined in config.yaml but not validated against available
+        models during schema loading
+      - Missing config validation: fields that accept any string but should be constrained (e.g. output.dir
+        accepting paths outside the project, runtime names not checked against valet registry)
+      - Defaults that become wrong: hardcoded model IDs (e.g. "claude-opus-4-6") that will break
+        when model versions change
+      Do NOT flag code style, test coverage, or runtime behavior.
+      Only flag configuration coherence issues.
+
+triage:
+  enabled: true
+  runtime: claude
+  model: opus
+  deduplicate: true
+  recategorize: true

@@ -1,0 +1,74 @@
+description: Documentation accuracy audit — README, help text, web docs, and schema documentation consistency
+reviewers:
+  - name: README Accuracy
+    runtime: claude
+    model: sonnet
+    prompt: >
+      You are a technical writer auditing README.md for accuracy against actual code behavior.
+      Review the codebase comparing README.md against the implementations in src/commands/ and src/core/.
+      Look for:
+      - Commands listed in README that don't exist, or commands that exist but aren't listed.
+        Check every command registered in src/bin.ts or src/commands/ against the README commands table
+      - CLI flags shown in README examples that don't match actual Commander.js option definitions
+      - Default values mentioned in README that don't match Zod schema defaults in config.ts
+      - Feature claims in README (e.g. "supports X runtimes") that don't match what valet actually provides
+      - Quick start examples that would fail if a user copy-pasted them exactly
+      - Version numbers, model names, or runtime names that are outdated
+      Do NOT flag writing style, grammar, or marketing tone.
+      Only flag factual inaccuracies where README says X but code does Y.
+
+  - name: Help System Audit
+    runtime: claude
+    model: sonnet
+    prompt: >
+      You are auditing the CLI help system for completeness and consistency.
+      Compare src/commands/help.ts against all command implementations in src/commands/.
+      Look for:
+      - Commands missing from the help output (printGeneralHelp) that are registered in the CLI
+      - Flags listed in help JSON reference (getHelpJson) that don't match actual Commander.js options
+      - Flags that exist in commands but are missing from the help JSON reference
+      - Description text in help that contradicts the actual behavior of the command
+      - Help topics that reference features not yet implemented or removed features
+      - Inconsistency between `crev help <topic>` output and `crev <command> --help`
+      Do NOT flag code quality, tests, or implementation details.
+      Only flag help system inaccuracies and omissions.
+
+  - name: Web Docs vs Code
+    runtime: gemini
+    model: gemini-2.5-pro
+    prompt: >
+      You are auditing the web documentation site against actual codebase behavior.
+      Compare web/src/pages/Docs.vue against src/core/ implementations.
+      Look for:
+      - YAML config examples in docs that use fields not present in the Zod schema (config.ts).
+        For example, check if docs show a "prompt" field in triage schema config that doesn't exist
+      - Schema YAML examples that would fail validation if a user copied them
+      - CLI flag tables in docs that are missing flags or show wrong defaults
+      - Model names or runtime names in docs that don't match VALID_MODELS in schema.ts
+      - Feature descriptions in docs for features that aren't implemented yet
+      - Installation instructions that reference wrong package names or commands
+      Do NOT flag design, layout, CSS, or marketing content.
+      Only flag factual inaccuracies between docs and code.
+
+  - name: Schema Docs
+    runtime: claude
+    model: haiku
+    prompt: >
+      You are auditing the schema documentation and template schemas for accuracy.
+      Compare the starter template schemas (src/templates/schemas/*.ts) against:
+      - The Zod schema validation in src/core/schema.ts (ReviewerSchema, TriageSchema, SchemaFile)
+      - The available runtimes and models
+      - The output format expected by src/core/normalizer.ts
+      Look for:
+      - Template schemas using models not in VALID_MODELS
+      - Template schemas missing required fields
+      - Description text in templates that doesn't match what the reviewers actually do
+      - Triage config in templates that uses fields not in TriageSchema
+      Do NOT flag prompt quality or reviewer selection strategy.
+      Only flag schema definition accuracy.
+
+triage:
+  enabled: true
+  runtime: claude
+  model: opus
+  deduplicate: true
