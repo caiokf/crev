@@ -100,20 +100,27 @@ export function loadSchemaFile(schemaPath: string, aliases?: Record<string, stri
   try {
     const parsed = YAML.parse(content)
     const validated = ValidatedSchemaFile.parse(parsed)
-    if (aliases) {
-      for (const reviewer of validated.reviewers) {
-        if (aliases[reviewer.model]) {
-          reviewer.model = aliases[reviewer.model]
-        }
-      }
-      if (validated.triage?.model && aliases[validated.triage.model]) {
-        validated.triage.model = aliases[validated.triage.model]
-      }
-    }
-    return validated
+    if (!aliases) return validated
+    return applyModelAliases(validated, aliases)
   } catch (err) {
     const reason = err instanceof Error ? err.message : String(err)
     throw new Error(`Invalid schema file "${schemaPath}": ${reason}`)
+  }
+}
+
+function applyModelAliases(schema: SchemaFileType, aliases: Record<string, string>): SchemaFileType {
+  return {
+    ...schema,
+    reviewers: schema.reviewers.map((reviewer) => ({
+      ...reviewer,
+      model: aliases[reviewer.model] ?? reviewer.model,
+    })),
+    triage: schema.triage
+      ? {
+          ...schema.triage,
+          model: schema.triage.model ? (aliases[schema.triage.model] ?? schema.triage.model) : schema.triage.model,
+        }
+      : schema.triage,
   }
 }
 
