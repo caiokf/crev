@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest"
-import { buildTriagePrompt, parseTriageResponse, applyTriageVerdicts } from "./triage.js"
+import { buildTriagePrompt, parseTriageResponse, applyTriageVerdicts, runTriage } from "./triage.js"
 import type { RawTriageVerdict } from "./triage.js"
 import type { ReviewIssue } from "./types.js"
+import type { Config } from "./config.js"
 
 const sampleIssue: ReviewIssue = {
   id: "security--xss-1",
@@ -317,5 +318,36 @@ describe("applyTriageVerdicts", () => {
     expect(result[0].triage?.verdict).toBe("actionable")
     expect(result[1].triage?.verdict).toBe("dismissed") // deduped
     expect(result[2].category).toBe("performance") // recategorized
+  })
+})
+
+describe("runTriage", () => {
+  const baseConfig = {
+    defaults: { schema: "quick", type: "all", base: "main" },
+    runtimes: {},
+    aliases: {},
+    diff: { exclude: [] },
+    output: { dir: ".crev/reviews", format: "json" },
+    normalizer: { enabled: true, runtime: "claude", model: "haiku" },
+    failback: {},
+    triage: {
+      enabled: true,
+      runtime: "claude",
+      model: "opus",
+      deduplicate: false,
+      recategorize: false,
+      prompt: "Triage these issues.",
+    },
+  } as Config
+
+  it("returns empty result for zero issues", async () => {
+    const result = await runTriage({
+      issues: [],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+    expect(result.triaged).toEqual([])
+    expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
+    expect(result.durationMs).toBeGreaterThanOrEqual(0)
   })
 })
