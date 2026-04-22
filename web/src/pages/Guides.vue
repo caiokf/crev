@@ -1,12 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue"
-import { RouterLink, useRoute } from "vue-router"
-
-const route = useRoute()
-const activeSection = ref("guide-pr")
-const docsExpanded = ref(false)
-const guidesExpanded = ref(true)
-const mobileNav = ref(false)
+import DocsLayout from "../components/DocsLayout.vue"
 
 const docSections = [
   { id: "getting-started", label: "Getting Started" },
@@ -21,7 +14,7 @@ const docSections = [
   { id: "skill", label: "SKILL.md" },
 ]
 
-const sections = [
+const guideSections = [
   { id: "guide-pr", label: "Review a PR" },
   { id: "guide-uncommitted", label: "Uncommitted Changes" },
   { id: "guide-committed", label: "Committed Changes" },
@@ -37,78 +30,19 @@ const sections = [
   { id: "guide-show", label: "Viewing Reviews" },
   { id: "guide-defaults", label: "Defaults & Tips" },
 ]
-
-function scrollTo(id: string) {
-  activeSection.value = id
-  mobileNav.value = false
-  const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-}
-
-onMounted(() => {
-  if (route.hash) {
-    const id = route.hash.slice(1)
-    activeSection.value = id
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          activeSection.value = e.target.id
-        }
-      }
-    },
-    { rootMargin: "-80px 0px -60% 0px", threshold: 0 },
-  )
-  sections.forEach((s) => {
-    const el = document.getElementById(s.id)
-    if (el) observer.observe(el)
-  })
-})
-
-watch(() => route.hash, (hash) => {
-  if (hash) scrollTo(hash.slice(1))
-})
 </script>
 
 <template>
-  <div class="docs">
-    <button class="mobile-nav-toggle" @click="mobileNav = !mobileNav">
-      &#9776; {{ mobileNav ? 'Close' : 'Menu' }}
-    </button>
-    <aside :class="['sidebar', { open: mobileNav }]">
-      <div class="sidebar-inner">
-        <button class="sidebar-title" :class="{ active: docsExpanded }" @click="docsExpanded = !docsExpanded">
-          <span class="toggle-icon">&#9656;</span> Documentation
-        </button>
-        <nav v-if="docsExpanded" class="sidebar-nav">
-          <RouterLink
-            v-for="s in docSections"
-            :key="s.id"
-            :to="'/docs#' + s.id"
-          >
-            {{ s.label }}
-          </RouterLink>
-        </nav>
-        <button class="sidebar-title" :class="{ active: guidesExpanded }" @click="guidesExpanded = !guidesExpanded">
-          <span class="toggle-icon">&#9656;</span> User Guides
-        </button>
-        <nav v-if="guidesExpanded" class="sidebar-nav">
-          <a
-            v-for="s in sections"
-            :key="s.id"
-            :href="'#' + s.id"
-            :class="{ active: activeSection === s.id }"
-            @click.prevent="scrollTo(s.id)"
-          >
-            {{ s.label }}
-          </a>
-        </nav>
-      </div>
-    </aside>
-
-    <main class="content">
+  <DocsLayout
+    :sections="guideSections"
+    :doc-sections="docSections"
+    :guide-sections="guideSections"
+    default-section="guide-pr"
+    active-page="guides"
+    :docs-expanded-default="false"
+    docs-link-prefix="/docs"
+    guides-link-prefix="/docs/guides"
+  >
       <!-- Review a PR -->
       <section id="guide-pr">
         <h1>Review a Pull Request</h1>
@@ -648,8 +582,7 @@ crev show --json | jq '.reviews[].issues[] | select(.severity == "high")'</code>
           </li>
         </ul>
       </section>
-    </main>
-  </div>
+  </DocsLayout>
 </template>
 
 <style scoped>

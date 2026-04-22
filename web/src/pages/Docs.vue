@@ -1,12 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from "vue"
-import { RouterLink, useRoute } from "vue-router"
+import DocsLayout from "../components/DocsLayout.vue"
 
-const route = useRoute()
-const activeSection = ref("getting-started")
-const docsExpanded = ref(true)
-const guidesExpanded = ref(true)
-const mobileNav = ref(false)
+const docSections = [
+  { id: "getting-started", label: "Getting Started" },
+  { id: "configuration", label: "Configuration" },
+  { id: "schemas", label: "Schemas" },
+  { id: "runtimes", label: "Runtimes" },
+  { id: "models", label: "Models" },
+  { id: "triage", label: "Triage" },
+  { id: "cli", label: "CLI Reference" },
+  { id: "ci-cd", label: "CI/CD" },
+  { id: "output", label: "Output Format" },
+  { id: "skill", label: "SKILL.md" },
+]
 
 const guideSections = [
   { id: "guide-pr", label: "Review a PR" },
@@ -24,91 +30,18 @@ const guideSections = [
   { id: "guide-show", label: "Viewing Reviews" },
   { id: "guide-defaults", label: "Defaults & Tips" },
 ]
-
-const sections = [
-  { id: "getting-started", label: "Getting Started" },
-  { id: "configuration", label: "Configuration" },
-  { id: "schemas", label: "Schemas" },
-  { id: "runtimes", label: "Runtimes" },
-  { id: "models", label: "Models" },
-  { id: "triage", label: "Triage" },
-  { id: "cli", label: "CLI Reference" },
-  { id: "ci-cd", label: "CI/CD" },
-  { id: "output", label: "Output Format" },
-  { id: "skill", label: "SKILL.md" },
-]
-
-function scrollTo(id: string) {
-  activeSection.value = id
-  mobileNav.value = false
-  const el = document.getElementById(id)
-  if (el) el.scrollIntoView({ behavior: "smooth", block: "start" })
-}
-
-onMounted(() => {
-  if (route.hash) {
-    const id = route.hash.slice(1)
-    activeSection.value = id
-  }
-
-  const observer = new IntersectionObserver(
-    (entries) => {
-      for (const e of entries) {
-        if (e.isIntersecting) {
-          activeSection.value = e.target.id
-        }
-      }
-    },
-    { rootMargin: "-80px 0px -60% 0px", threshold: 0 },
-  )
-  sections.forEach((s) => {
-    const el = document.getElementById(s.id)
-    if (el) observer.observe(el)
-  })
-})
-
-watch(() => route.hash, (hash) => {
-  if (hash) scrollTo(hash.slice(1))
-})
 </script>
 
 <template>
-  <div class="docs">
-    <button class="mobile-nav-toggle" @click="mobileNav = !mobileNav">
-      &#9776; {{ mobileNav ? 'Close' : 'Menu' }}
-    </button>
-    <aside :class="['sidebar', { open: mobileNav }]">
-      <div class="sidebar-inner">
-        <button class="sidebar-title" :class="{ active: docsExpanded }" @click="docsExpanded = !docsExpanded">
-          <span class="toggle-icon">&#9656;</span> Documentation
-        </button>
-        <nav v-if="docsExpanded" class="sidebar-nav">
-          <a
-            v-for="s in sections"
-            :key="s.id"
-            :href="'#' + s.id"
-            :class="{ active: activeSection === s.id }"
-            @click.prevent="scrollTo(s.id)"
-          >
-            {{ s.label }}
-          </a>
-        </nav>
-        <button class="sidebar-title sidebar-title-link" :class="{ active: guidesExpanded }" @click="guidesExpanded = !guidesExpanded">
-          <span class="toggle-icon">&#9656;</span> User Guides
-        </button>
-        <nav v-if="guidesExpanded" class="sidebar-nav">
-          <RouterLink
-            v-for="s in guideSections"
-            :key="s.id"
-            :to="'/docs/guides#' + s.id"
-          >
-            {{ s.label }}
-          </RouterLink>
-        </nav>
-      </div>
-    </aside>
-
-    <main class="content">
+  <DocsLayout
+    :sections="docSections"
+    :doc-sections="docSections"
+    :guide-sections="guideSections"
+    default-section="getting-started"
+    active-page="docs"
+    docs-link-prefix="/docs"
+    guides-link-prefix="/docs/guides"
+  >
       <!-- Getting Started -->
       <section id="getting-started">
         <h1>Getting Started</h1>
@@ -897,8 +830,7 @@ Use `crev stats` to evaluate reviewer signal-to-noise:
 4. `--json` for machine-readable output</code></pre>
         </div>
       </section>
-    </main>
-  </div>
+  </DocsLayout>
 </template>
 
 <style scoped>
