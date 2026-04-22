@@ -6,6 +6,7 @@ import { findCrevDir } from "../core/config.js"
 import { listAllSchemas, resolveSchemaPath, parseSchemaFile, validateAgentRefs, loadSchemaFile } from "../core/schema.js"
 import { getSchemasDir } from "../util/paths.js"
 import { exitWithCode, exitWithError } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 const TEMPLATE = `description: ""
 reviewers:
@@ -16,12 +17,12 @@ reviewers:
 `
 
 export function registerSchemaCommand(program: Command): void {
-  const schema = program.command("schema").description("Schema management")
+  const schema = program.command("schema").description(COMMAND_DESCRIPTIONS.schema)
 
   // --- schema init ---
   schema
     .command("init <name>")
-    .description("Scaffold an empty schema")
+    .description(COMMAND_DESCRIPTIONS.schemaInit)
     .action((name) => {
       if (!/^[a-zA-Z0-9._-]{1,100}$/.test(name)) {
         exitWithError(chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"))
@@ -43,8 +44,8 @@ export function registerSchemaCommand(program: Command): void {
   // --- schema show ---
   schema
     .command("show <name>")
-    .description("Display schema details")
-    .option("--json", "Machine-readable JSON output")
+    .description(COMMAND_DESCRIPTIONS.schemaShow)
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action((schemaName, opts) => {
       const crevDir = findCrevDir()
       const schemaPath = resolveSchemaPath(schemaName, crevDir)
@@ -89,9 +90,9 @@ export function registerSchemaCommand(program: Command): void {
   // --- schema validate ---
   schema
     .command("validate [file]")
-    .description("Validate schemas")
+    .description(COMMAND_DESCRIPTIONS.schemaValidate)
     .option("--all", "Validate all schemas in .crev/schemas/")
-    .option("--json", "Machine-readable JSON output")
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action(async (file, opts) => {
       const crevDir = findCrevDir()
       const jsonOutput = opts.json ?? false

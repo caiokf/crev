@@ -5,11 +5,12 @@ import chalk from "chalk"
 import { detectAITools } from "../util/detect-tools.js"
 import { writeSkill } from "../util/skills.js"
 import { exitWithError } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 export function registerUpdateCommand(program: Command): void {
   program
     .command("update [path]")
-    .description("Regenerate AI tool skills")
+    .description(COMMAND_DESCRIPTIONS.update)
     .action(async (initPath) => {
       const projectRoot = initPath ? path.resolve(initPath) : process.cwd()
       const crevDir = path.join(projectRoot, ".crev")

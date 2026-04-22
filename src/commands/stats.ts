@@ -5,6 +5,7 @@ import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
 import { exitWithError } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 type ReviewerStats = {
   reviewer: string
@@ -41,10 +42,10 @@ type RevisionGroup = {
 export function registerStatsCommand(program: Command): void {
   program
     .command("stats")
-    .description("Aggregate review statistics across runs")
+    .description(COMMAND_DESCRIPTIONS.stats)
     .option("--schema <name>", "Filter by schema name")
     .option("--history", "Show all schema revisions with comparison deltas")
-    .option("--json", "Machine-readable JSON output")
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action((opts) => {
       const crevDir = findCrevDir()
       const config = loadLayeredConfig(crevDir)

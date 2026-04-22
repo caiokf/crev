@@ -14,8 +14,7 @@ import { registerStatsCommand } from "./stats.js"
 import { registerUpdateCommand } from "./update.js"
 
 async function runHelp(args: string[]) {
-  const program = new Command()
-  registerHelpCommand(program)
+  const program = buildProgram()
   await program.parseAsync(["help", ...args], { from: "user" })
 }
 
@@ -84,19 +83,34 @@ describe("help command content", () => {
 
   it("keeps help --json command flags aligned with registered Commander options", () => {
     const program = buildProgram()
-    const reference = getFullReference() as {
-      commands: Array<{ name: string; flags?: string[] }>
+    const reference = getFullReference(program) as {
+      commands: Array<{ name: string; description: string; flags?: string[] }>
     }
 
     for (const entry of reference.commands) {
       const cmd = findCommandByPath(program, entry.name)
       expect(cmd, `Missing command in registration: ${entry.name}`).toBeDefined()
 
-      const declaredFlags = new Set((cmd?.options ?? []).map((opt) => opt.long).filter(Boolean))
+      expect(cmd?.description()).toBe(entry.description)
+
+      const declaredFlags = new Set(
+        (cmd?.options ?? [])
+          .map((opt) => opt.long)
+          .filter((flag): flag is string => Boolean(flag) && flag !== "--help"),
+      )
+      const documentedFlags = new Set(entry.flags ?? [])
+
       for (const flag of entry.flags ?? []) {
         expect(
           declaredFlags.has(flag),
           `Command "${entry.name}" is missing flag "${flag}" declared in help --json`,
+        ).toBe(true)
+      }
+
+      for (const flag of declaredFlags) {
+        expect(
+          documentedFlags.has(flag),
+          `Command "${entry.name}" has undocumented flag "${flag}" in help --json`,
         ).toBe(true)
       }
     }

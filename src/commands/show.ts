@@ -6,12 +6,13 @@ import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
 import { SEVERITY_COLORS } from "../tui/theme.js"
 import { exitWithError, readFileOrDie } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 export function registerShowCommand(program: Command): void {
   program
     .command("show [file]")
-    .description("Pretty-print a review artifact (default: latest)")
-    .option("--json", "Machine-readable JSON output")
+    .description(COMMAND_DESCRIPTIONS.show)
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action((file, opts) => {
       const crevDir = findCrevDir()
       const filePath = file ? path.resolve(file) : findLatestReview(crevDir)

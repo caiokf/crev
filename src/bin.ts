@@ -11,10 +11,11 @@ import { registerInitCommand } from "./commands/init.js"
 import { registerUpdateCommand } from "./commands/update.js"
 import { registerStatsCommand } from "./commands/stats.js"
 import { registerConfigCommand } from "./commands/config.js"
+import { ROOT_PROGRAM_DESCRIPTION } from "./commands/metadata.js"
 
 program
   .name("crev")
-  .description("AI-powered multi-reviewer code review CLI")
+  .description(ROOT_PROGRAM_DESCRIPTION)
   .version(CREV_VERSION)
 
 registerRunCommand(program)
