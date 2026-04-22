@@ -5,6 +5,7 @@ import { z } from "zod"
 import YAML from "yaml"
 import { annotatedMerge, deepMerge, type ProvenanceMap } from "./merge.js"
 import { resolveAgentPath, type AgentPathContext } from "./agent-path.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 const runtimeConfigSchema = z.object({
   command: z.string().optional(),
@@ -100,8 +101,7 @@ function loadRawYaml(filePath: string): Record<string, unknown> | null {
     const parsed = YAML.parse(raw)
     return parsed && typeof parsed === "object" ? parsed : null
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err)
-    throw new Error(`Invalid YAML in ${filePath}: ${reason}`)
+    throw new Error(`Invalid YAML in ${filePath}: ${errorMessage(err)}`)
   }
 }
 

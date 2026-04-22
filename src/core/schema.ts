@@ -5,6 +5,7 @@ import YAML from "yaml"
 import { getAllRuntimes, getRuntimeNames } from "@caiokf/valet"
 import { getUserCrevDir } from "./config.js"
 import { resolveAgentPath, type AgentPathContext } from "./agent-path.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 // Single source of truth: derived from runtime adapters
 export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(
@@ -91,7 +92,7 @@ export function parseSchemaFile(content: string): z.SafeParseReturnType<unknown,
     const parsed = YAML.parse(content)
     return ValidatedSchemaFile.safeParse(parsed)
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err)
+    const reason = errorMessage(err)
     return invalidSchemaParseResult(`Invalid YAML: ${reason}`)
   }
 }
@@ -104,7 +105,7 @@ export function loadSchemaFile(schemaPath: string, aliases?: Record<string, stri
     if (!aliases) return validated
     return applyModelAliases(validated, aliases)
   } catch (err) {
-    const reason = err instanceof Error ? err.message : String(err)
+    const reason = errorMessage(err)
     throw new Error(`Invalid schema file "${schemaPath}": ${reason}`)
   }
 }

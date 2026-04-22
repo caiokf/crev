@@ -10,6 +10,7 @@ import { checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
 import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-?]*[ -/]*[@-~]/g
 const ANSI_OSC_REGEX = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
@@ -393,7 +394,7 @@ async function runPingTests(
           model,
           pass: false,
           durationMs: performance.now() - start,
-          error: err instanceof Error ? err.message : String(err),
+          error: errorMessage(err),
         })
       } finally {
         try { fs.unlinkSync(promptFile) } catch {}

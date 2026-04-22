@@ -10,6 +10,7 @@ import { configTemplate } from "../templates/config.js"
 import { quickSchema } from "../templates/schemas/quick.js"
 import { standardSchema } from "../templates/schemas/standard.js"
 import { thoroughSchema } from "../templates/schemas/thorough.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 const BANNER = `
   ${chalk.cyan("██████")} ${chalk.cyan("████████")}  ${chalk.cyan("████████")} ${chalk.cyan("██")}     ${chalk.cyan("██")}
@@ -177,7 +178,7 @@ async function scaffold(
       }
     }
   } catch (err) {
-    console.log(`  ${chalk.dim("Health check failed:")} ${err instanceof Error ? err.message : String(err)}`)
+    console.error(`  ${chalk.dim("Health check failed:")} ${errorMessage(err)}`)
   }
 
   console.log()

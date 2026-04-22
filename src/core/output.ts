@@ -6,6 +6,7 @@ import { getOutputDir } from "./config.js"
 import type { NormalizedReview, ReviewResult } from "./types.js"
 import { SEVERITY_ORDER, SEVERITY_COLORS } from "../tui/theme.js"
 import { uniqueSuffix } from "../util/paths.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 import type { OrchestrateOptions } from "./orchestrator.js"
 
@@ -97,7 +98,7 @@ export function mergeAndWriteOutput(newResult: ReviewResult, existingFilePath: s
     }
     existing = parsed as ReviewResult
   } catch (err) {
-    throw new Error(`--review-file ${existingFilePath} contains invalid JSON: ${err instanceof Error ? err.message : String(err)}`)
+    throw new Error(`--review-file ${existingFilePath} contains invalid JSON: ${errorMessage(err)}`)
   }
 
   const existingReviewerNames = new Set(existing.reviews.map((r) => r.reviewer))

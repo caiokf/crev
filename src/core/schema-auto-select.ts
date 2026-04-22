@@ -8,6 +8,7 @@ import { extractAndParse } from "./json-extract.js"
 import { listAllSchemas, resolveSchemaPath } from "./schema.js"
 import type { DiffSource } from "./types.js"
 import { withTempPromptFile } from "./temp-prompt.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 const execFileAsync = promisify(execFile)
 
@@ -209,7 +210,7 @@ async function selectWithLlm(
     // Fallback: pick the first schema alphabetically
     const fallback = candidates[0].name
     console.error(
-      `Warning: Auto schema selection failed (${runtime}/${model}): ${err instanceof Error ? err.message : String(err)}. Using "${fallback}".`,
+      `Warning: Auto schema selection failed (${runtime}/${model}): ${errorMessage(err)}. Using "${fallback}".`,
     )
     return { schema: fallback, reasoning: "Fallback after selection failure" }
   }

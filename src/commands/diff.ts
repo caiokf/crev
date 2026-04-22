@@ -3,7 +3,7 @@ import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
 import { RawDiffFlags } from "../core/types.js"
-import { exitWithError } from "../util/cli-errors.js"
+import { errorMessage, exitWithError } from "../util/cli-errors.js"
 
 export function registerDiffCommand(program: Command): void {
   program
@@ -37,7 +37,7 @@ export function registerDiffCommand(program: Command): void {
           crevDir,
         })
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err)
+        const reason = errorMessage(err)
         exitWithError(chalk.red(`Error: failed to generate diff: ${reason}`))
       }
 

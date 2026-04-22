@@ -10,7 +10,7 @@ import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
 import { loadSchemaFile, resolveSchemaPath, type SchemaFileType } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
-import { exitWithError } from "../util/cli-errors.js"
+import { errorMessage, exitWithError } from "../util/cli-errors.js"
 
 export function registerRunCommand(program: Command): void {
   program
@@ -78,7 +78,7 @@ export function registerRunCommand(program: Command): void {
             console.log(chalk.dim(`Auto-selected schema: ${resolvedSchemaName} (${selection.reasoning})`))
           }
         } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err)
+          const reason = errorMessage(err)
           exitWithError(chalk.red(`Error: auto schema selection failed: ${reason}`))
         }
       }
@@ -93,7 +93,7 @@ export function registerRunCommand(program: Command): void {
       try {
         schema = loadSchemaFile(schemaPath, config.aliases)
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err)
+        const reason = errorMessage(err)
         exitWithError(chalk.red(`Error: ${reason}`))
       }
 
@@ -114,7 +114,7 @@ export function registerRunCommand(program: Command): void {
           crevDir,
         })
       } catch (err) {
-        const reason = err instanceof Error ? err.message : String(err)
+        const reason = errorMessage(err)
         exitWithError(chalk.red(`Error: failed to generate diff: ${reason}`))
       }
 
@@ -148,7 +148,7 @@ export function registerRunCommand(program: Command): void {
           console.log(JSON.stringify(promptPreview, null, 2))
           return
         } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err)
+          const reason = errorMessage(err)
           exitWithError(chalk.red(`Error: ${reason}`))
         } finally {
           cleanupDiffFile(diff)
@@ -164,7 +164,7 @@ export function registerRunCommand(program: Command): void {
           console.log(chalk.yellow("Review cancelled. No files saved."))
           return
         }
-        const reason = err instanceof Error ? err.message : String(err)
+        const reason = errorMessage(err)
         exitWithError(chalk.red(`Error: ${reason}`))
       }
 

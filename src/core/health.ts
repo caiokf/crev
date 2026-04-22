@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { getAllRuntimes, type RuntimeHealth } from "@caiokf/valet"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "./schema.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 export type SchemaReadiness = {
   name: string
@@ -85,8 +86,7 @@ export function checkSchemaReadiness(
 
       return { name, ready: issues.length === 0, issues }
     } catch (err) {
-      const reason = err instanceof Error ? err.message : String(err)
-      return { name, ready: false, issues: [`failed to load schema: ${reason}`] }
+      return { name, ready: false, issues: [`failed to load schema: ${errorMessage(err)}`] }
     }
   })
 }
