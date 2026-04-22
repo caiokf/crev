@@ -74,25 +74,93 @@ To add a personal schema available across all projects, place it in \`~/.crev/sc
 
 1. Pick a schema: \`crev list --schemas\`
 2. Run: \`crev run --schema <name> --base main\`
-3. Read output from \`.crev/reviews/<slug>.json\` (or \`.md\` if format is markdown/both)
-4. For each open issue: fix the code or mark as \`wont-fix\` in the JSON
+3. Read output from \`.crev/reviews/<slug>.json\`
+4. For each actionable issue: either fix it or post it to the PR as a comment
 5. Re-run to merge: \`crev run --schema <name> --review-file .crev/reviews/<slug>.json\`
 
 ### Reading Results
 
-Output format is controlled by \`output.format\` in config.yaml: \`json\` (default), \`markdown\`, or \`both\`.
-
 Output JSON structure:
 - \`metadata\` — slug, timestamp, schema used, diff info
 - \`reviews[]\` — per-reviewer: name, runtime, model, duration, issues
-- \`summary\` — totals by severity, category, status, reviewer, triage
+- \`summary\` — totals by severity, category, reviewer, triage
 
 Each issue has:
 - \`severity\`: critical | high | medium | low
 - \`category\`: bug | security | performance | style | compliance | architecture
-- \`status\`: open | fixed | wont-fix
 - \`triage.verdict\`: actionable | deferred | dismissed (when triage enabled)
+- \`triage.reasoning\`: why triage decided that verdict
+- \`triage.enrichment\` (when \`triage.enrichComments: true\`):
+  - \`title\`: issue headline used in PR comment
+  - \`context\`: short evidence paragraph (where + what + risk)
+  - \`minimalFix.summary\`: one-line fix strategy
+  - \`minimalFix.language\`: code fence language (\`diff\`, \`ts\`, \`js\`, \`yaml\`, \`bash\`, \`text\`)
+  - \`minimalFix.patch\`: concrete minimal patch/snippet
+  - \`promptForAgents\`: explicit prompt another agent can run to verify/fix
 - \`file\`, \`line\`, \`title\`, \`description\`
+
+Enrichment shape:
+\\\`\\\`\\\`json
+{
+  "triage": {
+    "verdict": "actionable",
+    "reasoning": "Missing IAM permission will cause runtime AccessDenied.",
+    "enrichment": {
+      "title": "Add IAM permission for the new M2M secret ARN",
+      "context": "Line 102 adds the secret env var, but the role policy still only allows old secret ARNs.",
+      "minimalFix": {
+        "summary": "Include the new secret ARN in \`secretsmanager:GetSecretValue\` resources.",
+        "language": "diff",
+        "patch": "- old\\\\n+ new"
+      },
+      "promptForAgents": "Verify the finding against current code and patch the role policy with the new ARN."
+    }
+  }
+}
+\\\`\\\`\\\`
+
+### Posting PR Comments (CodeRabbit Style)
+
+When the user asks to post findings to the PR:
+1. Ensure triage enrichment is enabled (\`triage.enrichComments: true\`) before running review.
+2. Only post issues where \`triage.verdict === "actionable"\`.
+3. Post one comment per issue.
+4. Use the markdown template below exactly, including collapsible blocks.
+5. Keep \`minimalFix.patch\` and \`promptForAgents\` verbatim from triage enrichment.
+6. If enrichment is missing, synthesize it from the issue + triage reasoning before posting.
+
+Severity badge mapping:
+- \`critical\` → \`🔴 Critical\`
+- \`high\` → \`🟠 High\`
+- \`medium\` → \`🟡 Medium\`
+- \`low\` → \`🔵 Low\`
+
+Exact comment template:
+\\\`\\\`\\\`\\\`md
+⚠️ **Potential issue** | {{severity_badge}}
+
+**{{triage.enrichment.title}}**
+
+{{triage.enrichment.context}}
+
+<details>
+<summary>💡 Minimal fix</summary>
+
+{{triage.enrichment.minimalFix.summary}}
+
+\\\`\\\`\\\`{{triage.enrichment.minimalFix.language}}
+{{triage.enrichment.minimalFix.patch}}
+\\\`\\\`\\\`
+</details>
+
+<details>
+<summary>🤖 Prompt for AI Agents</summary>
+
+\\\`\\\`\\\`text
+{{triage.enrichment.promptForAgents}}
+\\\`\\\`\\\`
+</details>
+\\\`\\\`\\\`\\\`
 
 ### Creating a Schema
 
@@ -119,6 +187,7 @@ triage:
   enabled: true
   runtime: claude
   model: opus
+  enrichComments: true
 \\\`\\\`\\\`
 
 Per-reviewer fields:
