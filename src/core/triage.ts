@@ -23,6 +23,14 @@ type TriageResult = {
   }
 }
 
+export type TriageFlags = {
+  deduplicate: boolean
+  recategorize: boolean
+}
+
+const VALID_SEVERITIES = new Set(["low", "medium", "high", "critical"])
+const VALID_CATEGORIES = new Set(["bug", "security", "performance", "style", "compliance", "architecture"])
+
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const start = performance.now()
   const { issues, diffContent, diffType, config } = input
@@ -35,19 +43,15 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
     }
   }
 
-  const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType)
+  const flags: TriageFlags = {
+    deduplicate: config.triage.deduplicate,
+    recategorize: config.triage.recategorize,
+  }
+
+  const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
   const verdicts = await callTriageAgent(prompt, config)
 
-  const triaged = issues.map((issue) => {
-    const verdict = verdicts.find((v) => v.id === issue.id)
-    if (verdict) {
-      return { ...issue, triage: { verdict: verdict.verdict, reasoning: verdict.reasoning } }
-    }
-    return {
-      ...issue,
-      triage: { verdict: "actionable" as const, reasoning: "No triage verdict returned." },
-    }
-  })
+  const triaged = applyTriageVerdicts(issues, verdicts, flags)
 
   const summary = {
     actionable: triaged.filter((i) => i.triage?.verdict === "actionable").length,
@@ -62,11 +66,59 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   }
 }
 
+export function applyTriageVerdicts(
+  issues: ReviewIssue[],
+  verdicts: RawTriageVerdict[],
+  flags: TriageFlags,
+): ReviewIssue[] {
+  const issueMap = new Map(issues.map((i) => [i.id, i]))
+
+  const triaged = issues.map((issue) => {
+    const verdict = verdicts.find((v) => v.id === issue.id)
+    if (!verdict) {
+      return {
+        ...issue,
+        triage: { verdict: "actionable" as const, reasoning: "No triage verdict returned." },
+      }
+    }
+
+    const result = { ...issue }
+
+    // Apply dedup: mark as dismissed if it's a duplicate of another issue
+    if (flags.deduplicate && verdict.duplicateOf) {
+      const canonical = issueMap.get(verdict.duplicateOf)
+      if (canonical && canonical.id !== issue.id) {
+        result.triage = {
+          verdict: "dismissed",
+          reasoning: `Duplicate of ${verdict.duplicateOf}: ${verdict.reasoning}`,
+        }
+        return result
+      }
+    }
+
+    // Apply recategorize: correct severity/category if the triage model suggests it
+    if (flags.recategorize) {
+      if (verdict.correctedSeverity && VALID_SEVERITIES.has(verdict.correctedSeverity)) {
+        result.severity = verdict.correctedSeverity as ReviewIssue["severity"]
+      }
+      if (verdict.correctedCategory && VALID_CATEGORIES.has(verdict.correctedCategory)) {
+        result.category = verdict.correctedCategory as ReviewIssue["category"]
+      }
+    }
+
+    result.triage = { verdict: verdict.verdict, reasoning: verdict.reasoning }
+    return result
+  })
+
+  return triaged
+}
+
 export function buildTriagePrompt(
   issues: ReviewIssue[],
   diffContent: string,
   triageInstructions: string,
   diffType?: string,
+  flags?: TriageFlags,
 ): string {
   const issuesSummary = issues.map((issue) => ({
     id: issue.id,
@@ -79,7 +131,27 @@ export function buildTriagePrompt(
     description: issue.description,
   }))
 
-  return `${triageInstructions}
+  const dedupSection = flags?.deduplicate
+    ? `\n\n## Deduplication\nMultiple reviewers may have flagged the same underlying issue. If two or more issues describe the same problem (even with different wording), mark all but the best-described one as duplicates by setting "duplicateOf" to the ID of the canonical issue.`
+    : ""
+
+  const recategorizeSection = flags?.recategorize
+    ? `\n\n## Re-categorization\nIf a reviewer has assigned the wrong severity or category, correct it. Set "correctedSeverity" and/or "correctedCategory" only when the original classification is clearly wrong. Valid severities: low, medium, high, critical. Valid categories: bug, security, performance, style, compliance, architecture.`
+    : ""
+
+  const extraFields = (flags?.deduplicate || flags?.recategorize)
+    ? [
+        ...(flags.deduplicate ? [`      "duplicateOf": "canonical-issue-id or null"`] : []),
+        ...(flags.recategorize ? [
+          `      "correctedSeverity": "low | medium | high | critical or null",`,
+          `      "correctedCategory": "bug | security | performance | style | compliance | architecture or null"`,
+        ] : []),
+      ].join(",\n")
+    : ""
+
+  const extraFieldsBlock = extraFields ? `,\n${extraFields}` : ""
+
+  return `${triageInstructions}${dedupSection}${recategorizeSection}
 
 ${diffType === "analyze"
     ? `## Scope\nThis is a full codebase analysis, not a diff review. The issues below reference files in the repository.`
@@ -97,16 +169,19 @@ Respond ONLY with valid JSON matching this exact schema:
     {
       "id": "the-issue-id",
       "verdict": "actionable | deferred | dismissed",
-      "reasoning": "1-2 sentences explaining your position"
+      "reasoning": "1-2 sentences explaining your position"${extraFieldsBlock}
     }
   ]
 }`
 }
 
-type RawTriageVerdict = {
+export type RawTriageVerdict = {
   id: string
   verdict: "actionable" | "deferred" | "dismissed"
   reasoning: string
+  duplicateOf?: string
+  correctedSeverity?: string
+  correctedCategory?: string
 }
 
 async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
@@ -156,6 +231,9 @@ export function parseTriageResponse(raw: string): RawTriageVerdict[] {
           id: String(v.id ?? ""),
           verdict: (validVerdicts.has(verdict) ? verdict : "actionable") as RawTriageVerdict["verdict"],
           reasoning: String(v.reasoning ?? ""),
+          duplicateOf: v.duplicateOf ? String(v.duplicateOf) : undefined,
+          correctedSeverity: v.correctedSeverity ? String(v.correctedSeverity) : undefined,
+          correctedCategory: v.correctedCategory ? String(v.correctedCategory) : undefined,
         }
       })
       .filter((v) => v.id)

@@ -34,6 +34,8 @@ export const TriageSchema = z
     enabled: z.boolean().default(false),
     runtime: RuntimeName.optional(),
     model: z.string().optional(),
+    deduplicate: z.boolean().optional(),
+    recategorize: z.boolean().optional(),
   })
   .refine((t) => !t.enabled || (t.runtime && t.model), {
     message: "Triage requires runtime and model when enabled",

@@ -46,6 +46,8 @@ const configSchema = z.object({
       enabled: z.boolean().default(false),
       runtime: z.string().default("claude"),
       model: z.string().default("opus"),
+      deduplicate: z.boolean().default(false),
+      recategorize: z.boolean().default(false),
       prompt: z
         .string()
         .default(

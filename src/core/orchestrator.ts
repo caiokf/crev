@@ -262,6 +262,8 @@ async function runTriagePass(
           enabled: true,
           runtime: schemaTriage.runtime ?? opts.config.triage.runtime,
           model: schemaTriage.model ?? opts.config.triage.model,
+          deduplicate: schemaTriage.deduplicate ?? opts.config.triage.deduplicate,
+          recategorize: schemaTriage.recategorize ?? opts.config.triage.recategorize,
         },
       }
     : opts.config
@@ -283,8 +285,15 @@ async function runTriagePass(
 
   for (const triaged of result.triaged) {
     const original = allIssues.find((i) => i.id === triaged.id)
-    if (original && triaged.triage) {
+    if (!original) continue
+    if (triaged.triage) {
       original.triage = triaged.triage
+    }
+    if (triaged.severity !== original.severity) {
+      original.severity = triaged.severity
+    }
+    if (triaged.category !== original.category) {
+      original.category = triaged.category
     }
   }
 
