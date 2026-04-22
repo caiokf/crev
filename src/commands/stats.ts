@@ -4,6 +4,7 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { findCrevDir, loadLayeredConfig, getOutputDir } from "../core/config.js"
 import type { ReviewResult } from "../core/types.js"
+import { exitWithError } from "../util/cli-errors.js"
 
 type ReviewerStats = {
   reviewer: string
@@ -50,15 +51,19 @@ export function registerStatsCommand(program: Command): void {
       const outputDir = getOutputDir(config, crevDir)
 
       if (!fs.existsSync(outputDir)) {
-        console.error(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
-        process.exit(1)
+        exitWithError(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
       }
 
-      const reviews = loadAllReviews(outputDir)
+      const { reviews, skippedFiles } = loadAllReviews(outputDir)
+      if (skippedFiles.length > 0) {
+        const detail = skippedFiles.length <= 5
+          ? skippedFiles.map((f) => path.basename(f)).join(", ")
+          : `${skippedFiles.slice(0, 5).map((f) => path.basename(f)).join(", ")} and ${skippedFiles.length - 5} more`
+        console.error(chalk.yellow(`Warning: skipped ${skippedFiles.length} invalid review file${skippedFiles.length !== 1 ? "s" : ""}: ${detail}`))
+      }
 
       if (reviews.length === 0) {
-        console.error(chalk.red("No review files found. Run a review first with: crev run --schema <name>"))
-        process.exit(1)
+        exitWithError(chalk.red("No valid review files found. Run a review first with: crev run --schema <name>"))
       }
 
       // Filter by schema if requested
@@ -67,8 +72,7 @@ export function registerStatsCommand(program: Command): void {
         : reviews
 
       if (filtered.length === 0) {
-        console.error(chalk.red(`No reviews found for schema "${opts.schema}"`))
-        process.exit(1)
+        exitWithError(chalk.red(`No reviews found for schema "${opts.schema}"`))
       }
 
       // Group by schema name
@@ -99,19 +103,23 @@ export function registerStatsCommand(program: Command): void {
     })
 }
 
-function loadAllReviews(outputDir: string): ReviewResult[] {
-  return fs
+function loadAllReviews(outputDir: string): { reviews: ReviewResult[]; skippedFiles: string[] } {
+  const skippedFiles: string[] = []
+  const reviews = fs
     .readdirSync(outputDir)
     .filter((f) => f.endsWith(".json"))
     .sort()
     .flatMap((f) => {
+      const filePath = path.join(outputDir, f)
       try {
-        const content = fs.readFileSync(path.join(outputDir, f), "utf-8")
+        const content = fs.readFileSync(filePath, "utf-8")
         return [JSON.parse(content) as ReviewResult]
       } catch {
+        skippedFiles.push(filePath)
         return []
       }
     })
+  return { reviews, skippedFiles }
 }
 
 function buildRevisions(reviews: ReviewResult[]): RevisionGroup[] {
