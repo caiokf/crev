@@ -7,6 +7,8 @@ import { getAllRuntimes, type RuntimeHealth, type RuntimeAdapter } from "@caiokf
 import { findCrevDir, loadLayeredConfig, getRuntimeConfig } from "../core/config.js"
 import { resolveModelAlias } from "../core/config.js"
 import type { Config } from "../core/config.js"
+import { collectRuntimeHealth, checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
+import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../ui/ansi.js"
 
@@ -22,66 +24,22 @@ export function registerDoctorCommand(program: Command): void {
       const jsonOutput = opts.json ?? false
       const cols = process.stdout.columns ?? 80
 
-      // Collect which runtimes are used by which schemas
       const schemas = listAllSchemas(crevDir)
-      const runtimeUsage = new Map<string, string[]>()
-      const schemaLoadErrors = new Map<string, string>()
-      for (const name of schemas) {
-        try {
-          const schemaPath = resolveSchemaPath(name, crevDir)
-          if (!schemaPath) continue
-          const schema = loadSchemaFile(schemaPath)
-          for (const reviewer of schema.reviewers) {
-            const list = runtimeUsage.get(reviewer.runtime) ?? []
-            list.push(name)
-            runtimeUsage.set(reviewer.runtime, list)
-          }
-          if (schema.triage?.enabled && schema.triage.runtime) {
-            const list = runtimeUsage.get(schema.triage.runtime) ?? []
-            if (!list.includes(name)) list.push(name)
-            runtimeUsage.set(schema.triage.runtime, list)
-          }
-        } catch (err) {
-          schemaLoadErrors.set(name, err instanceof Error ? err.message : String(err))
-        }
-      }
-
       const config = loadLayeredConfig(crevDir)
-
-      // Check all runtimes in parallel with simple progress indicator
-      const allRuntimes = getAllRuntimes()
-      const allHealthResults: RuntimeHealth[] = new Array(allRuntimes.length)
-
       const isTTY = process.stdout.isTTY && !jsonOutput
-      let checked = 0
 
+      // Collect runtime health via shared service
       if (isTTY) {
-        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${allRuntimes.length}`)}`)
+        const total = getAllRuntimes().length
+        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${total}`)}`)
       }
 
-      await Promise.all(
-        allRuntimes.map(async (runtime, i) => {
-          try {
-            allHealthResults[i] = await runtime.healthCheck()
-          } catch (e) {
-            allHealthResults[i] = {
-              name: runtime.name,
-              command: runtime.name,
-              installed: false,
-              version: null,
-              authenticated: "unknown",
-              authDetail: String(e),
-              error: String(e),
-            }
-          }
-          checked++
-          if (isTTY) {
-            process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${allRuntimes.length}`)}`)
-          }
-        }),
+      const allHealthResults = await collectRuntimeHealth(
+        isTTY ? (checked, total) => {
+          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${total}`)}`)
+        } : undefined,
       )
 
-      // Clear progress line
       if (isTTY) {
         process.stdout.write("\r\x1B[2K")
       }
@@ -91,38 +49,11 @@ export function registerDoctorCommand(program: Command): void {
         ? allHealthResults
         : allHealthResults.filter((h) => h.installed)
 
-      // Check project setup
       const projectChecks = checkProjectSetup(crevDir)
+      const schemaReadiness = checkSchemaReadiness(crevDir, allHealthResults)
 
-      // Determine schema readiness
-      const schemaReadiness = schemas.map((name) => {
-        try {
-          const resolved = resolveSchemaPath(name, crevDir)
-          if (!resolved) return { name, ready: false, issues: ["Schema file not found"] }
-          const schema = loadSchemaFile(resolved)
-          const issues: string[] = []
-          for (const reviewer of schema.reviewers) {
-            const health = allHealthResults.find((h) => h.name === reviewer.runtime)
-            if (!health || !health.installed) {
-              issues.push(`${reviewer.runtime}: not installed — reviewer "${reviewer.name}" will fail`)
-            } else if (health.authenticated === "no") {
-              issues.push(`${reviewer.runtime}: not authenticated — reviewer "${reviewer.name}" will fail`)
-            }
-          }
-          if (schema.triage?.enabled && schema.triage.runtime) {
-            const health = allHealthResults.find((h) => h.name === schema.triage!.runtime)
-            if (!health || !health.installed) {
-              issues.push(`${schema.triage.runtime}: not installed — triage will fail`)
-            } else if (health.authenticated === "no") {
-              issues.push(`${schema.triage.runtime}: not authenticated — triage will fail`)
-            }
-          }
-          return { name, ready: issues.length === 0, issues }
-        } catch (err) {
-          const reason = err instanceof Error ? err.message : String(err)
-          return { name, ready: false, issues: [`failed to load schema: ${reason}`] }
-        }
-      })
+      // Build runtime usage map for JSON output
+      const runtimeUsage = buildRuntimeUsageMap(crevDir, schemas)
 
       let pingResults: PingResult[] | undefined
       if (opts.ping) {
@@ -233,14 +164,6 @@ export function registerDoctorCommand(program: Command): void {
     })
 }
 
-type ProjectCheck = { name: string; ok: boolean; detail: string }
-
-type SchemaReadiness = {
-  name: string
-  ready: boolean
-  issues: string[]
-}
-
 type DoctorJsonPayload = {
   runtimes: Array<RuntimeHealth & { usedIn: string[] }>
   schemas: SchemaReadiness[]
@@ -270,37 +193,24 @@ export function buildDoctorJsonPayload(input: {
   return payload
 }
 
-function checkProjectSetup(crevDir: string): ProjectCheck[] {
-  const checks: ProjectCheck[] = []
-
-  checks.push({
-    name: ".crev/config.yaml",
-    ok: fs.existsSync(path.join(crevDir, "config.yaml")),
-    detail: fs.existsSync(path.join(crevDir, "config.yaml")) ? "valid" : "missing",
-  })
-
-  const schemaCount = listAllSchemas(crevDir).length
-  checks.push({
-    name: "schemas",
-    ok: schemaCount > 0,
-    detail: schemaCount > 0 ? `${schemaCount} schema${schemaCount !== 1 ? "s" : ""}` : "empty",
-  })
-
-  checks.push({
-    name: ".crev/reviews/",
-    ok: fs.existsSync(path.join(crevDir, "reviews")),
-    detail: fs.existsSync(path.join(crevDir, "reviews")) ? "exists" : "missing",
-  })
-
-  checks.push({
-    name: ".crev/diffs/",
-    ok: fs.existsSync(path.join(crevDir, "diffs")),
-    detail: fs.existsSync(path.join(crevDir, "diffs")) ? "exists" : "missing",
-  })
-
-  return checks
+function buildRuntimeUsageMap(crevDir: string, schemas: string[]): Map<string, string[]> {
+  const usage = new Map<string, string[]>()
+  for (const name of schemas) {
+    try {
+      const schemaPath = resolveSchemaPath(name, crevDir)
+      if (!schemaPath) continue
+      const schema = loadSchemaFile(schemaPath)
+      for (const reviewer of schema.reviewers) {
+        const list = usage.get(reviewer.runtime) ?? []
+        list.push(name)
+        usage.set(reviewer.runtime, list)
+      }
+    } catch {
+      // Skip schemas that can't be loaded
+    }
+  }
+  return usage
 }
-
 
 /**
  * Responsive runtime line — progressively adds detail based on terminal width.

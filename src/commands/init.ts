@@ -140,73 +140,40 @@ async function scaffold(
     writeSkill(projectRoot, tool)
   }
 
-  // Run auto-doctor
+  // Run auto-doctor using shared health service
   console.log()
   console.log(chalk.dim("Running health check..."))
   console.log()
 
   try {
-    const { getAllRuntimes } = await import("@caiokf/valet")
-    const { listSchemas, loadSchemaFile } = await import("../core/schema.js")
+    const { collectRuntimeHealth, checkSchemaReadiness } = await import("../core/health.js")
 
-    const schemasDir = path.join(crevDir, "schemas")
-    const schemaNames = listSchemas(schemasDir)
+    const healthResults = await collectRuntimeHealth()
 
-    // Collect referenced runtimes
-    const referencedRuntimes = new Set<string>()
-    for (const name of schemaNames) {
-      try {
-        const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
-        for (const r of schema.reviewers) referencedRuntimes.add(r.runtime)
-      } catch (err) {
-        console.log(`  ${chalk.red("✗")} ${name}.yaml: ${err instanceof Error ? err.message : String(err)}`)
-      }
-    }
-
-    // Check each referenced runtime
-    for (const name of referencedRuntimes) {
-      try {
-        const allRuntimes = getAllRuntimes()
-        const runtime = allRuntimes.find((r) => r.name === name)
-        if (runtime) {
-          const health = await runtime.healthCheck()
-          const installed = health.installed ? chalk.green("✓ installed") : chalk.red("✗ not found")
-          const auth =
-            health.authenticated === "yes"
-              ? chalk.green("✓ auth'd")
-              : health.authenticated === "no"
-                ? chalk.red("✗ no auth")
-                : chalk.yellow("? unknown")
-          console.log(`  ${name.padEnd(16)} ${installed}  ${auth}`)
-        }
-      } catch (err) {
-        console.log(`  ${name.padEnd(16)} ${chalk.red("✗ error:")} ${err instanceof Error ? err.message : String(err)}`)
-      }
+    // Show only installed runtimes
+    for (const health of healthResults) {
+      if (!health.installed) continue
+      const installed = chalk.green("✓ installed")
+      const auth =
+        health.authenticated === "yes"
+          ? chalk.green("✓ auth'd")
+          : health.authenticated === "no"
+            ? chalk.red("✗ no auth")
+            : chalk.yellow("? unknown")
+      console.log(`  ${health.name.padEnd(16)} ${installed}  ${auth}`)
     }
 
     // Schema readiness
-    console.log()
-    for (const name of schemaNames) {
-      try {
-        const schema = loadSchemaFile(path.join(schemasDir, `${name}.yaml`))
-        const issues: string[] = []
-        for (const r of schema.reviewers) {
-          const allRuntimes = getAllRuntimes()
-          const runtime = allRuntimes.find((rt) => rt.name === r.runtime)
-          if (runtime) {
-            const health = await runtime.healthCheck()
-            if (!health.installed || health.authenticated === "no") {
-              issues.push(`${r.runtime} not ready`)
-            }
-          }
-        }
-        if (issues.length === 0) {
-          console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.green("✓ ready")}`)
+    const schemaReadiness = checkSchemaReadiness(crevDir, healthResults)
+    if (schemaReadiness.length > 0) {
+      console.log()
+      for (const schema of schemaReadiness) {
+        const label = `${schema.name}.yaml`.padEnd(20)
+        if (schema.ready) {
+          console.log(`  ${label}${chalk.green("✓ ready")}`)
         } else {
-          console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.red("✗ " + issues.join(", "))}`)
+          console.log(`  ${label}${chalk.red("✗ " + schema.issues.join(", "))}`)
         }
-      } catch (err) {
-        console.log(`  ${`${name}.yaml`.padEnd(20)}${chalk.red("✗ load failed:")} ${err instanceof Error ? err.message : String(err)}`)
       }
     }
   } catch (err) {
