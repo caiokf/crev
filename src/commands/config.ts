@@ -65,17 +65,19 @@ function printAnnotatedYaml(config: Record<string, unknown>, provenance: Record<
   const yamlStr = YAML.stringify(config, { indent: 2 })
   const lines = yamlStr.split("\n")
 
-  // Build a path tracker to annotate lines
-  const annotations = buildLineAnnotations(config, provenance)
+  // Build a path tracker to annotate lines by index.
+  // Using line text as the key is incorrect when repeated lines exist
+  // (for example multiple "enabled: true" leaves in different sections).
+  const annotations = buildLineAnnotations(lines, provenance)
 
   console.log()
-  for (const line of lines) {
+  for (const [lineNumber, line] of lines.entries()) {
     if (!line.trim()) {
       console.log()
       continue
     }
 
-    const annotation = annotations.get(line)
+    const annotation = annotations.get(lineNumber)
     if (annotation) {
       console.log(`${line}  ${chalk.dim(`# ${annotation}`)}`)
     } else {
@@ -89,21 +91,16 @@ function printAnnotatedYaml(config: Record<string, unknown>, provenance: Record<
  * This is a best-effort approach that matches leaf key-value lines.
  */
 function buildLineAnnotations(
-  config: Record<string, unknown>,
+  lines: string[],
   provenance: Record<string, string>,
-): Map<string, string> {
-  const annotations = new Map<string, string>()
-
-  // Generate YAML and match paths to lines
-  const yamlDoc = new YAML.Document(config)
-  const yamlStr = yamlDoc.toString({ indent: 2 })
-  const lines = yamlStr.split("\n")
+): Map<number, string> {
+  const annotations = new Map<number, string>()
 
   // Track current path by indent level
   const pathStack: string[] = []
   let prevIndent = -1
 
-  for (const line of lines) {
+  for (const [lineNumber, line] of lines.entries()) {
     if (!line.trim() || line.trim().startsWith("#")) continue
 
     const indent = line.length - line.trimStart().length
@@ -129,7 +126,7 @@ function buildLineAnnotations(
     if (value && !value.startsWith("|") && !value.startsWith(">")) {
       const source = provenance[dotpath]
       if (source) {
-        annotations.set(line, source)
+        annotations.set(lineNumber, source)
       }
     }
 
@@ -137,7 +134,7 @@ function buildLineAnnotations(
     if (!value) {
       const source = provenance[dotpath]
       if (source) {
-        annotations.set(line, source)
+        annotations.set(lineNumber, source)
       }
     }
   }

@@ -77,4 +77,26 @@ describe("registerConfigCommand", () => {
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })
+
+  it("keeps provenance annotations distinct when YAML has repeated line text", async () => {
+    configMocks.findCrevDir.mockReturnValue("/tmp/project/.crev")
+    configMocks.loadAnnotatedConfig.mockReturnValue({
+      config: {
+        normalizer: { enabled: true },
+        triage: { enabled: true },
+      },
+      provenance: {
+        "normalizer.enabled": "~/.crev/config.yaml",
+        "triage.enabled": ".crev/config.local.yaml",
+      },
+    })
+
+    await runConfig([])
+
+    const renderedLines = logSpy.mock.calls.map(([line]) => String(line))
+    const enabledLines = renderedLines.filter((line) => line.includes("enabled: true"))
+    expect(enabledLines).toHaveLength(2)
+    expect(enabledLines[0]).toContain("# ~/.crev/config.yaml")
+    expect(enabledLines[1]).toContain("# .crev/config.local.yaml")
+  })
 })
