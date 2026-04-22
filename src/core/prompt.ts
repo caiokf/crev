@@ -1,6 +1,6 @@
 import { getRuntime } from "@caiokf/valet"
 import type { DiffInput } from "@caiokf/valet"
-import { loadAgentPrompt, getOutputFormat } from "./config.js"
+import { loadAgentPrompt } from "./config.js"
 import type { ReviewerConfig } from "./schema.js"
 
 export const UNTRUSTED_INPUT_WARNING = [
@@ -82,4 +82,24 @@ export function extractChangedFiles(diffContent: string): string[] {
     }
   }
   return [...files]
+}
+
+export function getOutputFormat(): string {
+  return JSON.stringify(
+    {
+      issues: [
+        {
+          id: "unique-issue-id",
+          file: "exact/path/from/source/headers.ts",
+          line: 0,
+          severity: "low | medium | high | critical",
+          category: "bug | security | performance | style | compliance | architecture",
+          title: "Short title of the issue",
+          description: "Detailed description of the issue and suggested fix",
+        },
+      ],
+    },
+    null,
+    2,
+  ) + "\n\nIMPORTANT: For the \"file\" field, use the exact file paths as they appear in the source headers (e.g. \"--- packages/cli/src/commands/init.ts ---\"). Do NOT abbreviate or invent paths."
 }
