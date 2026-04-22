@@ -242,9 +242,12 @@ async function executeReviewersWithTui(
   }
 
   const results: NormalizedReview[] = []
-  for (const entry of settled) {
+  for (let i = 0; i < settled.length; i++) {
+    const entry = settled[i]
     if (entry.status === "fulfilled" && entry.value && entry.value.exitCode === 0) {
       results.push(entry.value)
+    } else if (entry.status === "rejected") {
+      console.error(`Warning: ${reviewers[i].name} failed: ${entry.reason instanceof Error ? entry.reason.message : String(entry.reason)}`)
     }
   }
 

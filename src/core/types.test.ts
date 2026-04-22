@@ -84,6 +84,22 @@ describe("RawRunFlags validation", () => {
     expect(result.success).toBe(false)
   })
 
+  it("rejects --slug with path traversal", () => {
+    const result = RawRunFlags.safeParse({ ...valid, slug: "../../tmp/evil" })
+    expect(result.success).toBe(false)
+  })
+
+  it("rejects --slug over 100 characters", () => {
+    const result = RawRunFlags.safeParse({ ...valid, slug: "a".repeat(101) })
+    expect(result.success).toBe(false)
+  })
+
+  it("accepts valid --slug values", () => {
+    expect(RawRunFlags.safeParse({ ...valid, slug: "my-review" }).success).toBe(true)
+    expect(RawRunFlags.safeParse({ ...valid, slug: "v1.2.3" }).success).toBe(true)
+    expect(RawRunFlags.safeParse({ ...valid, slug: "feat_branch" }).success).toBe(true)
+  })
+
   // ── Mutually exclusive output modes ──
 
   it("allows --plain with --json (CI mode)", () => {

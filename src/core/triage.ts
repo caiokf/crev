@@ -52,6 +52,16 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
   const verdicts = await callTriageAgent(prompt, config)
 
+  // If triage failed (returned no verdicts), return issues unchanged rather than
+  // marking everything as "actionable" which would silently inflate the count.
+  if (verdicts.length === 0) {
+    return {
+      triaged: issues,
+      durationMs: performance.now() - start,
+      summary: { actionable: 0, deferred: 0, dismissed: 0 },
+    }
+  }
+
   const triaged = applyTriageVerdicts(issues, verdicts, flags)
 
   const summary = {

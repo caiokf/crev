@@ -78,8 +78,13 @@ export function findCrevDir(startDir?: string): string {
     dir = path.dirname(dir)
   }
 
-  // Fallback: return .crev relative to the starting directory
-  return path.resolve(startDir ?? process.cwd(), ".crev")
+  // Fallback: return .crev relative to the starting directory.
+  // Callers that require an existing .crev/ should check and suggest `crev init`.
+  const fallback = path.resolve(startDir ?? process.cwd(), ".crev")
+  if (!fs.existsSync(fallback)) {
+    console.error(`Warning: No .crev directory found. Run "crev init" to set up your project.`)
+  }
+  return fallback
 }
 
 export function getUserCrevDir(): string {
@@ -89,8 +94,13 @@ export function getUserCrevDir(): string {
 function loadRawYaml(filePath: string): Record<string, unknown> | null {
   if (!fs.existsSync(filePath)) return null
   const raw = fs.readFileSync(filePath, "utf-8")
-  const parsed = YAML.parse(raw)
-  return parsed && typeof parsed === "object" ? parsed : null
+  try {
+    const parsed = YAML.parse(raw)
+    return parsed && typeof parsed === "object" ? parsed : null
+  } catch (err) {
+    const reason = err instanceof Error ? err.message : String(err)
+    throw new Error(`Invalid YAML in ${filePath}: ${reason}`)
+  }
 }
 
 /**

@@ -54,7 +54,7 @@ export const RawRunFlags = z
     type: z.enum(["all", "committed", "uncommitted"]).default("all"),
     analyze: z.boolean().default(false),
     reviewers: z.string().optional(),
-    slug: z.string().optional(),
+    slug: z.string().regex(/^[a-zA-Z0-9._-]{1,100}$/, "--slug must be 1-100 alphanumeric, dash, dot, or underscore characters").optional(),
     description: z.string().optional(),
     reviewFile: z.string().optional(),
     plain: z.boolean().default(false),

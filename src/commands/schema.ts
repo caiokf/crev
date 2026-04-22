@@ -22,6 +22,11 @@ export function registerSchemaCommand(program: Command): void {
     .command("init <name>")
     .description("Scaffold an empty schema")
     .action((name) => {
+      if (!/^[a-zA-Z0-9._-]{1,100}$/.test(name)) {
+        console.error(chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"))
+        process.exit(1)
+      }
+
       const crevDir = findCrevDir()
       const schemasDir = getSchemasDir(crevDir)
       fs.mkdirSync(schemasDir, { recursive: true })
