@@ -57,7 +57,7 @@ export function registerDoctorCommand(program: Command): void {
 
       let pingResults: PingResult[] | undefined
       if (opts.ping) {
-        const readyRuntimes = allRuntimes.filter((rt) => {
+        const readyRuntimes = getAllRuntimes().filter((rt) => {
           const health = allHealthResults.find((h) => h.name === rt.name)
           return health?.installed && health?.authenticated !== "no"
         })
