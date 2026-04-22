@@ -11,6 +11,7 @@ import { quickSchema } from "../templates/schemas/quick.js"
 import { standardSchema } from "../templates/schemas/standard.js"
 import { thoroughSchema } from "../templates/schemas/thorough.js"
 import { errorMessage } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 const BANNER = `
   ${chalk.cyan("██████")} ${chalk.cyan("████████")}  ${chalk.cyan("████████")} ${chalk.cyan("██")}     ${chalk.cyan("██")}
@@ -31,7 +32,7 @@ const SCHEMAS: Record<string, { label: string; content: string }> = {
 export function registerInitCommand(program: Command): void {
   program
     .command("init [path]")
-    .description("Interactive TUI setup")
+    .description(COMMAND_DESCRIPTIONS.init)
     .option("--tools <list>", "Comma-separated tool IDs (all/none/claude,cursor,...)")
     .option("--schemas <list>", "Comma-separated schema names (all/quick,standard,...)")
     .action(async (initPath, opts) => {

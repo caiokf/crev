@@ -4,11 +4,12 @@ import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
 import { RawDiffFlags } from "../core/types.js"
 import { errorMessage, exitWithError } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 export function registerDiffCommand(program: Command): void {
   program
     .command("diff")
-    .description("Preview what diff would be reviewed (dry-run)")
+    .description(COMMAND_DESCRIPTIONS.diff)
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
     .option("--type <type>", "Diff type: all, committed, uncommitted", "all")

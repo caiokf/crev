@@ -11,11 +11,12 @@ import { loadSchemaFile, resolveSchemaPath, type SchemaFileType } from "../core/
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
 import { errorMessage, exitWithError } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 export function registerRunCommand(program: Command): void {
   program
     .command("run")
-    .description("Execute a review")
+    .description(COMMAND_DESCRIPTIONS.run)
     .option("--schema <name>", "Which review schema to use")
     .option("--base <branch>", "Git base branch for diff")
     .option("--base-commit <sha>", "Specific commit hash")
@@ -27,7 +28,7 @@ export function registerRunCommand(program: Command): void {
     .option("--description <text>", "Metadata description")
     .option("--review-file <path>", "Merge into existing review")
     .option("--plain", "No TUI (CI-friendly)")
-    .option("--json", "Machine-readable JSON output")
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .option("--prompt-only", "Output prompts as JSON, don't execute")
     .action(async (opts) => {
       const crevDir = findCrevDir()

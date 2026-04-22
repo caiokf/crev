@@ -11,6 +11,7 @@ import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
 import { errorMessage } from "../util/cli-errors.js"
+import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-?]*[ -/]*[@-~]/g
 const ANSI_OSC_REGEX = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
@@ -18,10 +19,10 @@ const ANSI_OSC_REGEX = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
 export function registerDoctorCommand(program: Command): void {
   program
     .command("doctor")
-    .description("Health check for runtimes and schemas")
+    .description(COMMAND_DESCRIPTIONS.doctor)
     .option("--all", "Check all known runtimes, not just those in schemas")
     .option("--ping", "Send a test prompt through each runtime to verify end-to-end")
-    .option("--json", "Machine-readable JSON output")
+    .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
     .action(async (opts) => {
       const crevDir = findCrevDir()
       const jsonOutput = opts.json ?? false
