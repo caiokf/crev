@@ -1,10 +1,20 @@
 import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
+import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { detectAITools } from "../util/detect-tools.js"
+import * as detectToolsModule from "../util/detect-tools.js"
+import * as skillsModule from "../util/skills.js"
+import * as healthModule from "../core/health.js"
 import { writeIfNew } from "../util/paths.js"
 import { configTemplate } from "../templates/config.js"
+import { registerInitCommand } from "./init.js"
+
+async function runInit(args: string[]) {
+  const program = new Command()
+  registerInitCommand(program)
+  await program.parseAsync(["init", ...args], { from: "user" })
+}
 
 describe("init scaffolding", () => {
   let tmpDir: string
@@ -68,14 +78,14 @@ describe("detectAITools", () => {
 
   it("detects claude when .claude directory exists", () => {
     fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true })
-    const tools = detectAITools(tmpDir)
+    const tools = detectToolsModule.detectAITools(tmpDir)
     const claude = tools.find((t) => t.id === "claude")
     expect(claude).toBeDefined()
     expect(claude!.detected).toBe(true)
   })
 
   it("returns all tool definitions even if not detected", () => {
-    const tools = detectAITools(tmpDir)
+    const tools = detectToolsModule.detectAITools(tmpDir)
     expect(tools.length).toBeGreaterThanOrEqual(5)
     expect(tools.every((t) => !t.detected)).toBe(true)
   })
@@ -85,11 +95,53 @@ describe("detectAITools", () => {
     fs.mkdirSync(path.join(tmpDir, ".cursor"), { recursive: true })
     fs.mkdirSync(path.join(tmpDir, ".github"), { recursive: true })
 
-    const tools = detectAITools(tmpDir)
+    const tools = detectToolsModule.detectAITools(tmpDir)
     const detected = tools.filter((t) => t.detected)
     expect(detected.length).toBe(3)
     expect(detected.map((t) => t.id)).toContain("claude")
     expect(detected.map((t) => t.id)).toContain("cursor")
     expect(detected.map((t) => t.id)).toContain("copilot")
+  })
+})
+
+describe("registerInitCommand", () => {
+  beforeEach(() => {
+    vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(detectToolsModule, "detectAITools").mockReturnValue([])
+    vi.spyOn(skillsModule, "writeSkill").mockImplementation(() => {})
+    vi.spyOn(healthModule, "collectRuntimeHealth").mockResolvedValue([])
+    vi.spyOn(healthModule, "checkSchemaReadiness").mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("scaffolds selected schemas in non-interactive mode", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-init-cmd-"))
+
+    await runInit([tmp, "--tools", "none", "--schemas", "quick"])
+
+    expect(fs.existsSync(path.join(tmp, ".crev", "config.yaml"))).toBe(true)
+    expect(fs.existsSync(path.join(tmp, ".crev", "schemas", "quick.yaml"))).toBe(true)
+    expect(fs.existsSync(path.join(tmp, ".crev", "schemas", "standard.yaml"))).toBe(false)
+    expect(skillsModule.writeSkill).not.toHaveBeenCalled()
+
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it("writes skills for all configured tools when --tools all is used", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-init-tools-"))
+    const claude = { name: "Claude", id: "claude", detected: true, detectionPath: ".claude", skillPath: ".claude/skills/crev" }
+    const cursor = { name: "Cursor", id: "cursor", detected: false, detectionPath: ".cursor", skillPath: ".cursor/skills/crev" }
+    vi.spyOn(detectToolsModule, "detectAITools").mockReturnValue([claude, cursor])
+
+    await runInit([tmp, "--tools", "all", "--schemas", "quick"])
+
+    expect(skillsModule.writeSkill).toHaveBeenCalledTimes(2)
+    expect(skillsModule.writeSkill).toHaveBeenCalledWith(tmp, claude)
+    expect(skillsModule.writeSkill).toHaveBeenCalledWith(tmp, cursor)
+
+    fs.rmSync(tmp, { recursive: true, force: true })
   })
 })
