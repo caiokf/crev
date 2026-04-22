@@ -4,7 +4,7 @@ import path from "node:path"
 import { getRuntime } from "@caiokf/valet"
 import type { Config } from "./config.js"
 import { extractJsonObject } from "./json-extract.js"
-import type { ReviewIssue } from "./types.js"
+import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
 import { uniqueSuffix } from "../util/paths.js"
 
 type TriageInput = {
@@ -27,6 +27,7 @@ type TriageResult = {
 export type TriageFlags = {
   deduplicate: boolean
   recategorize: boolean
+  enrichComments: boolean
 }
 
 const VALID_SEVERITIES = new Set(["low", "medium", "high", "critical"])
@@ -47,6 +48,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const flags: TriageFlags = {
     deduplicate: config.triage.deduplicate,
     recategorize: config.triage.recategorize,
+    enrichComments: config.triage.enrichComments ?? false,
   }
 
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
@@ -102,6 +104,7 @@ export function applyTriageVerdicts(
         result.triage = {
           verdict: "dismissed",
           reasoning: `Duplicate of ${verdict.duplicateOf}: ${verdict.reasoning}`,
+          enrichment: verdict.enrichment,
         }
         return result
       }
@@ -117,7 +120,11 @@ export function applyTriageVerdicts(
       }
     }
 
-    result.triage = { verdict: verdict.verdict, reasoning: verdict.reasoning }
+    result.triage = {
+      verdict: verdict.verdict,
+      reasoning: verdict.reasoning,
+      enrichment: verdict.enrichment,
+    }
     return result
   })
 
@@ -150,19 +157,39 @@ export function buildTriagePrompt(
     ? `\n\n## Re-categorization\nIf a reviewer has assigned the wrong severity or category, correct it. Set "correctedSeverity" and/or "correctedCategory" only when the original classification is clearly wrong. Valid severities: low, medium, high, critical. Valid categories: bug, security, performance, style, compliance, architecture.`
     : ""
 
-  const extraFields = (flags?.deduplicate || flags?.recategorize)
-    ? [
-        ...(flags.deduplicate ? [`      "duplicateOf": "canonical-issue-id or null"`] : []),
-        ...(flags.recategorize ? [
-          `      "correctedSeverity": "low | medium | high | critical or null",`,
-          `      "correctedCategory": "bug | security | performance | style | compliance | architecture or null"`,
-        ] : []),
-      ].join(",\n")
+  const enrichmentSection = flags?.enrichComments
+    ? `\n\n## Comment Enrichment\nFor each issue, include "enrichment" so downstream agents can post a CodeRabbit-style PR comment.
+- title: short imperative title (for example "Add IAM permission for the new secret")
+- context: 1 short paragraph referencing evidence, file path(s), and line number(s)
+- minimalFix.summary: one-line fix strategy
+- minimalFix.language: code fence language like "diff", "ts", "js", "yaml", "bash", or "text"
+- minimalFix.patch: small concrete patch/snippet (minimal viable fix, no placeholders)
+- promptForAgents: direct instructions another agent can run to verify/fix this issue`
     : ""
+
+  const extraFields = [
+    ...(flags?.deduplicate ? [`      "duplicateOf": "canonical-issue-id or null"`] : []),
+    ...(flags?.recategorize ? [
+      `      "correctedSeverity": "low | medium | high | critical or null"`,
+      `      "correctedCategory": "bug | security | performance | style | compliance | architecture or null"`,
+    ] : []),
+    ...(flags?.enrichComments ? [
+      `      "enrichment": {
+        "title": "short issue headline",
+        "context": "what is wrong + where + why it matters",
+        "minimalFix": {
+          "summary": "single-line fix strategy",
+          "language": "diff | ts | js | yaml | bash | text",
+          "patch": "small concrete patch/snippet"
+        },
+        "promptForAgents": "explicit instructions to validate + implement the fix"
+      }`,
+    ] : []),
+  ].join(",\n")
 
   const extraFieldsBlock = extraFields ? `,\n${extraFields}` : ""
 
-  return `${triageInstructions}${dedupSection}${recategorizeSection}
+  return `${triageInstructions}${dedupSection}${recategorizeSection}${enrichmentSection}
 
 ${diffType === "analyze"
     ? `## Scope\nThis is a full codebase analysis, not a diff review. The issues below reference files in the repository.`
@@ -193,6 +220,7 @@ export type RawTriageVerdict = {
   duplicateOf?: string
   correctedSeverity?: string
   correctedCategory?: string
+  enrichment?: TriageCommentEnrichment
 }
 
 async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
@@ -245,10 +273,38 @@ export function parseTriageResponse(raw: string): RawTriageVerdict[] {
           duplicateOf: v.duplicateOf ? String(v.duplicateOf) : undefined,
           correctedSeverity: v.correctedSeverity ? String(v.correctedSeverity) : undefined,
           correctedCategory: v.correctedCategory ? String(v.correctedCategory) : undefined,
+          enrichment: parseEnrichment(v.enrichment),
         }
       })
       .filter((v) => v.id)
   } catch {
     return []
+  }
+}
+
+function parseEnrichment(value: unknown): TriageCommentEnrichment | undefined {
+  if (!value || typeof value !== "object") return undefined
+  const obj = value as Record<string, unknown>
+  const minimalFixRaw = obj.minimalFix
+  if (!minimalFixRaw || typeof minimalFixRaw !== "object") return undefined
+  const minimalFix = minimalFixRaw as Record<string, unknown>
+
+  const title = String(obj.title ?? "").trim()
+  const context = String(obj.context ?? "").trim()
+  const summary = String(minimalFix.summary ?? "").trim()
+  const patch = String(minimalFix.patch ?? "").trim()
+  const promptForAgents = String(obj.promptForAgents ?? "").trim()
+  if (!title || !context || !summary || !patch || !promptForAgents) return undefined
+
+  const languageRaw = String(minimalFix.language ?? "").trim()
+  return {
+    title,
+    context,
+    minimalFix: {
+      summary,
+      language: languageRaw || undefined,
+      patch,
+    },
+    promptForAgents,
   }
 }

@@ -18,6 +18,7 @@ function makeConfig(failback: Record<string, string> = {}): Config {
       model: "opus",
       deduplicate: false,
       recategorize: false,
+      enrichComments: false,
       prompt: "",
     },
   }

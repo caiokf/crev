@@ -145,6 +145,7 @@ describe("normalizeOutput", () => {
       model: "opus",
       deduplicate: false,
       recategorize: false,
+      enrichComments: false,
       prompt: "",
     },
   } as Config

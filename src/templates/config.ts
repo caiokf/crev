@@ -31,4 +31,5 @@ triage:
   enabled: false
   runtime: claude
   model: opus
+  enrichComments: false
 `

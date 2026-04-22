@@ -332,6 +332,7 @@ describe("orchestrate", () => {
       model: "opus",
       deduplicate: false,
       recategorize: false,
+      enrichComments: false,
       prompt: "",
     },
   })

@@ -49,6 +49,7 @@ const configSchema = z.object({
       model: z.string().default("opus"),
       deduplicate: z.boolean().default(false),
       recategorize: z.boolean().default(false),
+      enrichComments: z.boolean().default(false),
       prompt: z
         .string()
         .default(
@@ -200,4 +201,3 @@ export function loadAgentPrompt(agentPath: string): string | null {
 export function getRuntimeConfig(config: Config, runtimeName: string): RuntimeConfig {
   return config.runtimes[runtimeName] ?? { env: {}, args: [] }
 }
-

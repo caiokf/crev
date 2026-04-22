@@ -51,7 +51,7 @@ const sampleIssue3: ReviewIssue = {
   description: "Loop issues individual queries",
 }
 
-const noFlags = { deduplicate: false, recategorize: false }
+const noFlags = { deduplicate: false, recategorize: false, enrichComments: false }
 
 describe("buildTriagePrompt", () => {
   it("includes issues, diff, and instructions", () => {
@@ -72,6 +72,7 @@ describe("buildTriagePrompt", () => {
     const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", undefined, {
       deduplicate: true,
       recategorize: false,
+      enrichComments: false,
     })
     expect(prompt).toContain("## Deduplication")
     expect(prompt).toContain("duplicateOf")
@@ -83,6 +84,7 @@ describe("buildTriagePrompt", () => {
     const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", undefined, {
       deduplicate: false,
       recategorize: true,
+      enrichComments: false,
     })
     expect(prompt).toContain("## Re-categorization")
     expect(prompt).toContain("correctedSeverity")
@@ -94,6 +96,7 @@ describe("buildTriagePrompt", () => {
     const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", undefined, {
       deduplicate: true,
       recategorize: true,
+      enrichComments: false,
     })
     expect(prompt).toContain("## Deduplication")
     expect(prompt).toContain("## Re-categorization")
@@ -101,10 +104,23 @@ describe("buildTriagePrompt", () => {
     expect(prompt).toContain("correctedSeverity")
   })
 
+  it("includes comment enrichment section when enrichComments is enabled", () => {
+    const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", undefined, {
+      deduplicate: false,
+      recategorize: false,
+      enrichComments: true,
+    })
+    expect(prompt).toContain("## Comment Enrichment")
+    expect(prompt).toContain('"enrichment"')
+    expect(prompt).toContain('"minimalFix"')
+    expect(prompt).toContain('"promptForAgents"')
+  })
+
   it("omits extra sections when no flags are set", () => {
     const prompt = buildTriagePrompt([sampleIssue], "diff", "Instructions", undefined, noFlags)
     expect(prompt).not.toContain("## Deduplication")
     expect(prompt).not.toContain("## Re-categorization")
+    expect(prompt).not.toContain("## Comment Enrichment")
     expect(prompt).not.toContain("duplicateOf")
     expect(prompt).not.toContain("correctedSeverity")
   })
@@ -182,6 +198,46 @@ describe("parseTriageResponse", () => {
     expect(verdicts[0].correctedCategory).toBe("security")
   })
 
+  it("parses enrichment payload", () => {
+    const json = JSON.stringify({
+      triage: [{
+        id: "issue-1",
+        verdict: "actionable",
+        reasoning: "Real issue",
+        enrichment: {
+          title: "Add missing IAM secret permission",
+          context: "The new secret ARN is referenced but not included in the role policy.",
+          minimalFix: {
+            summary: "Add the ARN to the GetSecretValue resource list.",
+            language: "diff",
+            patch: "- old\n+ new",
+          },
+          promptForAgents: "Verify the policy includes the new secret ARN and update tests.",
+        },
+      }],
+    })
+    const verdicts = parseTriageResponse(json)
+    expect(verdicts[0].enrichment?.title).toBe("Add missing IAM secret permission")
+    expect(verdicts[0].enrichment?.minimalFix.language).toBe("diff")
+    expect(verdicts[0].enrichment?.promptForAgents).toContain("update tests")
+  })
+
+  it("drops invalid enrichment payloads", () => {
+    const json = JSON.stringify({
+      triage: [{
+        id: "issue-1",
+        verdict: "actionable",
+        reasoning: "Real issue",
+        enrichment: {
+          title: "Incomplete enrichment",
+          minimalFix: { summary: "x", patch: "y" },
+        },
+      }],
+    })
+    const verdicts = parseTriageResponse(json)
+    expect(verdicts[0].enrichment).toBeUndefined()
+  })
+
   it("omits optional fields when not present", () => {
     const json = JSON.stringify({
       triage: [{ id: "1", verdict: "actionable", reasoning: "ok" }],
@@ -190,6 +246,7 @@ describe("parseTriageResponse", () => {
     expect(verdicts[0].duplicateOf).toBeUndefined()
     expect(verdicts[0].correctedSeverity).toBeUndefined()
     expect(verdicts[0].correctedCategory).toBeUndefined()
+    expect(verdicts[0].enrichment).toBeUndefined()
   })
 })
 
@@ -203,6 +260,29 @@ describe("applyTriageVerdicts", () => {
     expect(result[0].triage?.reasoning).toBe("Real issue")
     expect(result[0].severity).toBe("high") // unchanged
     expect(result[0].category).toBe("security") // unchanged
+  })
+
+  it("applies enrichment when provided by triage", () => {
+    const verdicts: RawTriageVerdict[] = [
+      {
+        id: "security--xss-1",
+        verdict: "actionable",
+        reasoning: "Real issue",
+        enrichment: {
+          title: "Escape untrusted input before rendering",
+          context: "The unsanitized value reaches HTML output at src/app.ts:42.",
+          minimalFix: {
+            summary: "Escape user-controlled values in the render path.",
+            language: "ts",
+            patch: "const safe = escapeHtml(input)",
+          },
+          promptForAgents: "Add escaping in render path and validate with an XSS regression test.",
+        },
+      },
+    ]
+    const result = applyTriageVerdicts([sampleIssue], verdicts, noFlags)
+    expect(result[0].triage?.enrichment?.title).toContain("Escape untrusted input")
+    expect(result[0].triage?.enrichment?.minimalFix.language).toBe("ts")
   })
 
   it("defaults to actionable when no verdict is returned for an issue", () => {
@@ -219,6 +299,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue, sampleIssue2], verdicts, {
       deduplicate: true,
       recategorize: false,
+      enrichComments: false,
     })
     expect(result[0].triage?.verdict).toBe("actionable")
     expect(result[1].triage?.verdict).toBe("dismissed")
@@ -242,6 +323,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue], verdicts, {
       deduplicate: true,
       recategorize: false,
+      enrichComments: false,
     })
     expect(result[0].triage?.verdict).toBe("actionable")
   })
@@ -253,6 +335,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue], verdicts, {
       deduplicate: true,
       recategorize: false,
+      enrichComments: false,
     })
     expect(result[0].triage?.verdict).toBe("actionable")
   })
@@ -264,6 +347,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue3], verdicts, {
       deduplicate: false,
       recategorize: true,
+      enrichComments: false,
     })
     expect(result[0].severity).toBe("high")
     expect(result[0].category).toBe("style") // unchanged
@@ -276,6 +360,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue3], verdicts, {
       deduplicate: false,
       recategorize: true,
+      enrichComments: false,
     })
     expect(result[0].category).toBe("performance")
     expect(result[0].severity).toBe("low") // unchanged
@@ -297,6 +382,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue3], verdicts, {
       deduplicate: false,
       recategorize: true,
+      enrichComments: false,
     })
     expect(result[0].severity).toBe("low") // unchanged, invalid value rejected
   })
@@ -308,6 +394,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue3], verdicts, {
       deduplicate: false,
       recategorize: true,
+      enrichComments: false,
     })
     expect(result[0].category).toBe("style") // unchanged, invalid value rejected
   })
@@ -321,6 +408,7 @@ describe("applyTriageVerdicts", () => {
     const result = applyTriageVerdicts([sampleIssue, sampleIssue2, sampleIssue3], verdicts, {
       deduplicate: true,
       recategorize: true,
+      enrichComments: false,
     })
     expect(result[0].severity).toBe("critical") // recategorized
     expect(result[0].triage?.verdict).toBe("actionable")
@@ -344,6 +432,7 @@ describe("runTriage", () => {
       model: "opus",
       deduplicate: false,
       recategorize: false,
+      enrichComments: false,
       prompt: "Triage these issues.",
     },
   } as Config

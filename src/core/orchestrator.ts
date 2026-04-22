@@ -287,6 +287,7 @@ async function runTriagePass(
           model: schemaTriage.model ?? opts.config.triage.model,
           deduplicate: schemaTriage.deduplicate ?? opts.config.triage.deduplicate,
           recategorize: schemaTriage.recategorize ?? opts.config.triage.recategorize,
+          enrichComments: schemaTriage.enrichComments ?? opts.config.triage.enrichComments,
         },
       }
     : opts.config

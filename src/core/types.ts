@@ -110,6 +110,18 @@ export const RawRunFlags = z
 export type TriageVerdict = {
   verdict: "actionable" | "deferred" | "dismissed"
   reasoning: string
+  enrichment?: TriageCommentEnrichment
+}
+
+export type TriageCommentEnrichment = {
+  title: string
+  context: string
+  minimalFix: {
+    summary: string
+    language?: string
+    patch: string
+  }
+  promptForAgents: string
 }
 
 export type ReviewIssue = {
