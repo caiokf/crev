@@ -7,7 +7,7 @@ import { autoSelectSchema } from "../core/schema-auto-select.js"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { cleanupDiffFile, resolveDiff } from "../core/diff.js"
 import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
-import { loadSchemaFile, resolveSchemaPath, type ModelOverrides, type SchemaFileType } from "../core/schema.js"
+import { applyModelOverrides, getModelOverrideFormatError, loadSchemaFile, parseModelOverrides, resolveSchemaPath, type ModelOverrides, type SchemaFileType } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
 import { errorMessage, exitWithError } from "../util/cli-errors.js"
@@ -24,6 +24,7 @@ export function registerRunCommand(program: Command): void {
     .option("--pr <number>", "GitHub PR number")
     .option("--analyze", "Full codebase analysis (no diff)")
     .option("--reviewers <list>", "Comma-separated reviewer names")
+    .option("--model <spec>", "Override runtime/model (repeatable: runtime/model or Name=runtime/model)", (val: string, acc: string[]) => { acc.push(val); return acc }, [] as string[])
     .option("--slug <name>", "Override artifact name")
     .option("--description <text>", "Metadata description")
     .option("--review-file <path>", "Merge into existing review")
@@ -56,6 +57,7 @@ export function registerRunCommand(program: Command): void {
         analyze: opts.analyze ?? false,
         pr: opts.pr ? Number(opts.pr) : undefined,
         reviewers: opts.reviewers,
+        model: opts.model?.length ? opts.model : undefined,
         slug: opts.slug,
         description: opts.description,
         reviewFile: opts.reviewFile,
@@ -96,6 +98,19 @@ export function registerRunCommand(program: Command): void {
       } catch (err) {
         const reason = errorMessage(err)
         exitWithError(chalk.red(`Error: ${reason}`))
+      }
+
+      if (cmd.modelOverrides) {
+        const overrides = parseModelOverrides(cmd.modelOverrides)
+        const formatError = getModelOverrideFormatError(overrides)
+        if (formatError) {
+          exitWithError(chalk.red(`Error: ${formatError}`))
+        }
+        const reviewerError = getModelOverrideReviewerError(schema, overrides)
+        if (reviewerError) {
+          exitWithError(chalk.red(`Error: ${reviewerError}`))
+        }
+        schema = applyModelOverrides(schema, overrides)
       }
 
       const reviewerFilterError = getReviewerFilterError(schema, cmd.reviewers)

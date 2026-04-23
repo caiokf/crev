@@ -40,6 +40,7 @@ export interface RunCommand {
   output: OutputMode
   target: ReviewTarget
   reviewers?: string[]
+  modelOverrides?: string[]
   plain: boolean
   analyze: boolean
 }
@@ -99,6 +100,7 @@ export const RawRunFlags = z
     type: z.enum(["all", "committed", "uncommitted"]).default("all"),
     analyze: z.boolean().default(false),
     reviewers: z.string().optional(),
+    model: z.union([z.string(), z.array(z.string())]).optional(),
     slug: z.string().regex(/^[a-zA-Z0-9._-]{1,100}$/, "--slug must be 1-100 alphanumeric, dash, dot, or underscore characters").optional(),
     description: z.string().optional(),
     reviewFile: z.string().optional(),
@@ -147,6 +149,7 @@ export const RawRunFlags = z
         ? { kind: "merge", reviewFile: f.reviewFile }
         : { kind: "fresh", slug: f.slug, description: f.description },
       reviewers: f.reviewers?.split(",").map((r) => r.trim()),
+      modelOverrides: f.model ? (Array.isArray(f.model) ? f.model : [f.model]) : undefined,
     }),
   )
 

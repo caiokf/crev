@@ -186,6 +186,23 @@ describe("RawRunFlags validation", () => {
     const result = RawRunFlags.safeParse({})
     expect(result.success).toBe(false)
   })
+
+  // ── --model transforms ──
+
+  it("single --model string passes through as modelOverrides array", () => {
+    const result = RawRunFlags.parse({ ...valid, model: "claude/sonnet" })
+    expect(result.modelOverrides).toEqual(["claude/sonnet"])
+  })
+
+  it("multiple --model strings pass through as modelOverrides array", () => {
+    const result = RawRunFlags.parse({ ...valid, model: ["claude/sonnet", "Engineer=claude/opus"] })
+    expect(result.modelOverrides).toEqual(["claude/sonnet", "Engineer=claude/opus"])
+  })
+
+  it("no --model results in undefined modelOverrides", () => {
+    const result = RawRunFlags.parse(valid)
+    expect(result.modelOverrides).toBeUndefined()
+  })
 })
 
 describe("RawDiffFlags validation", () => {
