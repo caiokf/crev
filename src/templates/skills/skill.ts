@@ -146,6 +146,7 @@ When the user asks to post findings to the PR:
 4. Use the markdown template below exactly, including collapsible blocks.
 5. Keep \`minimalFix.patch\` and \`promptForAgents\` verbatim from triage enrichment.
 6. If enrichment is missing, synthesize it from the issue + triage reasoning before posting.
+7. **Max 90 characters per line** in the comment body. Wrap longer lines.
 
 Severity badge mapping:
 - \`critical\` → \`🔴 Critical\`
@@ -162,11 +163,11 @@ Exact comment template:
 {{triage.enrichment.context}}
 
 <details>
-<summary>💡 Minimal fix</summary>
+<summary>💡 Proposed fix</summary>
 
 {{triage.enrichment.minimalFix.summary}}
 
-\\\`\\\`\\\`{{triage.enrichment.minimalFix.language}}
+\\\`\\\`\\\`diff
 {{triage.enrichment.minimalFix.patch}}
 \\\`\\\`\\\`
 </details>
@@ -179,6 +180,15 @@ Exact comment template:
 \\\`\\\`\\\`
 </details>
 \\\`\\\`\\\`\\\`
+
+The \`minimalFix.patch\` MUST use unified diff format with \`-\` and \`+\` line prefixes showing deletions and additions. Include a few lines of unchanged context (no prefix) around the change for readability. Example:
+
+\\\`\\\`\\\`diff
+     databaseConnectionId: requireEnv("AUTH0_CONNECTION_ID"),
+-    merchantClientId: requireEnv("AUTH0_MERCHANT_CLIENT_ID", ""),
++    merchantClientId: requireEnv("AUTH0_MERCHANT_CLIENT_ID"),
+   },
+\\\`\\\`\\\`
 
 ### Creating a Schema
 
