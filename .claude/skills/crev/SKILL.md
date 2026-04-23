@@ -17,6 +17,7 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Analyze entire codebase     | `crev run --schema <name> --analyze`                     |
 | CI mode (no TUI)            | `crev run --schema <name> --plain --json`                |
 | Subset of reviewers         | `crev run --schema <name> --reviewers "Security,Arch"`   |
+| Override reviewer models    | `crev run --schema <name> --model codex/chatgpt-5.3`    |
 | Preview prompts only        | `crev run --schema <name> --prompt-only`                 |
 | Merge into existing review  | `crev run --schema <name> --review-file <path>`          |
 | List schemas/runtimes       | `crev list --schemas` / `crev list --runtimes`           |
@@ -77,6 +78,23 @@ To add a personal schema available across all projects, place it in `~/.crev/sch
 3. Read output from `.crev/reviews/<slug>.json`
 4. For each issue: fix it or set `status: "wont-fix"` when intentionally not fixing
 5. Re-run to merge: `crev run --schema <name> --review-file .crev/reviews/<slug>.json`
+
+### Overriding Models at Runtime
+
+Use `--model` to override the runtime/model pair for reviewers without editing the schema file:
+
+```bash
+# Override ALL reviewers to a different runtime/model
+crev run --schema standard --model codex/chatgpt-5.3
+
+# Override SPECIFIC reviewers (case-insensitive name matching)
+crev run --schema standard --model "Engineer=codex/chatgpt-5.3" --model "Security=claude/sonnet"
+
+# Mix: blanket default + per-reviewer override (per-reviewer wins)
+crev run --schema standard --model codex/chatgpt-5.3 --model "Security=claude/sonnet"
+```
+
+Format: `runtime/model` for all reviewers, or `Name=runtime/model` for a specific reviewer. The flag is repeatable.
 
 ### Reading Results
 
