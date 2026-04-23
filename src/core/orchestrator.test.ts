@@ -359,7 +359,7 @@ describe("orchestrate", () => {
   let tmpDir: string
 
   const makeConfig = () => ({
-    defaults: { schema: "quick", type: "all", base: "main" },
+    defaults: { schema: "quick", type: "all" as const, base: "main" },
     runtimes: {},
     aliases: {},
     diff: { exclude: [] },

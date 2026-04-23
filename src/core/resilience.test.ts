@@ -5,7 +5,7 @@ import type { Config } from "./config.js"
 // Minimal config factory with failback entries
 function makeConfig(failback: Record<string, string> = {}): Config {
   return {
-    defaults: { schema: "quick", type: "all", base: "main" },
+    defaults: { schema: "quick", type: "all" as const, base: "main" },
     runtimes: {},
     aliases: {},
     diff: { exclude: [] },
@@ -105,7 +105,7 @@ describe("getFailback", () => {
 
 describe("withResilience", () => {
   it("returns on first success without retry", async () => {
-    const fn = vi.fn().mockResolvedValue({ data: "ok" })
+    const fn: (r: string, m: string) => Promise<{ data: string }> = vi.fn().mockResolvedValue({ data: "ok" })
     const config = makeConfig()
     const result = await withResilience(fn, "claude", "opus", config)
     expect(result.data).toBe("ok")
@@ -114,7 +114,7 @@ describe("withResilience", () => {
   })
 
   it("retries once on retryable error then succeeds", async () => {
-    const fn = vi.fn()
+    const fn: (r: string, m: string) => Promise<{ data: string }> = vi.fn()
       .mockRejectedValueOnce(new Error("rate limited"))
       .mockResolvedValueOnce({ data: "retry ok" })
     const config = makeConfig()
@@ -124,7 +124,7 @@ describe("withResilience", () => {
   })
 
   it("falls back to failback chain after retry failure", async () => {
-    const fn = vi.fn()
+    const fn: (r: string, m: string) => Promise<{ data: string }> = vi.fn()
       .mockRejectedValueOnce(new Error("rate limited"))
       .mockRejectedValueOnce(new Error("still rate limited"))
       .mockResolvedValueOnce({ data: "fallback ok" })

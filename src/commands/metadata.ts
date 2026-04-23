@@ -52,7 +52,7 @@ export const HELP_COMMAND_ORDER: readonly CommandPath[] = [
   "help",
 ]
 
-export const GENERAL_HELP_COMMANDS: readonly Array<{ usage: string; description: string }> = [
+export const GENERAL_HELP_COMMANDS: ReadonlyArray<{ usage: string; description: string }> = [
   { usage: "crev run --schema <name>", description: COMMAND_DESCRIPTIONS.run },
   { usage: "crev show [file.json]", description: "Pretty-print a review (default: latest)" },
   { usage: "crev diff [flags]", description: "Preview what diff would be reviewed" },
@@ -68,13 +68,13 @@ export const GENERAL_HELP_COMMANDS: readonly Array<{ usage: string; description:
   { usage: "crev help [run|schema]", description: "Detailed help" },
 ]
 
-export const QUICKSTART_STEPS: readonly Array<{ usage: string; description: string }> = [
+export const QUICKSTART_STEPS: ReadonlyArray<{ usage: string; description: string }> = [
   { usage: "1. crev init", description: "Set up .crev/ directory" },
   { usage: "2. crev doctor", description: "Check runtime health" },
   { usage: "3. crev run --schema quick --base main", description: "Run your first review" },
 ]
 
-export const RUN_HELP_FLAGS: readonly Array<{ flag: string; description: string }> = [
+export const RUN_HELP_FLAGS: ReadonlyArray<{ flag: string; description: string }> = [
   { flag: "--schema <name>", description: "Which review schema to use (from .crev/schemas/)" },
   { flag: "--base <branch>", description: "Git base branch for diff" },
   { flag: "--base-commit <sha>", description: "Specific commit hash" },
