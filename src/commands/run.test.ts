@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest"
-import { getReviewerFilterError } from "./run.js"
+import { getModelOverrideReviewerError, getReviewerFilterError } from "./run.js"
+import { parseModelOverrides } from "../core/schema.js"
 
 const schema = {
   reviewers: [
@@ -25,5 +26,41 @@ describe("getReviewerFilterError", () => {
   it("returns helpful error when no reviewers match", () => {
     expect(getReviewerFilterError(schema, ["Nope"]))
       .toBe("No reviewers matched --reviewers. Available reviewers: Engineer, Security")
+  })
+})
+
+describe("getModelOverrideReviewerError", () => {
+  it("returns null when targeted is empty", () => {
+    const overrides = parseModelOverrides([])
+    expect(getModelOverrideReviewerError(schema, overrides)).toBeNull()
+  })
+
+  it("returns null when targeted names match exactly", () => {
+    const overrides = parseModelOverrides(["Engineer=claude/opus"])
+    expect(getModelOverrideReviewerError(schema, overrides)).toBeNull()
+  })
+
+  it("returns null when targeted names match case-insensitively", () => {
+    const overrides = parseModelOverrides(["SECURITY=claude/opus"])
+    expect(getModelOverrideReviewerError(schema, overrides)).toBeNull()
+  })
+
+  it("returns null for blanket-only overrides", () => {
+    const overrides = parseModelOverrides(["claude/opus"])
+    expect(getModelOverrideReviewerError(schema, overrides)).toBeNull()
+  })
+
+  it("returns error when targeted name doesn't match any reviewer", () => {
+    const overrides = parseModelOverrides(["Nope=claude/opus"])
+    const err = getModelOverrideReviewerError(schema, overrides)
+    expect(err).toContain("unknown reviewer")
+    expect(err).toContain("nope")
+  })
+
+  it("error message lists available reviewers", () => {
+    const overrides = parseModelOverrides(["Nope=claude/opus"])
+    const err = getModelOverrideReviewerError(schema, overrides)
+    expect(err).toContain("Engineer")
+    expect(err).toContain("Security")
   })
 })

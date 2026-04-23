@@ -7,7 +7,7 @@ import { autoSelectSchema } from "../core/schema-auto-select.js"
 import { findCrevDir, loadLayeredConfig } from "../core/config.js"
 import { cleanupDiffFile, resolveDiff } from "../core/diff.js"
 import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
-import { loadSchemaFile, resolveSchemaPath, type SchemaFileType } from "../core/schema.js"
+import { loadSchemaFile, resolveSchemaPath, type ModelOverrides, type SchemaFileType } from "../core/schema.js"
 import { RawRunFlags, UserCancelledError, type ReviewResult, type RunCommand } from "../core/types.js"
 import path from "node:path"
 import { errorMessage, exitWithError } from "../util/cli-errors.js"
@@ -187,6 +187,21 @@ export function getReviewerFilterError(schema: SchemaFileType, reviewerFilter?: 
   if (hasMatch) return null
 
   return `No reviewers matched --reviewers. Available reviewers: ${schemaReviewers.join(", ")}`
+}
+
+export function getModelOverrideReviewerError(schema: SchemaFileType, overrides: ModelOverrides): string | null {
+  if (overrides.targeted.size === 0) return null
+
+  const schemaReviewers = schema.reviewers.map((r) => r.name)
+  const schemaReviewersSet = new Set(schemaReviewers.map((r) => r.toLowerCase()))
+
+  for (const name of overrides.targeted.keys()) {
+    if (!schemaReviewersSet.has(name)) {
+      return `--model targets unknown reviewer "${name}". Available reviewers: ${schemaReviewers.join(", ")}`
+    }
+  }
+
+  return null
 }
 
 function buildEmptyResult(
