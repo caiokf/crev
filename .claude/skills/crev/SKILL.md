@@ -164,7 +164,7 @@ Exact comment template:
 {{triage.enrichment.context}}
 
 <details>
-<summary>💡 Proposed fix</summary>
+<summary>💡 Possible fix</summary>
 
 {{triage.enrichment.minimalFix.summary}}
 
