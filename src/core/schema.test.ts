@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { ValidatedSchemaFile, listSchemas, loadSchemaFile, parseModelOverrides, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
+import { ValidatedSchemaFile, getModelOverrideFormatError, listSchemas, loadSchemaFile, parseModelOverrides, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
 
 describe("schema validation", () => {
   it("parses a valid schema", () => {
@@ -371,5 +371,56 @@ describe("parseModelOverrides", () => {
   it("handles reviewer names with spaces", () => {
     const result = parseModelOverrides(["Security Expert=claude/sonnet"])
     expect(result.targeted.get("security expert")).toEqual({ runtime: "claude", model: "sonnet" })
+  })
+})
+
+describe("getModelOverrideFormatError", () => {
+  it("returns null for valid blanket override", () => {
+    const overrides = parseModelOverrides(["claude/sonnet"])
+    expect(getModelOverrideFormatError(overrides)).toBeNull()
+  })
+
+  it("returns null for valid targeted override", () => {
+    const overrides = parseModelOverrides(["Engineer=claude/sonnet"])
+    expect(getModelOverrideFormatError(overrides)).toBeNull()
+  })
+
+  it("returns null for empty overrides", () => {
+    const overrides = parseModelOverrides([])
+    expect(getModelOverrideFormatError(overrides)).toBeNull()
+  })
+
+  it("returns error for blanket with unknown runtime", () => {
+    const overrides = parseModelOverrides(["fakert/somemodel"])
+    const err = getModelOverrideFormatError(overrides)
+    expect(err).toContain("unknown runtime")
+    expect(err).toContain("fakert")
+  })
+
+  it("returns error for blanket with valid runtime but invalid model", () => {
+    const overrides = parseModelOverrides(["claude/nonexistent-model"])
+    const err = getModelOverrideFormatError(overrides)
+    expect(err).toContain("invalid model")
+    expect(err).toContain("nonexistent-model")
+  })
+
+  it("returns error for targeted with unknown runtime", () => {
+    const overrides = parseModelOverrides(["Engineer=fakert/somemodel"])
+    const err = getModelOverrideFormatError(overrides)
+    expect(err).toContain("unknown runtime")
+    expect(err).toContain("fakert")
+  })
+
+  it("returns error for targeted with valid runtime but invalid model", () => {
+    const overrides = parseModelOverrides(["Engineer=claude/nonexistent"])
+    const err = getModelOverrideFormatError(overrides)
+    expect(err).toContain("invalid model")
+    expect(err).toContain("nonexistent")
+  })
+
+  it("includes valid options in error message", () => {
+    const overrides = parseModelOverrides(["claude/nonexistent"])
+    const err = getModelOverrideFormatError(overrides)
+    expect(err).toContain("Valid:")
   })
 })

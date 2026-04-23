@@ -168,6 +168,32 @@ function parseRuntimeModel(value: string): ModelOverride | null {
   return { runtime, model }
 }
 
+export function getModelOverrideFormatError(overrides: ModelOverrides): string | null {
+  const check = (label: string, override: ModelOverride): string | null => {
+    const validModels = VALID_MODELS[override.runtime]
+    if (!validModels) {
+      const validRuntimes = Object.keys(VALID_MODELS).join(", ")
+      return `${label}: unknown runtime "${override.runtime}". Valid runtimes: ${validRuntimes}`
+    }
+    if (!validModels.includes(override.model)) {
+      return `${label}: invalid model "${override.model}" for runtime "${override.runtime}". Valid: ${validModels.join(", ")}`
+    }
+    return null
+  }
+
+  if (overrides.blanket) {
+    const err = check("--model", overrides.blanket)
+    if (err) return err
+  }
+
+  for (const [name, override] of overrides.targeted) {
+    const err = check(`--model ${name}`, override)
+    if (err) return err
+  }
+
+  return null
+}
+
 export function listSchemas(schemasDir: string): string[] {
   if (!fs.existsSync(schemasDir)) return []
   return fs
