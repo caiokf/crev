@@ -137,16 +137,36 @@ Enrichment shape:
 }
 \\\`\\\`\\\`
 
-### Posting PR Comments (CodeRabbit Style)
+### Posting PR Comments
+
+Post findings as **inline review comments** on the PR, not plain
+issue comments. This attaches each comment to the exact file and
+line in the diff.
 
 When the user asks to post findings to the PR:
 1. Ensure triage enrichment is enabled (\`triage.enrichComments: true\`) before running review.
 2. Only post issues where \`triage.verdict === "actionable"\`.
-3. Post one comment per issue.
-4. Use the markdown template below exactly, including collapsible blocks.
-5. Keep \`minimalFix.patch\` and \`promptForAgents\` verbatim from triage enrichment.
-6. If enrichment is missing, synthesize it from the issue + triage reasoning before posting.
-7. **Max 90 characters per line** in the comment body. Wrap longer lines.
+3. Post as a single PR review with one inline comment per issue.
+4. Use \`gh api\` to create a review with inline comments:
+   \\\`\\\`\\\`bash
+   gh api repos/{owner}/{repo}/pulls/{pr}/reviews \\\\
+     -f event=COMMENT \\\\
+     -f body="crev review: X actionable findings" \\\\
+     --jsonArray -f 'comments[][path]=file.ts' \\\\
+     -f 'comments[][line]=42' \\\\
+     -f 'comments[][body]=...'
+   \\\`\\\`\\\`
+   Each comment uses the issue's \`file\` and \`line\` fields.
+   If an issue has no \`file\`/\`line\`, fall back to a plain
+   PR comment instead.
+5. Use the markdown template below exactly for each
+   comment body, including collapsible blocks.
+6. Keep \`minimalFix.patch\` and \`promptForAgents\` verbatim
+   from triage enrichment.
+7. If enrichment is missing, synthesize it from the issue
+   + triage reasoning before posting.
+8. **Max 90 characters per line** in the comment body.
+   Wrap longer lines.
 
 Severity badge mapping:
 - \`critical\` → \`🔴 Critical\`
