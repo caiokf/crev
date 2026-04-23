@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { ValidatedSchemaFile, getModelOverrideFormatError, listSchemas, loadSchemaFile, parseModelOverrides, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
+import { ValidatedSchemaFile, applyModelOverrides, getModelOverrideFormatError, listSchemas, loadSchemaFile, parseModelOverrides, parseSchemaFile, resolveSchemaPath, validateAgentRefs, type SchemaFileType } from "./schema.js"
 
 describe("schema validation", () => {
   it("parses a valid schema", () => {
@@ -422,5 +422,83 @@ describe("getModelOverrideFormatError", () => {
     const overrides = parseModelOverrides(["claude/nonexistent"])
     const err = getModelOverrideFormatError(overrides)
     expect(err).toContain("Valid:")
+  })
+})
+
+describe("applyModelOverrides", () => {
+  const baseSchema: SchemaFileType = {
+    reviewers: [
+      { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review for bugs." },
+      { name: "Security", runtime: "claude", model: "opus", prompt: "Check security." },
+    ],
+  }
+
+  it("returns schema unchanged when overrides are empty", () => {
+    const overrides = parseModelOverrides([])
+    const result = applyModelOverrides(baseSchema, overrides)
+    expect(result).toEqual(baseSchema)
+  })
+
+  it("blanket override replaces all reviewers' runtime and model", () => {
+    const overrides = parseModelOverrides(["gemini/gemini-2.5-flash"])
+    const result = applyModelOverrides(baseSchema, overrides)
+    expect(result.reviewers[0].runtime).toBe("gemini")
+    expect(result.reviewers[0].model).toBe("gemini-2.5-flash")
+    expect(result.reviewers[1].runtime).toBe("gemini")
+    expect(result.reviewers[1].model).toBe("gemini-2.5-flash")
+  })
+
+  it("targeted override replaces only matching reviewer", () => {
+    const overrides = parseModelOverrides(["Engineer=gemini/gemini-2.5-flash"])
+    const result = applyModelOverrides(baseSchema, overrides)
+    expect(result.reviewers[0].runtime).toBe("gemini")
+    expect(result.reviewers[0].model).toBe("gemini-2.5-flash")
+    expect(result.reviewers[1].runtime).toBe("claude")
+    expect(result.reviewers[1].model).toBe("opus")
+  })
+
+  it("targeted override is case-insensitive", () => {
+    const overrides = parseModelOverrides(["ENGINEER=gemini/gemini-2.5-flash"])
+    const result = applyModelOverrides(baseSchema, overrides)
+    expect(result.reviewers[0].runtime).toBe("gemini")
+    expect(result.reviewers[0].model).toBe("gemini-2.5-flash")
+  })
+
+  it("mixed: targeted wins for match, blanket for others", () => {
+    const overrides = parseModelOverrides(["gemini/gemini-2.5-flash", "Security=claude/sonnet"])
+    const result = applyModelOverrides(baseSchema, overrides)
+    // Engineer gets blanket
+    expect(result.reviewers[0].runtime).toBe("gemini")
+    expect(result.reviewers[0].model).toBe("gemini-2.5-flash")
+    // Security gets targeted
+    expect(result.reviewers[1].runtime).toBe("claude")
+    expect(result.reviewers[1].model).toBe("sonnet")
+  })
+
+  it("preserves other reviewer fields", () => {
+    const overrides = parseModelOverrides(["gemini/gemini-2.5-flash"])
+    const result = applyModelOverrides(baseSchema, overrides)
+    expect(result.reviewers[0].name).toBe("Engineer")
+    expect(result.reviewers[0].prompt).toBe("Review for bugs.")
+    expect(result.reviewers[1].name).toBe("Security")
+    expect(result.reviewers[1].prompt).toBe("Check security.")
+  })
+
+  it("does not mutate the input schema", () => {
+    const overrides = parseModelOverrides(["gemini/gemini-2.5-flash"])
+    applyModelOverrides(baseSchema, overrides)
+    expect(baseSchema.reviewers[0].runtime).toBe("claude")
+    expect(baseSchema.reviewers[0].model).toBe("sonnet")
+  })
+
+  it("does not affect triage settings", () => {
+    const schemaWithTriage: SchemaFileType = {
+      ...baseSchema,
+      triage: { enabled: true, runtime: "claude", model: "opus" },
+    }
+    const overrides = parseModelOverrides(["gemini/gemini-2.5-flash"])
+    const result = applyModelOverrides(schemaWithTriage, overrides)
+    expect(result.triage?.runtime).toBe("claude")
+    expect(result.triage?.model).toBe("opus")
   })
 })

@@ -168,6 +168,20 @@ function parseRuntimeModel(value: string): ModelOverride | null {
   return { runtime, model }
 }
 
+export function applyModelOverrides(schema: SchemaFileType, overrides: ModelOverrides): SchemaFileType {
+  if (!overrides.blanket && overrides.targeted.size === 0) return schema
+
+  return {
+    ...schema,
+    reviewers: schema.reviewers.map((reviewer) => {
+      const targeted = overrides.targeted.get(reviewer.name.toLowerCase())
+      if (targeted) return { ...reviewer, runtime: targeted.runtime, model: targeted.model }
+      if (overrides.blanket) return { ...reviewer, runtime: overrides.blanket.runtime, model: overrides.blanket.model }
+      return reviewer
+    }),
+  }
+}
+
 export function getModelOverrideFormatError(overrides: ModelOverrides): string | null {
   const check = (label: string, override: ModelOverride): string | null => {
     const validModels = VALID_MODELS[override.runtime]
