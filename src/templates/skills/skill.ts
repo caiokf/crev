@@ -173,7 +173,7 @@ Exact comment template:
 </details>
 
 <details>
-<summary>🔍 Fix prompt</summary>
+<summary>🔍 Prompt to fix it</summary>
 
 \\\`\\\`\\\`text
 {{triage.enrichment.promptForAgents}}
