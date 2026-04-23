@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { ValidatedSchemaFile, listSchemas, loadSchemaFile, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
+import { ValidatedSchemaFile, listSchemas, loadSchemaFile, parseModelOverrides, parseSchemaFile, resolveSchemaPath, validateAgentRefs } from "./schema.js"
 
 describe("schema validation", () => {
   it("parses a valid schema", () => {
@@ -296,5 +296,80 @@ describe("validateAgentRefs", () => {
     )
 
     expect(issues).toHaveLength(0)
+  })
+})
+
+describe("parseModelOverrides", () => {
+  it("returns empty overrides for empty array", () => {
+    const result = parseModelOverrides([])
+    expect(result.blanket).toBeUndefined()
+    expect(result.targeted.size).toBe(0)
+  })
+
+  it("parses a single blanket override", () => {
+    const result = parseModelOverrides(["codex/chatgpt-5.3"])
+    expect(result.blanket).toEqual({ runtime: "codex", model: "chatgpt-5.3" })
+    expect(result.targeted.size).toBe(0)
+  })
+
+  it("parses a single targeted override", () => {
+    const result = parseModelOverrides(["Engineer=codex/chatgpt-5.3"])
+    expect(result.blanket).toBeUndefined()
+    expect(result.targeted.get("engineer")).toEqual({ runtime: "codex", model: "chatgpt-5.3" })
+  })
+
+  it("parses multiple targeted overrides", () => {
+    const result = parseModelOverrides(["Engineer=codex/chatgpt-5.3", "Security=claude/sonnet"])
+    expect(result.targeted.size).toBe(2)
+    expect(result.targeted.get("engineer")).toEqual({ runtime: "codex", model: "chatgpt-5.3" })
+    expect(result.targeted.get("security")).toEqual({ runtime: "claude", model: "sonnet" })
+  })
+
+  it("parses mixed blanket and targeted", () => {
+    const result = parseModelOverrides(["codex/chatgpt-5.3", "Security=claude/sonnet"])
+    expect(result.blanket).toEqual({ runtime: "codex", model: "chatgpt-5.3" })
+    expect(result.targeted.get("security")).toEqual({ runtime: "claude", model: "sonnet" })
+  })
+
+  it("lowercases targeted reviewer name", () => {
+    const result = parseModelOverrides(["SECURITY=claude/sonnet"])
+    expect(result.targeted.has("security")).toBe(true)
+    expect(result.targeted.has("SECURITY")).toBe(false)
+  })
+
+  it("last blanket wins when multiple provided", () => {
+    const result = parseModelOverrides(["codex/chatgpt-5.3", "claude/opus"])
+    expect(result.blanket).toEqual({ runtime: "claude", model: "opus" })
+  })
+
+  it("last targeted per-name wins when duplicates provided", () => {
+    const result = parseModelOverrides(["Engineer=codex/chatgpt-5.3", "Engineer=claude/opus"])
+    expect(result.targeted.get("engineer")).toEqual({ runtime: "claude", model: "opus" })
+  })
+
+  it("throws on invalid format without slash", () => {
+    expect(() => parseModelOverrides(["noSlash"])).toThrow('Invalid --model format "noSlash"')
+  })
+
+  it("throws on empty name before equals", () => {
+    expect(() => parseModelOverrides(["=claude/sonnet"])).toThrow("Reviewer name before")
+  })
+
+  it("throws on empty value after equals", () => {
+    expect(() => parseModelOverrides(["Engineer="])).toThrow("Expected")
+  })
+
+  it("throws on value without slash after equals", () => {
+    expect(() => parseModelOverrides(["Engineer=justmodel"])).toThrow("Expected")
+  })
+
+  it("handles model names with hyphens and dots", () => {
+    const result = parseModelOverrides(["codex/gpt-5.3-codex"])
+    expect(result.blanket).toEqual({ runtime: "codex", model: "gpt-5.3-codex" })
+  })
+
+  it("handles reviewer names with spaces", () => {
+    const result = parseModelOverrides(["Security Expert=claude/sonnet"])
+    expect(result.targeted.get("security expert")).toEqual({ runtime: "claude", model: "sonnet" })
   })
 })

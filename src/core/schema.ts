@@ -126,6 +126,48 @@ function applyModelAliases(schema: SchemaFileType, aliases: Record<string, strin
   }
 }
 
+// ── Model overrides ──
+
+export type ModelOverride = { runtime: string; model: string }
+
+export type ModelOverrides = {
+  blanket?: ModelOverride
+  targeted: Map<string, ModelOverride> // key = lowercase reviewer name
+}
+
+export function parseModelOverrides(specs: string[]): ModelOverrides {
+  const result: ModelOverrides = { targeted: new Map() }
+
+  for (const spec of specs) {
+    const eqIndex = spec.indexOf("=")
+    if (eqIndex === -1) {
+      // Blanket: "runtime/model"
+      const parsed = parseRuntimeModel(spec)
+      if (!parsed) throw new Error(`Invalid --model format "${spec}". Expected "runtime/model" or "Name=runtime/model"`)
+      result.blanket = parsed
+    } else {
+      // Targeted: "Name=runtime/model"
+      const name = spec.slice(0, eqIndex)
+      const value = spec.slice(eqIndex + 1)
+      if (!name) throw new Error(`Invalid --model format "${spec}". Reviewer name before "=" cannot be empty`)
+      const parsed = parseRuntimeModel(value)
+      if (!parsed) throw new Error(`Invalid --model format "${spec}". Expected "runtime/model" after reviewer name`)
+      result.targeted.set(name.toLowerCase(), parsed)
+    }
+  }
+
+  return result
+}
+
+function parseRuntimeModel(value: string): ModelOverride | null {
+  const slashIndex = value.indexOf("/")
+  if (slashIndex === -1) return null
+  const runtime = value.slice(0, slashIndex)
+  const model = value.slice(slashIndex + 1)
+  if (!runtime || !model) return null
+  return { runtime, model }
+}
+
 export function listSchemas(schemasDir: string): string[] {
   if (!fs.existsSync(schemasDir)) return []
   return fs
