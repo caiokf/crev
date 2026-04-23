@@ -82,6 +82,7 @@ export const RUN_HELP_FLAGS: ReadonlyArray<{ flag: string; description: string }
   { flag: "--pr <number>", description: "GitHub PR number" },
   { flag: "--analyze", description: "Full codebase analysis (no diff)" },
   { flag: "--reviewers <list>", description: "Comma-separated reviewer names to run" },
+  { flag: "--model <spec>", description: "Override runtime/model (repeatable: runtime/model or Name=runtime/model)" },
   { flag: "--slug <name>", description: "Override artifact name" },
   { flag: "--description <text>", description: "Metadata" },
   { flag: "--review-file <path>", description: "Merge into existing review" },
