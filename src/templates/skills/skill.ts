@@ -163,7 +163,7 @@ Exact comment template:
 {{triage.enrichment.context}}
 
 <details>
-<summary>💡 Possible fix</summary>
+<summary>🔧 Possible fix</summary>
 
 {{triage.enrichment.minimalFix.summary}}
 
@@ -173,7 +173,7 @@ Exact comment template:
 </details>
 
 <details>
-<summary>🤖 Prompt for AI Agents</summary>
+<summary>🔍 Fix prompt</summary>
 
 \\\`\\\`\\\`text
 {{triage.enrichment.promptForAgents}}
