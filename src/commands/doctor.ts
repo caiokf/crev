@@ -27,19 +27,31 @@ export function registerDoctorCommand(program: Command): void {
       const cols = process.stdout.columns ?? 80
       const isTTY = process.stdout.isTTY && !jsonOutput
 
+      // Runtime health checks shell out to the runtime CLIs (`claude
+      // auth status`, `opencode --version`, etc). Some of those CLIs
+      // print startup banners straight to /dev/tty that bypass our
+      // pipe, so a naive `\r\x1B[2K` progress line can end up with
+      // foreign text stacked above it. We save the cursor on the
+      // first tick and, on each subsequent tick, restore + erase to
+      // end-of-screen so any leaked banner lines get wiped before we
+      // redraw the spinner (and again before the final report).
+      let spinnerInitialized = false
       const snapshot = await Effect.runPromise(
         doctorAction({
           includeAll: opts.all ?? false,
           onRuntimeProgress: isTTY
             ? (checked, total) => {
-                if (checked === 1) {
-                  process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${total}`)}`)
+                if (!spinnerInitialized) {
+                  process.stdout.write("\x1B[s") // save cursor
+                  spinnerInitialized = true
                 }
                 process.stdout.write(
-                  `\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${total}`)}`,
+                  `\x1B[u\x1B[0J  ${chalk.dim(`Checking runtimes... ${checked}/${total}`)}`,
                 )
                 if (checked === total) {
-                  process.stdout.write("\r\x1B[2K")
+                  // restore cursor + erase anything (subprocess noise
+                  // + spinner) that was written below it.
+                  process.stdout.write("\x1B[u\x1B[0J")
                 }
               }
             : undefined,
@@ -282,8 +294,12 @@ async function runPingTests(
       model: resolveModelAlias(config, rt.defaultModel),
     }))
 
+  let pingSpinnerInitialized = false
   if (isTTY) {
-    process.stdout.write(`\n  ${chalk.dim(`Running ping tests... 0/${tasks.length}`)}`)
+    process.stdout.write("\n")
+    process.stdout.write("\x1B[s") // save cursor before spinner
+    pingSpinnerInitialized = true
+    process.stdout.write(`  ${chalk.dim(`Running ping tests... 0/${tasks.length}`)}`)
   }
 
   let done = 0
@@ -336,17 +352,17 @@ async function runPingTests(
           fs.unlinkSync(promptFile)
         } catch {}
         done++
-        if (isTTY) {
+        if (isTTY && pingSpinnerInitialized) {
           process.stdout.write(
-            `\r\x1B[2K  ${chalk.dim(`Running ping tests... ${done}/${tasks.length}`)}`,
+            `\x1B[u\x1B[0J  ${chalk.dim(`Running ping tests... ${done}/${tasks.length}`)}`,
           )
         }
       }
     }),
   )
 
-  if (isTTY) {
-    process.stdout.write("\r\x1B[2K")
+  if (isTTY && pingSpinnerInitialized) {
+    process.stdout.write("\x1B[u\x1B[0J")
   }
 
   return results.sort((a, b) => a.runtime.localeCompare(b.runtime))
