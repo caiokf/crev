@@ -71,6 +71,21 @@ export class DiffResolutionError extends Data.TaggedError("DiffResolutionError")
   readonly cause: unknown
 }> {}
 
+// ── Run ──
+
+export class RunValidationError extends Data.TaggedError("RunValidationError")<{
+  readonly reason: string
+}> {}
+
+export class RunCancelledError extends Data.TaggedError("RunCancelledError")<{
+  readonly message?: string
+}> {}
+
+export class OrchestrationError extends Data.TaggedError("OrchestrationError")<{
+  readonly reason: string
+  readonly cause: unknown
+}> {}
+
 // ── Git ──
 
 export class GitError extends Data.TaggedError("GitError")<{
