@@ -2,11 +2,13 @@ import { afterEach, describe, expect, it } from "vitest"
 import {
   startFix,
   getFixState,
+  getActiveFixStates,
   updateFixProgress,
   completeFix,
   failFix,
   clearFixState,
   isFixRunning,
+  isBulkFixRunning,
   isIssueBeingFixed,
   formatElapsed,
 } from "./fix-state.js"
@@ -14,13 +16,17 @@ import {
 const FILE = "/test/review.json"
 
 afterEach(() => {
-  // Clean up state between tests
+  // Clean up all state between tests
   completeFix(FILE)
   clearFixState(FILE)
+  for (const id of ["i-1", "i-2", "i-3"]) {
+    completeFix(FILE, id)
+    clearFixState(FILE, id)
+  }
 })
 
 describe("fix-state", () => {
-  it("startFix creates a new state entry", () => {
+  it("startFix creates a new state entry for bulk", () => {
     expect(startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)).toBe(true)
     const state = getFixState(FILE)
     expect(state).toBeDefined()
@@ -32,8 +38,31 @@ describe("fix-state", () => {
     expect(state!.finishedAt).toBeNull()
   })
 
-  it("startFix returns false if a fix is already running", () => {
-    expect(startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)).toBe(true)
+  it("startFix creates a new state entry for single issue", () => {
+    expect(startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)).toBe(true)
+    const state = getFixState(FILE, "i-1")
+    expect(state).toBeDefined()
+    expect(state!.mode).toEqual({ kind: "single", issueId: "i-1" })
+  })
+
+  it("bulk blocks if single-issue fix is running", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
+    expect(startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)).toBe(false)
+  })
+
+  it("single-issue fix blocks if bulk is running", () => {
+    startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)
+    expect(startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)).toBe(false)
+  })
+
+  it("allows multiple single-issue fixes for different issues", () => {
+    expect(startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)).toBe(true)
+    expect(startFix(FILE, { kind: "single", issueId: "i-2" }, "claude", "sonnet", 1)).toBe(true)
+    expect(startFix(FILE, { kind: "single", issueId: "i-3" }, "claude", "sonnet", 1)).toBe(true)
+  })
+
+  it("blocks duplicate single-issue fix for same issue", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
     expect(startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)).toBe(false)
   })
 
@@ -52,10 +81,24 @@ describe("fix-state", () => {
     expect(state.statuses[0].id).toBe("i-1")
   })
 
+  it("updateFixProgress works with issue-scoped keys", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
+    updateFixProgress(FILE, 1, 1, { id: "i-1", status: "fixed", reasoning: "done" }, "i-1")
+    const state = getFixState(FILE, "i-1")!
+    expect(state.completed).toBe(1)
+  })
+
   it("completeFix sets finishedAt", () => {
     startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)
     completeFix(FILE)
     const state = getFixState(FILE)!
+    expect(state.finishedAt).toBeTypeOf("number")
+  })
+
+  it("completeFix works with issue-scoped keys", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
+    completeFix(FILE, "i-1")
+    const state = getFixState(FILE, "i-1")!
     expect(state.finishedAt).toBeTypeOf("number")
   })
 
@@ -80,11 +123,28 @@ describe("fix-state", () => {
     expect(getFixState(FILE)).toBeDefined()
   })
 
-  it("isFixRunning returns true while running", () => {
+  it("isBulkFixRunning only returns true for bulk", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
+    expect(isBulkFixRunning(FILE)).toBe(false)
+    completeFix(FILE, "i-1")
+
     startFix(FILE, { kind: "bulk" }, "claude", "sonnet", 3)
+    expect(isBulkFixRunning(FILE)).toBe(true)
+  })
+
+  it("isFixRunning returns true for any active fix", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
     expect(isFixRunning(FILE)).toBe(true)
-    completeFix(FILE)
+    completeFix(FILE, "i-1")
     expect(isFixRunning(FILE)).toBe(false)
+  })
+
+  it("getActiveFixStates returns all active states for a file", () => {
+    startFix(FILE, { kind: "single", issueId: "i-1" }, "claude", "sonnet", 1)
+    startFix(FILE, { kind: "single", issueId: "i-2" }, "claude", "sonnet", 1)
+    expect(getActiveFixStates(FILE)).toHaveLength(2)
+    completeFix(FILE, "i-1")
+    expect(getActiveFixStates(FILE)).toHaveLength(1)
   })
 
   it("isIssueBeingFixed returns true for single-issue fix", () => {

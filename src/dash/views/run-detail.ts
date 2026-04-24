@@ -12,10 +12,12 @@ import { openInEditor } from "../editor.js"
 import {
   startFix,
   getFixState,
+  getActiveFixStates,
   updateFixProgress,
   completeFix,
   failFix,
   isFixRunning,
+  isBulkFixRunning,
   formatElapsed,
 } from "../fix-state.js"
 import { runDashEffect } from "../runtime.js"
@@ -262,8 +264,8 @@ export function createRunDetailView(filePath: string): DashView {
           })
         })
 
-        // On re-mount, check if a fix is still running and resume the status ticker
-        if (isFixRunning(filePath)) {
+        // On re-mount, show status for bulk fix or count of active single-issue fixes
+        if (isBulkFixRunning(filePath)) {
           const state = getFixState(filePath)!
           ctx.setStatus(
             `{${DASH_COLORS.accent}-fg}⟳ fixing ${state.completed}/${state.total} (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
@@ -276,6 +278,22 @@ export function createRunDetailView(filePath: string): DashView {
             }
             ctx.setStatus(
               `{${DASH_COLORS.accent}-fg}⟳ fixing ${s.completed}/${s.total} (${s.runtime}/${s.model} · ${formatElapsed(s.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+            )
+            ctx.screen.render()
+          }, 1000)
+        } else if (isFixRunning(filePath)) {
+          const active = getActiveFixStates(filePath)
+          ctx.setStatus(
+            `{${DASH_COLORS.accent}-fg}⟳ ${active.length} issue fix${active.length !== 1 ? "es" : ""} running…{/${DASH_COLORS.accent}-fg}`,
+          )
+          fixTimer = setInterval(() => {
+            const a = getActiveFixStates(filePath)
+            if (a.length === 0) {
+              if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+              return
+            }
+            ctx.setStatus(
+              `{${DASH_COLORS.accent}-fg}⟳ ${a.length} issue fix${a.length !== 1 ? "es" : ""} running…{/${DASH_COLORS.accent}-fg}`,
             )
             ctx.screen.render()
           }, 1000)

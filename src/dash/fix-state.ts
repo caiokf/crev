@@ -2,11 +2,13 @@ import type { FixStatus } from "../core/fix.js"
 
 /**
  * Shared fix execution state. Lives outside views so navigation
- * between run-detail ↔ issue-detail preserves running state. A single
- * module-level map keyed by review file path ensures:
- *  - only one fix operation per review at a time
- *  - navigating away and back still shows progress
- *  - bulk and single-issue fixes are mutually exclusive per review
+ * between run-detail ↔ issue-detail preserves running state.
+ *
+ * Mutual-exclusion rules (per review file):
+ *  - Multiple single-issue fixes for *different* issues → allowed
+ *  - Bulk fix blocks if any fix (bulk or single) is active
+ *  - Single-issue fix blocks if a bulk fix is active
+ *  - Same issue can't be fixed twice concurrently
  */
 
 export type FixMode =
@@ -26,14 +28,43 @@ export type FixRunState = {
   error: string | null
 }
 
-const runningFixes = new Map<string, FixRunState>()
-
-/** Get the current fix state for a review file. */
-export function getFixState(filePath: string): FixRunState | undefined {
-  return runningFixes.get(filePath)
+/**
+ * Internal key: bulk uses `filePath`, single uses `filePath\0issueId`.
+ * The separator ensures no collision with real file paths.
+ */
+function stateKey(filePath: string, mode: FixMode): string {
+  return mode.kind === "bulk" ? filePath : `${filePath}\0${mode.issueId}`
 }
 
-/** Start tracking a fix run. Returns false if one is already active. */
+const runningFixes = new Map<string, FixRunState>()
+
+/** Get the fix state for a specific key (bulk or single issue). */
+export function getFixState(filePath: string, issueId?: string): FixRunState | undefined {
+  if (issueId) {
+    return runningFixes.get(`${filePath}\0${issueId}`)
+  }
+  // Check bulk first
+  const bulk = runningFixes.get(filePath)
+  if (bulk) return bulk
+  return undefined
+}
+
+/** Get all active (not finished) fix states for a review file. */
+export function getActiveFixStates(filePath: string): FixRunState[] {
+  const results: FixRunState[] = []
+  for (const [key, state] of runningFixes) {
+    if (!state.finishedAt && (key === filePath || key.startsWith(`${filePath}\0`))) {
+      results.push(state)
+    }
+  }
+  return results
+}
+
+/**
+ * Start tracking a fix run. Returns false if mutual exclusion blocks it:
+ *  - bulk: blocked if any fix is active for this file
+ *  - single: blocked if a bulk fix is active, or this issue is already being fixed
+ */
 export function startFix(
   filePath: string,
   mode: FixMode,
@@ -41,9 +72,19 @@ export function startFix(
   model: string,
   total: number,
 ): boolean {
-  const existing = runningFixes.get(filePath)
-  if (existing && !existing.finishedAt) return false // already running
-  runningFixes.set(filePath, {
+  const active = getActiveFixStates(filePath)
+
+  if (mode.kind === "bulk") {
+    // Bulk can't start if anything is running for this file
+    if (active.length > 0) return false
+  } else {
+    // Single can't start if bulk is running or same issue is active
+    if (active.some((s) => s.mode.kind === "bulk")) return false
+    if (active.some((s) => s.mode.kind === "single" && s.mode.issueId === mode.issueId)) return false
+  }
+
+  const key = stateKey(filePath, mode)
+  runningFixes.set(key, {
     mode,
     runtime,
     model,
@@ -63,8 +104,10 @@ export function updateFixProgress(
   completed: number,
   total: number,
   status: FixStatus,
+  issueId?: string,
 ): void {
-  const state = runningFixes.get(filePath)
+  const key = issueId ? `${filePath}\0${issueId}` : filePath
+  const state = runningFixes.get(key)
   if (!state) return
   state.completed = completed
   state.total = total
@@ -72,39 +115,46 @@ export function updateFixProgress(
 }
 
 /** Mark a fix run as completed. */
-export function completeFix(filePath: string): void {
-  const state = runningFixes.get(filePath)
+export function completeFix(filePath: string, issueId?: string): void {
+  const key = issueId ? `${filePath}\0${issueId}` : filePath
+  const state = runningFixes.get(key)
   if (!state) return
   state.finishedAt = Date.now()
 }
 
 /** Mark a fix run as failed. */
-export function failFix(filePath: string, error: string): void {
-  const state = runningFixes.get(filePath)
+export function failFix(filePath: string, error: string, issueId?: string): void {
+  const key = issueId ? `${filePath}\0${issueId}` : filePath
+  const state = runningFixes.get(key)
   if (!state) return
   state.finishedAt = Date.now()
   state.error = error
 }
 
-/** Clear completed/failed fix state for a review. */
-export function clearFixState(filePath: string): void {
-  const state = runningFixes.get(filePath)
-  if (state?.finishedAt) runningFixes.delete(filePath)
+/** Clear completed/failed fix state. */
+export function clearFixState(filePath: string, issueId?: string): void {
+  const key = issueId ? `${filePath}\0${issueId}` : filePath
+  const state = runningFixes.get(key)
+  if (state?.finishedAt) runningFixes.delete(key)
 }
 
-/** Check if a fix is currently running (not finished) for this review. */
-export function isFixRunning(filePath: string): boolean {
+/** Check if a bulk fix is currently running for this review. */
+export function isBulkFixRunning(filePath: string): boolean {
   const state = runningFixes.get(filePath)
   return !!state && !state.finishedAt
 }
 
-/** Check if a specific issue is being fixed. */
+/** Check if any fix is currently running for this review (bulk or single). */
+export function isFixRunning(filePath: string): boolean {
+  return getActiveFixStates(filePath).length > 0
+}
+
+/** Check if a specific issue is being fixed (directly or via bulk). */
 export function isIssueBeingFixed(filePath: string, issueId: string): boolean {
-  const state = runningFixes.get(filePath)
-  if (!state || state.finishedAt) return false
-  if (state.mode.kind === "single") return state.mode.issueId === issueId
-  // In bulk mode, all actionable issues are being fixed
-  return true
+  const active = getActiveFixStates(filePath)
+  return active.some(
+    (s) => s.mode.kind === "bulk" || (s.mode.kind === "single" && s.mode.issueId === issueId),
+  )
 }
 
 /** Format elapsed time for display. */

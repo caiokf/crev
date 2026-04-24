@@ -12,7 +12,7 @@ import {
   updateFixProgress,
   completeFix,
   failFix,
-  isFixRunning,
+  isBulkFixRunning,
   isIssueBeingFixed,
   formatElapsed,
 } from "../fix-state.js"
@@ -126,11 +126,20 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
       if (fixConfigured) {
         box.key("f", () => {
           if (!currentIssue) return
-          // Block if any fix is already running for this review
-          if (isFixRunning(filePath)) {
+          // Block if a bulk fix is running (conflicts with single-issue fixes)
+          if (isBulkFixRunning(filePath)) {
             const state = getFixState(filePath)!
             ctx.setStatus(
-              `{${DASH_COLORS.warn}-fg}fix already running (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)}){/${DASH_COLORS.warn}-fg}`,
+              `{${DASH_COLORS.warn}-fg}bulk fix running (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)}){/${DASH_COLORS.warn}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          // Block if this specific issue is already being fixed
+          if (isIssueBeingFixed(filePath, issueId)) {
+            const state = getFixState(filePath, issueId)!
+            ctx.setStatus(
+              `{${DASH_COLORS.warn}-fg}already fixing this issue (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)}){/${DASH_COLORS.warn}-fg}`,
             )
             ctx.screen.render()
             return
@@ -149,7 +158,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
           ctx.screen.render()
 
           fixTimer = setInterval(() => {
-            const state = getFixState(filePath)
+            const state = getFixState(filePath, issueId)
             if (!state || state.finishedAt) {
               if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
               return
@@ -165,15 +174,15 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
               filePath,
               issueId,
               onProgress: (completed, total, status) => {
-                updateFixProgress(filePath, completed, total, status)
+                updateFixProgress(filePath, completed, total, status, issueId)
               },
             }),
           ).then((result) => {
             if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
-            completeFix(filePath)
+            completeFix(filePath, issueId)
             if (!box) return
             if (result.kind === "error") {
-              failFix(filePath, result.message)
+              failFix(filePath, result.message, issueId)
               ctx.setStatus(
                 `{${DASH_COLORS.danger}-fg}fix failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
               )
@@ -198,14 +207,14 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
           })
         })
 
-        // On re-mount, check if this issue is currently being fixed
+        // On re-mount, check if this specific issue is currently being fixed
         if (isIssueBeingFixed(filePath, issueId)) {
-          const state = getFixState(filePath)!
+          const state = getFixState(filePath, issueId) ?? getFixState(filePath)!
           ctx.setStatus(
             `{${DASH_COLORS.accent}-fg}⟳ fixing (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
           )
           fixTimer = setInterval(() => {
-            const s = getFixState(filePath)
+            const s = getFixState(filePath, issueId) ?? getFixState(filePath)
             if (!s || s.finishedAt) {
               if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
               return
