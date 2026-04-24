@@ -16,6 +16,10 @@ export function padVisible(s: string, width: number): string {
 const ANSI_ESCAPE_RE = /\x1B(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*\x07)/
 
 export function truncateVisible(s: string, maxLen: number): string {
+  // Guard against callers computing width via subtraction that could
+  // go to 0 or negative. Without this the while-loop condition
+  // `visible < maxLen - 1` returns `"…"` for a 0-width budget.
+  if (maxLen <= 0) return ""
   const stripped = s.replace(ANSI_RE, "")
   if (stripped.length <= maxLen) return s
 
