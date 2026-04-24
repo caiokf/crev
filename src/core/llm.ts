@@ -6,6 +6,15 @@ export type LlmCallOptions = {
   runtime: string
   model: string
   prompt: string
+  /**
+   * Optional abort signal. When the signal fires, the underlying
+   * runtime cancels its subprocess (valet forwards this to
+   * `execAbortable`). Required for user-initiated cancellation of
+   * in-flight triage / normalizer / auto-select calls — without
+   * it those long-running LLM calls would keep burning tokens
+   * after the user pressed [q].
+   */
+  signal?: AbortSignal
 }
 
 /**
@@ -22,6 +31,7 @@ export async function callLlm(opts: LlmCallOptions): Promise<string> {
       promptFile,
       diff: { diffContent: "", diffFile: "", type: "all" },
       outputFormat: "",
+      signal: opts.signal,
     })
     return result.raw
   })

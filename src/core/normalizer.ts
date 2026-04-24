@@ -15,6 +15,7 @@ export async function normalizeOutput(
   durationMs: number,
   exitCode: number,
   config: Config,
+  signal?: AbortSignal,
 ): Promise<NormalizedReview> {
   const base: Omit<NormalizedReview, "issues"> = {
     reviewer: reviewerName,
@@ -31,7 +32,7 @@ export async function normalizeOutput(
   }
 
   if (config.normalizer.enabled) {
-    const extracted = await extractWithNormalizer(raw, reviewerName, runtime, model, config)
+    const extracted = await extractWithNormalizer(raw, reviewerName, runtime, model, config, signal)
     return { ...base, issues: extracted }
   }
 
@@ -107,6 +108,7 @@ async function extractWithNormalizer(
   runtime: string,
   model: string,
   config: Config,
+  signal?: AbortSignal,
 ): Promise<ReviewIssue[]> {
   const prompt = `You are a JSON extraction assistant. Extract code review issues from the following review output and return valid JSON.
 
@@ -142,6 +144,7 @@ ${raw.slice(0, MAX_RAW_CHARS)}`
       runtime: normalizerRuntime,
       model: normalizerModel,
       prompt,
+      signal,
     })
     const parsed = tryParseIssues(raw, reviewer, runtime, model)
     return parsed.parsed ? parsed.issues : []

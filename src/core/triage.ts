@@ -10,6 +10,7 @@ type TriageInput = {
   diffContent: string
   diffType?: string
   config: Config
+  signal?: AbortSignal
 }
 
 type TriageResult = {
@@ -33,7 +34,7 @@ const VALID_CATEGORIES = REVIEW_CATEGORY_SET
 
 export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const start = performance.now()
-  const { issues, diffContent, diffType, config } = input
+  const { issues, diffContent, diffType, config, signal } = input
 
   if (issues.length === 0) {
     return {
@@ -50,7 +51,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   }
 
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
-  const verdicts = await callTriageAgent(prompt, config)
+  const verdicts = await callTriageAgent(prompt, config, signal)
 
   // If triage failed (returned no verdicts), return issues unchanged rather than
   // marking everything as "actionable" which would silently inflate the count.
@@ -225,10 +226,14 @@ export type RawTriageVerdict = {
   enrichment?: TriageCommentEnrichment
 }
 
-async function callTriageAgent(prompt: string, config: Config): Promise<RawTriageVerdict[]> {
+async function callTriageAgent(
+  prompt: string,
+  config: Config,
+  signal?: AbortSignal,
+): Promise<RawTriageVerdict[]> {
   const { runtime, model } = config.triage
   try {
-    const raw = await callLlm({ taskName: "Triage", runtime, model, prompt })
+    const raw = await callLlm({ taskName: "Triage", runtime, model, prompt, signal })
     return parseTriageResponse(raw)
   } catch (err) {
     console.error(`Warning: Triage failed (${runtime}/${model}): ${errorMessage(err)}`)

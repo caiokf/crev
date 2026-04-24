@@ -518,6 +518,15 @@ async function executeReviewer(
     }
 
     const rawResult = await runtime.execute(request)
-    return normalizeOutput(reviewer.name, runtimeName, model, rawResult.raw, rawResult.durationMs, rawResult.exitCode, opts.config)
+    return normalizeOutput(
+      reviewer.name,
+      runtimeName,
+      model,
+      rawResult.raw,
+      rawResult.durationMs,
+      rawResult.exitCode,
+      opts.config,
+      signal,
+    )
   })
 }

@@ -36,6 +36,7 @@ export async function autoSelectSchema(
   config: Config,
   source: DiffSource,
   analyze: boolean,
+  signal?: AbortSignal,
 ): Promise<AutoSelectResult> {
   const candidates = getSchemaDescriptions(crevDir)
 
@@ -48,7 +49,7 @@ export async function autoSelectSchema(
   }
 
   const stats = analyze ? null : await getDiffStats(source)
-  return selectWithLlm(candidates, stats, analyze, config)
+  return selectWithLlm(candidates, stats, analyze, config, signal)
 }
 
 export function getSchemaDescriptions(crevDir: string): SchemaCandidate[] {
@@ -186,13 +187,14 @@ async function selectWithLlm(
   stats: DiffStats | null,
   analyze: boolean,
   config: Config,
+  signal?: AbortSignal,
 ): Promise<AutoSelectResult> {
   const prompt = buildSelectionPrompt(candidates, stats, analyze)
   const runtime = config.normalizer.runtime
   const model = config.normalizer.model
 
   try {
-    const raw = await callLlm({ taskName: "Auto-Schema", runtime, model, prompt })
+    const raw = await callLlm({ taskName: "Auto-Schema", runtime, model, prompt, signal })
     return parseSelectionResponse(raw, candidates)
   } catch (err) {
     // Fallback: pick the first schema alphabetically
