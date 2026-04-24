@@ -1,29 +1,39 @@
 /**
  * Extract a JSON object containing a given key from raw text.
- * Tries each `{` position that precedes the key, from last to first,
- * to avoid the greedy-regex problem where preamble braces corrupt the match.
+ *
+ * Anchors on the *last* occurrence of the key (the LLM's final
+ * answer) and walks back through `{` positions to find its
+ * enclosing object, skipping over preamble braces that don't
+ * belong to any JSON value.
+ *
+ * Crucially, brace-walking stops at the prior occurrence of the
+ * same key. Without this bound, a malformed final block could
+ * silently fall back to a valid earlier block with the same key
+ * (e.g. a schema example in the preamble), returning stale
+ * findings as if they were the fresh output.
  */
 export function extractJsonObject(raw: string, key: string): string | null {
   const keyPattern = `"${key}"`
-  let searchFrom = raw.lastIndexOf(keyPattern)
+  const lastKey = raw.lastIndexOf(keyPattern)
+  if (lastKey < 0) return null
 
-  while (searchFrom >= 0) {
-    let bracePos = raw.lastIndexOf("{", searchFrom)
-    while (bracePos >= 0) {
-      const candidate = raw.slice(bracePos)
-      try {
-        const end = findMatchingBrace(candidate)
-        if (end < 0) { bracePos = bracePos > 0 ? raw.lastIndexOf("{", bracePos - 1) : -1; continue }
-        const parsed = JSON.parse(candidate.slice(0, end + 1))
-        if (parsed && typeof parsed === "object" && key in parsed) {
-          return JSON.stringify(parsed)
-        }
-      } catch {
-        // Not valid JSON from this position, try the previous `{`
+  const priorKey = raw.lastIndexOf(keyPattern, lastKey - 1)
+  const minBracePos = priorKey < 0 ? 0 : priorKey + keyPattern.length
+
+  let bracePos = raw.lastIndexOf("{", lastKey)
+  while (bracePos >= minBracePos) {
+    const candidate = raw.slice(bracePos)
+    try {
+      const end = findMatchingBrace(candidate)
+      if (end < 0) { bracePos = bracePos > 0 ? raw.lastIndexOf("{", bracePos - 1) : -1; continue }
+      const parsed = JSON.parse(candidate.slice(0, end + 1))
+      if (parsed && typeof parsed === "object" && key in parsed) {
+        return JSON.stringify(parsed)
       }
-      bracePos = bracePos > 0 ? raw.lastIndexOf("{", bracePos - 1) : -1
+    } catch {
+      // Not valid JSON from this position, try the previous `{`
     }
-    searchFrom = raw.lastIndexOf(keyPattern, searchFrom - 1)
+    bracePos = bracePos > 0 ? raw.lastIndexOf("{", bracePos - 1) : -1
   }
 
   return null

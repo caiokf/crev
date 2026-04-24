@@ -76,4 +76,23 @@ describe("extractJsonObject", () => {
     const result = extractJsonObject(raw, "issues")
     expect(JSON.parse(result!).issues).toHaveLength(1)
   })
+
+  it("does not fall back to a stale earlier object when the latest is malformed", () => {
+    // An earlier valid `{"issues": [...]}` block (e.g. a schema
+    // example) followed by a malformed final block must NOT silently
+    // return the stale earlier object.
+    const raw =
+      'Example: {"issues": [{"id": "stale"}]}\n\nFinal answer:\n{"issues": [{"id": "fresh", <-- broken'
+    expect(extractJsonObject(raw, "issues")).toBeNull()
+  })
+
+  it("returns the fresh object when both the earlier and final are valid", () => {
+    // Sanity check: the "latest wins" semantics still apply when
+    // the final candidate is parseable.
+    const raw =
+      'Example: {"issues": [{"id": "stale"}]}\n\nFinal:\n{"issues": [{"id": "fresh"}]}'
+    const result = extractJsonObject(raw, "issues")
+    const parsed = JSON.parse(result!)
+    expect(parsed.issues[0].id).toBe("fresh")
+  })
 })
