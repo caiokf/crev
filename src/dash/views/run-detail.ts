@@ -9,6 +9,14 @@ import { LIST_STYLE, BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
+ * Remembers the last-selected issue index per run file across
+ * unmount/remount cycles. Without this, navigating into an issue and
+ * backing out resets the cursor to the top of the list — annoying
+ * when triaging dozens of findings.
+ */
+const lastSelectedIndex = new Map<string, number>()
+
+/**
  * Run detail view. Left pane shows run metadata + per-reviewer issue
  * counts; right pane is a scrollable list of every issue across the
  * run, grouped by reviewer. Selecting an issue navigates to the
@@ -69,6 +77,7 @@ export function createRunDetailView(filePath: string): DashView {
       issueList.on("select", (_item, index) => {
         const issue = issues[index]
         if (!issue) return
+        lastSelectedIndex.set(filePath, index)
         ctx.router.navigate({ kind: "issue-detail", filePath, issueId: issue.id })
       })
 
@@ -95,11 +104,24 @@ export function createRunDetailView(filePath: string): DashView {
         } else {
           const widths = computeIssueWidths(issues)
           issueList.setItems(issues.map((issue) => formatIssueRow(issue, widths)))
+          // Restore the previous selection if we're re-entering the
+          // view (e.g. the user pressed [bksp] from issue-detail).
+          const prev = lastSelectedIndex.get(filePath)
+          if (prev !== undefined && prev < issues.length) {
+            issueList.select(prev)
+          }
         }
         ctx.screen.render()
       })
     },
     unmount() {
+      // Capture the cursor position before tearing the list down so
+      // plain arrow-scrolling (without pressing enter) is preserved
+      // too, not just explicit selections.
+      if (issueList && issues.length > 0) {
+        const current = (issueList as unknown as { selected?: number }).selected
+        if (typeof current === "number") lastSelectedIndex.set(filePath, current)
+      }
       issueList?.destroy()
       meta?.destroy()
       outer?.destroy()
