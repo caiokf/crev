@@ -52,7 +52,7 @@ export function createHomeView(): DashView {
       })
 
       list.focus()
-      ctx.setStatus("↑/↓ or j/k move · enter open · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [q] quit")
       ctx.screen.render()
     },
     unmount() {

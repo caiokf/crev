@@ -36,7 +36,7 @@ export function createSchemasListView(): DashView {
         style: LIST_STYLE,
       })
       list.focus()
-      ctx.setStatus("↑/↓ or j/k move · enter open · backspace back · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [bksp] back · [q] quit")
       ctx.screen.render()
 
       list.on("select", (_item, index) => {

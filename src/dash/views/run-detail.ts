@@ -62,7 +62,7 @@ export function createRunDetailView(filePath: string): DashView {
         style: LIST_STYLE,
       })
       issueList.focus()
-      ctx.setStatus("↑/↓ or j/k move · enter open · e editor · backspace back · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [e] editor · [bksp] back · [q] quit")
       ctx.screen.render()
 
       issueList.on("select", (_item, index) => {

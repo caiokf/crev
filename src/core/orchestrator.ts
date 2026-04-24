@@ -9,6 +9,7 @@ import { buildReviewerPrompt, getOutputFormat } from "./prompt.js"
 import { withResilience } from "./resilience.js"
 import { runTriage } from "./triage.js"
 import { DEFAULT_MODEL } from "./taxonomy.js"
+import type { ProgressCallback } from "./progress.js"
 import { UserCancelledError } from "./types.js"
 import type { NormalizedReview, ReviewResult, OutputMode, ReviewTarget } from "./types.js"
 import type { SchemaFileType, ReviewerConfig } from "../core/schema.js"
@@ -33,6 +34,14 @@ export type OrchestrateOptions = {
   analyze?: boolean
   output: OutputMode
   target: ReviewTarget
+  /**
+   * Optional lifecycle callback. Fires for reviewer start/complete and
+   * triage events so consumers (the dash, tests) can drive a live
+   * progress UI without subscribing through Effect's ProgressBus.
+   * Errors thrown by the callback are swallowed so a misbehaving UI
+   * can't tank a run.
+   */
+  onProgress?: ProgressCallback
 }
 
 export type PromptOnlyResult = {
@@ -54,6 +63,7 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
   const outputFormat = getOutputFormat()
   const timestamp = new Date().toISOString()
+  const runStart = performance.now()
 
   const isQuiet =
     opts.output.kind === "json" ||
@@ -65,6 +75,12 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
     const msg = `Running ${reviewers.length} reviewer${reviewers.length > 1 ? "s" : ""} from schema ${opts.schemaName}`
     process.stdout.write(`${msg}\n`)
   }
+
+  emitProgress(opts, {
+    kind: "run-started",
+    schema: opts.schemaName,
+    reviewerCount: reviewers.length,
+  })
 
   const { reviews, spinner } = await executeReviewers(reviewers, opts, outputFormat)
 
@@ -86,10 +102,31 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
 
     cleanupDiffFile(opts.diff)
 
+    emitProgress(opts, {
+      kind: "run-completed",
+      durationMs: performance.now() - runStart,
+    })
+
     return result
   } catch (err) {
     spinner?.stop()
+    emitProgress(opts, {
+      kind: "run-failed",
+      error: err instanceof Error ? err.message : String(err),
+    })
     throw err
+  }
+}
+
+function emitProgress(
+  opts: OrchestrateOptions,
+  event: Parameters<NonNullable<OrchestrateOptions["onProgress"]>>[0],
+): void {
+  if (!opts.onProgress) return
+  try {
+    opts.onProgress(event)
+  } catch {
+    // UI callbacks must never interrupt the run.
   }
 }
 
@@ -167,19 +204,43 @@ async function executeReviewersPlain(
     opts.output.kind === "dash"
 
   const promises = reviewers.map(async (reviewer) => {
-    if (!isQuiet) {
-      console.log(`Starting: ${reviewer.name} (${reviewer.runtime}/${resolveModelAlias(opts.config, reviewer.model)})`)
-    }
-
-    const result = await runSingleReviewer(reviewer, opts, outputFormat)
+    const resolvedModel = resolveModelAlias(opts.config, reviewer.model)
 
     if (!isQuiet) {
-      const elapsed = (result.durationMs / 1000).toFixed(1)
-      const issueCount = result.issues.length
-      console.log(`Completed: ${reviewer.name} - ${issueCount} issue${issueCount !== 1 ? "s" : ""} (${elapsed}s)`)
+      console.log(`Starting: ${reviewer.name} (${reviewer.runtime}/${resolvedModel})`)
     }
+    emitProgress(opts, {
+      kind: "reviewer-started",
+      name: reviewer.name,
+      runtime: reviewer.runtime,
+      model: resolvedModel,
+    })
 
-    return result
+    try {
+      const result = await runSingleReviewer(reviewer, opts, outputFormat)
+
+      if (!isQuiet) {
+        const elapsed = (result.durationMs / 1000).toFixed(1)
+        const issueCount = result.issues.length
+        console.log(`Completed: ${reviewer.name} - ${issueCount} issue${issueCount !== 1 ? "s" : ""} (${elapsed}s)`)
+      }
+      emitProgress(opts, {
+        kind: "reviewer-completed",
+        name: reviewer.name,
+        durationMs: result.durationMs,
+        issueCount: result.issues.length,
+        exitCode: result.exitCode,
+      })
+
+      return result
+    } catch (err) {
+      emitProgress(opts, {
+        kind: "reviewer-failed",
+        name: reviewer.name,
+        error: err instanceof Error ? err.message : String(err),
+      })
+      throw err
+    }
   })
 
   const settled = await Promise.allSettled(promises)
@@ -220,17 +281,41 @@ async function executeReviewersWithTui(
   try {
     settled = await Promise.allSettled(
       reviewers.map(async (reviewer) => {
-        const result = await runSingleReviewer(reviewer, opts, outputFormat, abort.signal)
-
-        if (abort.signal.aborted) return result
-
-        const state = result.exitCode === 0 ? "done" : "failed"
-        spinner.updateEntry(reviewer.name, state, {
-          elapsed: result.durationMs / 1000,
-          resultText: formatIssueSummary(result.issues.length),
+        emitProgress(opts, {
+          kind: "reviewer-started",
+          name: reviewer.name,
+          runtime: reviewer.runtime,
+          model: resolveModelAlias(opts.config, reviewer.model),
         })
 
-        return result
+        try {
+          const result = await runSingleReviewer(reviewer, opts, outputFormat, abort.signal)
+
+          if (abort.signal.aborted) return result
+
+          const state = result.exitCode === 0 ? "done" : "failed"
+          spinner.updateEntry(reviewer.name, state, {
+            elapsed: result.durationMs / 1000,
+            resultText: formatIssueSummary(result.issues.length),
+          })
+
+          emitProgress(opts, {
+            kind: "reviewer-completed",
+            name: reviewer.name,
+            durationMs: result.durationMs,
+            issueCount: result.issues.length,
+            exitCode: result.exitCode,
+          })
+
+          return result
+        } catch (err) {
+          emitProgress(opts, {
+            kind: "reviewer-failed",
+            name: reviewer.name,
+            error: err instanceof Error ? err.message : String(err),
+          })
+          throw err
+        }
       }),
     )
   } catch (err) {
@@ -310,6 +395,13 @@ async function runTriagePass(
     console.log(`Triage: analyzing ${allIssues.length} issues...`)
   }
 
+  emitProgress(opts, {
+    kind: "triage-started",
+    issueCount: allIssues.length,
+    runtime: effectiveConfig.triage.runtime,
+    model: effectiveConfig.triage.model,
+  })
+
   const result = await runTriage({
     issues: allIssues,
     diffContent: opts.diff.diffContent,
@@ -343,6 +435,14 @@ async function runTriagePass(
     const elapsed = (result.durationMs / 1000).toFixed(1)
     console.log(`Triage complete: ${resultText} (${elapsed}s)`)
   }
+
+  emitProgress(opts, {
+    kind: "triage-completed",
+    actionable,
+    deferred,
+    dismissed,
+    durationMs: result.durationMs,
+  })
 }
 
 // ── Single reviewer execution ──

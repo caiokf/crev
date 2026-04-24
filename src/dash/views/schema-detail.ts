@@ -36,7 +36,7 @@ export function createSchemaDetailView(name: string): DashView {
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("↑/↓ or j/k scroll · backspace back · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] scroll · [bksp] back · [q] quit")
       ctx.screen.render()
 
       void runDashEffect(showSchemaAction(name)).then((result) => {

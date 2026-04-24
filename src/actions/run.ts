@@ -9,6 +9,7 @@ import { autoSelectSchema } from "../core/schema-auto-select.js"
 import { cleanupDiffFile, resolveDiff as resolveDiffSync } from "../core/diff.js"
 import { buildPromptOnlyResult, orchestrate } from "../core/orchestrator.js"
 import type { OrchestrateOptions, PromptOnlyResult } from "../core/orchestrator.js"
+import type { ProgressCallback } from "../core/progress.js"
 import {
   applyModelOverrides,
   getModelOverrideFormatError,
@@ -40,6 +41,12 @@ export type AutoSelection = {
 
 export type RunActionInput = {
   readonly command: RunCommand
+  /**
+   * Optional callback invoked with lifecycle events during the run.
+   * The dash wires this to drive a live per-reviewer progress view;
+   * CLI callers leave it undefined so stdout stays the source of truth.
+   */
+  readonly onProgress?: ProgressCallback
 }
 
 export type RunActionOutput =
@@ -198,6 +205,7 @@ export const runAction = (
       analyze: cmd.analyze,
       output: cmd.output,
       target: cmd.target,
+      onProgress: input.onProgress,
     }
 
     if (cmd.output.kind === "prompt-only") {

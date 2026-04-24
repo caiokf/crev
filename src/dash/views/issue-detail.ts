@@ -38,7 +38,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("↑/↓ or j/k scroll · backspace back · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] scroll · [bksp] back · [q] quit")
       ctx.screen.render()
 
       void runDashEffect(showAction({ filePath })).then((result) => {

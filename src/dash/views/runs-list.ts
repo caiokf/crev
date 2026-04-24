@@ -41,7 +41,7 @@ export function createRunsListView(): DashView {
         style: LIST_STYLE,
       })
       list.focus()
-      ctx.setStatus("↑/↓ or j/k move · enter open · / filter · backspace back · q quit")
+      ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [/] filter · [bksp] back · [q] quit")
       ctx.screen.render()
 
       const renderRows = () => {
@@ -84,7 +84,7 @@ export function createRunsListView(): DashView {
         })
         filterInput.setValue(filter)
         filterInput.focus()
-        ctx.setStatus("type to filter · enter apply · esc cancel")
+        ctx.setStatus("type to filter · [enter] apply · [esc] cancel")
         ctx.screen.render()
 
         const closeInput = (apply: boolean) => {
@@ -93,7 +93,7 @@ export function createRunsListView(): DashView {
           filterInput.destroy()
           filterInput = null
           list?.focus()
-          ctx.setStatus("↑/↓ or j/k move · enter open · / filter · backspace back · q quit")
+          ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [/] filter · [bksp] back · [q] quit")
           renderRows()
         }
 

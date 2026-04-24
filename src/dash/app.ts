@@ -127,7 +127,7 @@ function confirmQuit(screen: blessed.Widgets.Screen, message: string): Promise<b
       label: " Quit? ",
       padding: { left: 2, right: 2, top: 1, bottom: 1 },
       style: { border: { fg: "yellow" } },
-      content: `${message}\n\n{gray-fg}y — quit   n — cancel{/gray-fg}`,
+      content: `${message}\n\n{gray-fg}[y] quit · [n] cancel{/gray-fg}`,
     })
     modal.focus()
     screen.render()

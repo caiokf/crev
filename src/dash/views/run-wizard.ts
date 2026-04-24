@@ -1,9 +1,10 @@
 import blessed from "blessed"
 import { listSchemasAction, type SchemaSummary } from "../../actions/list.js"
 import { runAction, type RunActionOutput } from "../../actions/run.js"
+import type { ProgressEvent } from "../../core/progress.js"
 import type { DiffSource, RunCommand } from "../../core/types.js"
 import { runDashEffect } from "../runtime.js"
-import { BOX_STYLE, LIST_STYLE } from "../theme.js"
+import { BOX_STYLE, DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
@@ -12,10 +13,39 @@ import type { AppContext, DashView } from "../types.js"
  * output so the orchestrator stays silent and blessed owns the
  * screen. On success, navigates to the run-detail view.
  *
- * Scope for this PR: schema pick → diff pick → execute. Per-reviewer
- * progress requires ProgressBus wiring into the orchestrator and is
- * deferred to a follow-up.
+ * The "running" phase subscribes to the orchestrator's `onProgress`
+ * callback and renders a per-reviewer status list with a spinner,
+ * elapsed counter, and result summary that update live as the
+ * orchestrator emits events.
  */
+
+export type ReviewerStatus =
+  | { readonly kind: "pending" }
+  | { readonly kind: "running"; readonly startedAt: number }
+  | {
+      readonly kind: "done"
+      readonly durationMs: number
+      readonly issueCount: number
+      readonly exitCode: number
+    }
+  | { readonly kind: "failed"; readonly error: string }
+
+export type ReviewerProgress = {
+  readonly name: string
+  readonly runtime?: string
+  readonly model?: string
+  readonly status: ReviewerStatus
+}
+
+export type TriageProgress =
+  | { readonly kind: "running"; readonly startedAt: number; readonly issueCount: number }
+  | {
+      readonly kind: "done"
+      readonly actionable: number
+      readonly deferred: number
+      readonly dismissed: number
+      readonly durationMs: number
+    }
 
 type WizardPhase =
   | { kind: "loading" }
@@ -27,8 +57,12 @@ type WizardPhase =
       diff: DiffSource
       analyze: boolean
       startedAt: number
+      reviewers: ReviewerProgress[]
+      triage: TriageProgress | null
     }
   | { kind: "error"; message: string }
+
+const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"] as const
 
 type DiffChoice = {
   readonly label: string
@@ -116,7 +150,7 @@ export function createRunWizardView(): DashView {
                 : ["  (no schemas — run `crev schema init <name>`)"],
             })
             list.focus()
-            ctx.setStatus("↑/↓ or j/k move · enter select · backspace cancel · q quit")
+            ctx.setStatus("[↑/↓] or [j/k] move · [enter] select · [bksp] cancel · [q] quit")
             list.on("select", (_item, index) => {
               if (phase.kind !== "pick-schema") return
               const schema = phase.schemas[index]
@@ -144,7 +178,7 @@ export function createRunWizardView(): DashView {
               items: DIFF_CHOICES.map((c) => `  ${c.label}`),
             })
             list.focus()
-            ctx.setStatus("↑/↓ or j/k move · enter start · backspace back · q quit")
+            ctx.setStatus("[↑/↓] or [j/k] move · [enter] start · [bksp] back · [q] quit")
             list.on("select", (_item, index) => {
               if (phase.kind !== "pick-diff") return
               const choice = DIFF_CHOICES[index]
@@ -157,6 +191,8 @@ export function createRunWizardView(): DashView {
                 diff,
                 analyze,
                 startedAt: Date.now(),
+                reviewers: [],
+                triage: null,
               }
               render()
               startRun(phase.schema, diff, analyze)
@@ -177,14 +213,14 @@ export function createRunWizardView(): DashView {
               content: renderRunning(running),
             })
             void box
-            ctx.setStatus("running · backspace cancel after done · q quit")
+            ctx.setStatus("running · [bksp] cancel after done · [q] quit")
 
             stopTicker()
             tickTimer = setInterval(() => {
               if (phase.kind !== "running" || !root) return
-              // Re-render the running view so the elapsed counter ticks.
+              // Re-render so the spinner frame + elapsed counters tick.
               render()
-            }, 500)
+            }, 120)
             break
           }
 
@@ -197,9 +233,9 @@ export function createRunWizardView(): DashView {
               bottom: 0,
               tags: true,
               padding: { left: 2, right: 2, top: 1, bottom: 1 },
-              content: `{red-fg}error:{/red-fg} ${phase.message}\n\n{gray-fg}backspace to go back{/gray-fg}`,
+              content: `{red-fg}error:{/red-fg} ${phase.message}\n\n{gray-fg}[bksp] to go back{/gray-fg}`,
             })
-            ctx.setStatus("backspace back · q quit")
+            ctx.setStatus("[bksp] back · [q] quit")
             break
           }
         }
@@ -212,6 +248,15 @@ export function createRunWizardView(): DashView {
           clearInterval(tickTimer)
           tickTimer = null
         }
+      }
+
+      const onProgress = (event: ProgressEvent): void => {
+        if (phase.kind !== "running") return
+        phase = {
+          ...phase,
+          ...applyProgress(phase, event),
+        }
+        render()
       }
 
       const startRun = (schemaName: string, diff: DiffSource, analyze: boolean) => {
@@ -230,7 +275,7 @@ export function createRunWizardView(): DashView {
             : null,
         )
 
-        void runDashEffect(runAction({ command })).then((result) => {
+        void runDashEffect(runAction({ command, onProgress })).then((result) => {
           stopTicker()
           ctx.setQuitGuard(null)
           if (phase.kind !== "running") return // user backed out
@@ -269,16 +314,165 @@ export function createRunWizardView(): DashView {
 }
 
 export function renderRunning(phase: Extract<WizardPhase, { kind: "running" }>): string {
-  const elapsed = Math.floor((Date.now() - phase.startedAt) / 1000)
-  return [
-    `{bold}running review{/bold}`,
-    "",
-    `schema:   {cyan-fg}${phase.schema}{/cyan-fg}`,
-    `diff:     ${phase.analyze ? "{yellow-fg}full repo analysis{/yellow-fg}" : formatDiff(phase.diff)}`,
-    `elapsed:  ${elapsed}s`,
-    "",
-    "{gray-fg}reviewers are executing — this can take a minute or two.{/gray-fg}",
-  ].join("\n")
+  const now = Date.now()
+  const elapsed = Math.floor((now - phase.startedAt) / 1000)
+  const frame = SPINNER_FRAMES[Math.floor(now / 80) % SPINNER_FRAMES.length]!
+
+  const lines: string[] = []
+  lines.push(`{bold}running review{/bold}`)
+  lines.push("")
+  lines.push(`schema:   {${DASH_COLORS.accent}-fg}${phase.schema}{/${DASH_COLORS.accent}-fg}`)
+  lines.push(
+    `diff:     ${phase.analyze ? `{${DASH_COLORS.warn}-fg}full repo analysis{/${DASH_COLORS.warn}-fg}` : formatDiff(phase.diff)}`,
+  )
+  lines.push(`elapsed:  ${elapsed}s`)
+  lines.push("")
+
+  if (phase.reviewers.length === 0) {
+    lines.push(`{gray-fg}${frame} starting reviewers…{/gray-fg}`)
+  } else {
+    lines.push(`{bold}reviewers{/bold}`)
+    const nameWidth = Math.min(
+      24,
+      Math.max(6, ...phase.reviewers.map((r) => r.name.length)),
+    )
+    for (const rv of phase.reviewers) {
+      lines.push(formatReviewerLine(rv, nameWidth, frame, now))
+    }
+  }
+
+  if (phase.triage) {
+    lines.push("")
+    lines.push(formatTriageLine(phase.triage, frame, now))
+  }
+
+  return lines.join("\n")
+}
+
+function formatReviewerLine(
+  rv: ReviewerProgress,
+  nameWidth: number,
+  frame: string,
+  now: number,
+): string {
+  const name = rv.name.padEnd(nameWidth)
+  const source = rv.runtime && rv.model ? `{gray-fg}${rv.runtime}/${rv.model}{/gray-fg}` : ""
+
+  switch (rv.status.kind) {
+    case "pending":
+      return `  {gray-fg}⋯{/gray-fg}  ${name}  ${source}  {gray-fg}pending{/gray-fg}`
+    case "running": {
+      const elapsed = Math.floor((now - rv.status.startedAt) / 1000)
+      return (
+        `  {${DASH_COLORS.accent}-fg}${frame}{/${DASH_COLORS.accent}-fg}  ` +
+        `${name}  ${source}  ` +
+        `{${DASH_COLORS.accent}-fg}${elapsed}s{/${DASH_COLORS.accent}-fg}`
+      )
+    }
+    case "done": {
+      const ok = rv.status.exitCode === 0
+      const icon = ok
+        ? `{${DASH_COLORS.ok}-fg}✓{/${DASH_COLORS.ok}-fg}`
+        : `{${DASH_COLORS.danger}-fg}✗{/${DASH_COLORS.danger}-fg}`
+      const elapsed = (rv.status.durationMs / 1000).toFixed(1)
+      const issues = rv.status.issueCount
+      const issueColor = issues === 0 ? DASH_COLORS.ok : issues >= 10 ? DASH_COLORS.danger : DASH_COLORS.warn
+      const result = ok
+        ? `{${issueColor}-fg}${issues} issue${issues === 1 ? "" : "s"}{/${issueColor}-fg}`
+        : `{${DASH_COLORS.danger}-fg}exit ${rv.status.exitCode}{/${DASH_COLORS.danger}-fg}`
+      return `  ${icon}  ${name}  ${source}  ${result} {gray-fg}(${elapsed}s){/gray-fg}`
+    }
+    case "failed":
+      return (
+        `  {${DASH_COLORS.danger}-fg}✗{/${DASH_COLORS.danger}-fg}  ` +
+        `${name}  ${source}  ` +
+        `{${DASH_COLORS.danger}-fg}${rv.status.error}{/${DASH_COLORS.danger}-fg}`
+      )
+  }
+}
+
+function formatTriageLine(triage: TriageProgress, frame: string, now: number): string {
+  if (triage.kind === "running") {
+    const elapsed = Math.floor((now - triage.startedAt) / 1000)
+    return `  {${DASH_COLORS.accent}-fg}${frame}{/${DASH_COLORS.accent}-fg}  triage · {gray-fg}${triage.issueCount} issue${triage.issueCount === 1 ? "" : "s"}{/gray-fg}  {${DASH_COLORS.accent}-fg}${elapsed}s{/${DASH_COLORS.accent}-fg}`
+  }
+  const elapsed = (triage.durationMs / 1000).toFixed(1)
+  return (
+    `  {${DASH_COLORS.ok}-fg}✓{/${DASH_COLORS.ok}-fg}  triage  ` +
+    `{${DASH_COLORS.ok}-fg}${triage.actionable} actionable{/${DASH_COLORS.ok}-fg} · ` +
+    `{${DASH_COLORS.warn}-fg}${triage.deferred} deferred{/${DASH_COLORS.warn}-fg} · ` +
+    `{gray-fg}${triage.dismissed} dismissed{/gray-fg} {gray-fg}(${elapsed}s){/gray-fg}`
+  )
+}
+
+export function applyProgress(
+  phase: Extract<WizardPhase, { kind: "running" }>,
+  event: ProgressEvent,
+): Pick<Extract<WizardPhase, { kind: "running" }>, "reviewers" | "triage"> {
+  switch (event.kind) {
+    case "run-started":
+    case "run-completed":
+    case "run-failed":
+      return { reviewers: phase.reviewers, triage: phase.triage }
+
+    case "reviewer-started": {
+      const existing = phase.reviewers.find((r) => r.name === event.name)
+      const next: ReviewerProgress = {
+        name: event.name,
+        runtime: event.runtime,
+        model: event.model,
+        status: { kind: "running", startedAt: Date.now() },
+      }
+      const reviewers = existing
+        ? phase.reviewers.map((r) => (r.name === event.name ? next : r))
+        : [...phase.reviewers, next]
+      return { reviewers, triage: phase.triage }
+    }
+
+    case "reviewer-completed": {
+      const reviewers = phase.reviewers.map((r) =>
+        r.name === event.name
+          ? {
+              ...r,
+              status: {
+                kind: "done" as const,
+                durationMs: event.durationMs,
+                issueCount: event.issueCount,
+                exitCode: event.exitCode,
+              },
+            }
+          : r,
+      )
+      return { reviewers, triage: phase.triage }
+    }
+
+    case "reviewer-failed": {
+      const reviewers = phase.reviewers.map((r) =>
+        r.name === event.name
+          ? { ...r, status: { kind: "failed" as const, error: event.error } }
+          : r,
+      )
+      return { reviewers, triage: phase.triage }
+    }
+
+    case "triage-started":
+      return {
+        reviewers: phase.reviewers,
+        triage: { kind: "running", startedAt: Date.now(), issueCount: event.issueCount },
+      }
+
+    case "triage-completed":
+      return {
+        reviewers: phase.reviewers,
+        triage: {
+          kind: "done",
+          actionable: event.actionable,
+          deferred: event.deferred,
+          dismissed: event.dismissed,
+          durationMs: event.durationMs,
+        },
+      }
+  }
 }
 
 export function formatDiff(d: DiffSource): string {
