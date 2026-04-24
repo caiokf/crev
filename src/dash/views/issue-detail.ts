@@ -2,8 +2,20 @@ import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import { showAction } from "../../actions/show.js"
 import { setVerdictAction } from "../../actions/verdict.js"
+import { fixAction } from "../../actions/fix.js"
+import { isFixConfigured } from "../../core/health.js"
 import type { ReviewIssue, TriageVerdict } from "../../core/types.js"
 import { copyToClipboard } from "../clipboard.js"
+import {
+  startFix,
+  getFixState,
+  updateFixProgress,
+  completeFix,
+  failFix,
+  isFixRunning,
+  isIssueBeingFixed,
+  formatElapsed,
+} from "../fix-state.js"
 import { runDashEffect } from "../runtime.js"
 import { BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
@@ -23,10 +35,13 @@ import type { AppContext, DashView } from "../types.js"
 export function createIssueDetailView(filePath: string, issueId: string): DashView {
   let box: Widgets.BoxElement | null = null
   let currentIssue: ReviewIssue | null = null
+  let fixTimer: ReturnType<typeof setInterval> | null = null
+  let fixConfigured = false
 
   return {
     route: { kind: "issue-detail", filePath, issueId },
     mount(ctx: AppContext) {
+      try { fixConfigured = isFixConfigured(ctx.crevDir) } catch { fixConfigured = false }
       box = blessed.box({
         parent: ctx.body,
         top: 0,
@@ -46,12 +61,12 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      // `[a]/[d]/[x]` triage shortcuts are always bound; `[c]` only
-      // appears in the statusline once we know an enrichment prompt
-      // exists (see the copy key handler below).
+      // `[a]/[d]/[x]` triage shortcuts are always bound; `[c]` and `[f]`
+      // only appear in the statusline once we know enrichment exists.
       const triageHint = "[a]actionable [d]deferred [x]dismissed"
-      const baseStatus = `[↑/↓] or [j/k] scroll · ${triageHint} · [bksp] back · [q] quit`
-      const statusWithCopy = `[↑/↓] or [j/k] scroll · [c] copy prompt · ${triageHint} · [bksp] back · [q] quit`
+      const fixHint = fixConfigured ? " · [f] fix" : ""
+      const baseStatus = `[↑/↓] or [j/k] scroll · ${triageHint}${fixHint} · [bksp] back · [q] quit`
+      const statusWithCopy = `[↑/↓] or [j/k] scroll · [c] copy prompt${fixHint} · ${triageHint} · [bksp] back · [q] quit`
       ctx.setStatus(baseStatus)
       ctx.screen.render()
 
@@ -107,6 +122,102 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
           })
       })
 
+      // ── [f] fix this issue ──
+      if (fixConfigured) {
+        box.key("f", () => {
+          if (!currentIssue) return
+          // Block if any fix is already running for this review
+          if (isFixRunning(filePath)) {
+            const state = getFixState(filePath)!
+            ctx.setStatus(
+              `{${DASH_COLORS.warn}-fg}fix already running (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)}){/${DASH_COLORS.warn}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          if (!currentIssue.triage?.enrichment?.promptForAgents?.trim()) {
+            ctx.setStatus(`{${DASH_COLORS.warn}-fg}no fix prompt available for this issue{/${DASH_COLORS.warn}-fg}`)
+            ctx.screen.render()
+            return
+          }
+
+          if (!startFix(filePath, { kind: "single", issueId }, "claude", "sonnet", 1)) return
+
+          ctx.setStatus(
+            `{${DASH_COLORS.accent}-fg}⟳ fixing issue…{/${DASH_COLORS.accent}-fg}`,
+          )
+          ctx.screen.render()
+
+          fixTimer = setInterval(() => {
+            const state = getFixState(filePath)
+            if (!state || state.finishedAt) {
+              if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+              return
+            }
+            ctx.setStatus(
+              `{${DASH_COLORS.accent}-fg}⟳ fixing (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+            )
+            ctx.screen.render()
+          }, 1000)
+
+          void runDashEffect(
+            fixAction({
+              filePath,
+              issueId,
+              onProgress: (completed, total, status) => {
+                updateFixProgress(filePath, completed, total, status)
+              },
+            }),
+          ).then((result) => {
+            if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+            completeFix(filePath)
+            if (!box) return
+            if (result.kind === "error") {
+              failFix(filePath, result.message)
+              ctx.setStatus(
+                `{${DASH_COLORS.danger}-fg}fix failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+              )
+              ctx.screen.render()
+              return
+            }
+            const status = result.value.statuses[0]
+            if (status?.status === "fixed") {
+              currentIssue = result.value.result.reviews
+                .flatMap((r) => r.issues)
+                .find((i) => i.id === issueId) ?? currentIssue
+              if (currentIssue) box.setContent(renderIssue(currentIssue))
+              ctx.setStatus(
+                `{${DASH_COLORS.ok}-fg}✓ issue fixed{/${DASH_COLORS.ok}-fg}`,
+              )
+            } else {
+              ctx.setStatus(
+                `{${DASH_COLORS.warn}-fg}fix ${status?.status ?? "unknown"}: ${status?.reasoning ?? ""}{/${DASH_COLORS.warn}-fg}`,
+              )
+            }
+            ctx.screen.render()
+          })
+        })
+
+        // On re-mount, check if this issue is currently being fixed
+        if (isIssueBeingFixed(filePath, issueId)) {
+          const state = getFixState(filePath)!
+          ctx.setStatus(
+            `{${DASH_COLORS.accent}-fg}⟳ fixing (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+          )
+          fixTimer = setInterval(() => {
+            const s = getFixState(filePath)
+            if (!s || s.finishedAt) {
+              if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+              return
+            }
+            ctx.setStatus(
+              `{${DASH_COLORS.accent}-fg}⟳ fixing (${s.runtime}/${s.model} · ${formatElapsed(s.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+            )
+            ctx.screen.render()
+          }, 1000)
+        }
+      }
+
       void runDashEffect(showAction({ filePath })).then((result) => {
         if (!box) return
         if (result.kind === "error") {
@@ -126,6 +237,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
       })
     },
     unmount() {
+      if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
       box?.destroy()
       box = null
       currentIssue = null

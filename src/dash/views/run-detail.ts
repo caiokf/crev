@@ -3,9 +3,21 @@ import type { Widgets } from "blessed"
 import path from "node:path"
 import { showAction } from "../../actions/show.js"
 import { setVerdictAction } from "../../actions/verdict.js"
+import { verifyAction } from "../../actions/verify.js"
+import { fixAction } from "../../actions/fix.js"
+import { isFixConfigured } from "../../core/health.js"
 import type { ReviewIssue, ReviewResult, TriageVerdict } from "../../core/types.js"
 import { fitCell } from "../../tui/ansi.js"
 import { openInEditor } from "../editor.js"
+import {
+  startFix,
+  getFixState,
+  updateFixProgress,
+  completeFix,
+  failFix,
+  isFixRunning,
+  formatElapsed,
+} from "../fix-state.js"
 import { runDashEffect } from "../runtime.js"
 import { LIST_STYLE, BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
@@ -42,10 +54,14 @@ export function createRunDetailView(filePath: string): DashView {
   let meta: Widgets.BoxElement | null = null
   let issueList: Widgets.ListElement | null = null
   let issues: ReviewIssue[] = []
+  let fixTimer: ReturnType<typeof setInterval> | null = null
+  let fixConfigured = false
 
   return {
     route: { kind: "run-detail", filePath },
     mount(ctx: AppContext) {
+      // Check if fix agent is configured
+      try { fixConfigured = isFixConfigured(ctx.crevDir) } catch { fixConfigured = false }
       outer = blessed.box({
         parent: ctx.body,
         top: 0,
@@ -83,8 +99,9 @@ export function createRunDetailView(filePath: string): DashView {
         style: LIST_STYLE,
       } as Parameters<typeof blessed.list>[0])
       issueList.focus()
+      const fixHint = fixConfigured ? " · [f] fix" : ""
       ctx.setStatus(
-        "[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [e] editor · [bksp] back · [q] quit",
+        `[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [v] verify${fixHint} · [e] editor · [bksp] back · [q] quit`,
       )
       ctx.screen.render()
 
@@ -144,6 +161,127 @@ export function createRunDetailView(filePath: string): DashView {
       issueList.key("d", () => applyVerdictToCursor("deferred"))
       issueList.key("x", () => applyVerdictToCursor("dismissed"))
 
+      let verifying = false
+      issueList.key("v", () => {
+        if (verifying || issues.length === 0) return
+        verifying = true
+        ctx.setStatus(`{${DASH_COLORS.accent}-fg}verifying issues against current code…{/${DASH_COLORS.accent}-fg}`)
+        ctx.screen.render()
+        void runDashEffect(verifyAction({ filePath })).then((result) => {
+          verifying = false
+          if (!meta || !issueList) return
+          if (result.kind === "error") {
+            ctx.setStatus(
+              `{${DASH_COLORS.danger}-fg}verify failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          const { summary } = result.value
+          // Reload the view to reflect updated statuses
+          const review = result.value.result
+          meta.setContent(renderMeta(review))
+          issues = flattenIssues(review)
+          const widths = computeIssueWidths(issues)
+          issueList.setItems(issues.map((i) => formatIssueRow(i, widths)))
+          const selected = (issueList as unknown as { selected?: number }).selected ?? 0
+          if (selected < issues.length) issueList.select(selected)
+          ctx.setStatus(
+            `{${DASH_COLORS.ok}-fg}✓ verified: ${summary.fixed} fixed, ${summary.open} open{/${DASH_COLORS.ok}-fg}`,
+          )
+          ctx.screen.render()
+        })
+      })
+
+      // ── [f] fix all actionable issues ──
+      if (fixConfigured) {
+        issueList.key("f", () => {
+          if (isFixRunning(filePath) || issues.length === 0) return
+          const actionable = issues.filter(
+            (i) => i.status !== "fixed" && i.status !== "wont-fix" && i.triage?.verdict === "actionable",
+          )
+          if (actionable.length === 0) {
+            ctx.setStatus(`{${DASH_COLORS.warn}-fg}no actionable issues to fix{/${DASH_COLORS.warn}-fg}`)
+            ctx.screen.render()
+            return
+          }
+          const fixState = getFixState(filePath)
+          const runtime = fixState?.runtime ?? "claude"
+          const model = fixState?.model ?? "sonnet"
+          if (!startFix(filePath, { kind: "bulk" }, runtime, model, actionable.length)) return
+
+          ctx.setStatus(
+            `{${DASH_COLORS.accent}-fg}⟳ fixing ${actionable.length} issues (${runtime}/${model})…{/${DASH_COLORS.accent}-fg}`,
+          )
+          ctx.screen.render()
+
+          // Start elapsed-time ticker
+          fixTimer = setInterval(() => {
+            const state = getFixState(filePath)
+            if (!state || state.finishedAt) {
+              if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+              return
+            }
+            ctx.setStatus(
+              `{${DASH_COLORS.accent}-fg}⟳ fixing ${state.completed}/${state.total} (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+            )
+            ctx.screen.render()
+          }, 1000)
+
+          void runDashEffect(
+            fixAction({
+              filePath,
+              onProgress: (completed, total, status) => {
+                updateFixProgress(filePath, completed, total, status)
+              },
+            }),
+          ).then((result) => {
+            if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+            completeFix(filePath)
+            if (!meta || !issueList) return
+            if (result.kind === "error") {
+              failFix(filePath, result.message)
+              ctx.setStatus(
+                `{${DASH_COLORS.danger}-fg}fix failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+              )
+              ctx.screen.render()
+              return
+            }
+            const { summary } = result.value
+            const review = result.value.result
+            meta.setContent(renderMeta(review))
+            issues = flattenIssues(review)
+            const widths = computeIssueWidths(issues)
+            issueList.setItems(issues.map((i) => formatIssueRow(i, widths)))
+            const selected = (issueList as unknown as { selected?: number }).selected ?? 0
+            if (selected < issues.length) issueList.select(selected)
+            ctx.setStatus(
+              `{${DASH_COLORS.ok}-fg}✓ fixed: ${summary.fixed} fixed, ${summary.failed} failed, ${summary.skipped} skipped{/${DASH_COLORS.ok}-fg}`,
+            )
+            ctx.screen.render()
+          })
+        })
+
+        // On re-mount, check if a fix is still running and resume the status ticker
+        if (isFixRunning(filePath)) {
+          const state = getFixState(filePath)!
+          ctx.setStatus(
+            `{${DASH_COLORS.accent}-fg}⟳ fixing ${state.completed}/${state.total} (${state.runtime}/${state.model} · ${formatElapsed(state.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+          )
+          fixTimer = setInterval(() => {
+            const s = getFixState(filePath)
+            if (!s || s.finishedAt) {
+              if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
+              return
+            }
+            ctx.setStatus(
+              `{${DASH_COLORS.accent}-fg}⟳ fixing ${s.completed}/${s.total} (${s.runtime}/${s.model} · ${formatElapsed(s.startedAt)})…{/${DASH_COLORS.accent}-fg}`,
+            )
+            ctx.screen.render()
+          }, 1000)
+        }
+      }
+
       void runDashEffect(showAction({ filePath })).then((result) => {
         if (!meta || !issueList) return
         if (result.kind === "error") {
@@ -178,6 +316,7 @@ export function createRunDetailView(filePath: string): DashView {
         const current = (issueList as unknown as { selected?: number }).selected
         if (typeof current === "number") lastSelectedIndex.set(filePath, current)
       }
+      if (fixTimer) { clearInterval(fixTimer); fixTimer = null }
       issueList?.destroy()
       meta?.destroy()
       outer?.destroy()
