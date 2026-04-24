@@ -183,6 +183,11 @@ describe("issue detail · findIssue / renderIssue", () => {
     expect(out).toContain("description")
   })
 
+  it("omits the prompt section for issues without enrichment", () => {
+    const out = renderIssue(issue)
+    expect(out).not.toContain("prompt for ai agents")
+  })
+
   it("renders triage verdict + enrichment when present", () => {
     const triaged: ReviewIssue = {
       ...issue,
@@ -229,12 +234,7 @@ describe("issue detail · buildCopyPrompt", () => {
     expect(buildCopyPrompt(triaged)).toBe("Verify + patch the null guard")
   })
 
-  it("falls back to a synthesized prompt when enrichment is missing", () => {
-    const out = buildCopyPrompt(issue)
-    expect(out).toContain("high")
-    expect(out).toContain("bug")
-    expect(out).toContain("src/foo.ts:42")
-    expect(out).toContain("Null deref")
-    expect(out).toContain("calling .trim()")
+  it("returns an empty string when enrichment is missing", () => {
+    expect(buildCopyPrompt(issue)).toBe("")
   })
 })

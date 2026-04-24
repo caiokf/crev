@@ -52,7 +52,9 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         if (!currentIssue) return
         const prompt = buildCopyPrompt(currentIssue)
         if (!prompt) {
-          ctx.setStatus(`{${DASH_COLORS.warn}-fg}no prompt to copy yet — run triage first{/${DASH_COLORS.warn}-fg}`)
+          ctx.setStatus(
+            `{${DASH_COLORS.warn}-fg}no prompt for ai agents — run with triage.enrichComments: true{/${DASH_COLORS.warn}-fg}`,
+          )
           ctx.screen.render()
           return
         }
@@ -98,26 +100,14 @@ export function findIssue(issues: readonly ReviewIssue[], id: string): ReviewIss
 }
 
 /**
- * Build the text that `[c]` copies to the clipboard. Prefers the
- * triage-enrichment prompt (canonical per the prompt skill); falls
- * back to a lightweight synthesized prompt so the copy key still
- * does something useful on un-triaged issues.
+ * Return the triage-enrichment prompt for AI agents verbatim, or the
+ * empty string if the run didn't produce one. This is the exact same
+ * field the PR-comment template (`triage.enrichment.promptForAgents`)
+ * renders — we never synthesize a fallback here so the dash mirrors
+ * what ends up in the PR.
  */
 export function buildCopyPrompt(issue: ReviewIssue): string {
-  const enriched = issue.triage?.enrichment?.promptForAgents?.trim()
-  if (enriched) return enriched
-
-  const where = issue.file
-    ? `${issue.file}${issue.line ? `:${issue.line}` : ""}`
-    : "(location unknown)"
-  return [
-    `Investigate and fix the following ${issue.severity} ${issue.category} issue in ${where}.`,
-    "",
-    `Title: ${issue.title}`,
-    "",
-    "Details:",
-    issue.description,
-  ].join("\n")
+  return issue.triage?.enrichment?.promptForAgents?.trim() ?? ""
 }
 
 export function renderIssue(issue: ReviewIssue): string {
@@ -180,7 +170,7 @@ export function renderIssue(issue: ReviewIssue): string {
         lines.push(`{gray-fg}\`\`\`{/gray-fg}`)
       }
 
-      if (enrich.promptForAgents) {
+      if (enrich.promptForAgents?.trim()) {
         lines.push("")
         lines.push(sectionHeader("prompt for ai agents"))
         lines.push(`{gray-fg}(press [c] to copy){/gray-fg}`)
