@@ -15,7 +15,7 @@ const runtimeConfigSchema = z.object({
 
 export type RuntimeConfig = z.infer<typeof runtimeConfigSchema>
 
-const configSchema = z.object({
+export const configSchema = z.object({
   defaults: z
     .object({
       schema: z.string().default("quick"),

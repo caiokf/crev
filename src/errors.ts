@@ -29,3 +29,37 @@ export class DirReadError extends Data.TaggedError("DirReadError")<{
   readonly path: string
   readonly cause: unknown
 }> {}
+
+// ── Config ──
+
+export class ConfigParseError extends Data.TaggedError("ConfigParseError")<{
+  readonly path: string
+  readonly cause: unknown
+}> {}
+
+export class CrevDirNotFoundError extends Data.TaggedError("CrevDirNotFoundError")<{
+  readonly searched: string
+}> {}
+
+// ── Schema ──
+
+export class SchemaNotFoundError extends Data.TaggedError("SchemaNotFoundError")<{
+  readonly name: string
+  readonly searched: readonly string[]
+}> {}
+
+export class SchemaInvalidError extends Data.TaggedError("SchemaInvalidError")<{
+  readonly path: string
+  readonly reason: string
+}> {}
+
+// ── Reviews ──
+
+export class ReviewParseError extends Data.TaggedError("ReviewParseError")<{
+  readonly path: string
+  readonly cause: unknown
+}> {}
+
+export class ReviewNotFoundError extends Data.TaggedError("ReviewNotFoundError")<{
+  readonly outputDir: string
+}> {}
