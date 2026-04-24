@@ -32,7 +32,17 @@ export interface AppContext {
   readonly router: DashRouter
   readonly setStatus: (text: string) => void
   readonly crevDir: string
+  /**
+   * Install/remove a guard that short-circuits the global quit
+   * behavior. Called by long-running views (e.g. the wizard while a
+   * review is executing) to prompt the user before discarding
+   * in-flight work.
+   */
+  readonly setQuitGuard: (guard: QuitGuard | null) => void
 }
+
+/** A guard returns the message to confirm, or null/undefined to allow quit. */
+export type QuitGuard = () => string | null | undefined
 
 export interface DashView {
   readonly route: DashRoute

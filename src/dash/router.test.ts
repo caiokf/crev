@@ -17,6 +17,7 @@ function makeStubCtx(): AppContext {
     router: {} as AppContext["router"],
     setStatus: vi.fn(),
     crevDir: "/tmp/.crev",
+    setQuitGuard: vi.fn(),
   }
 }
 

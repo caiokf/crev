@@ -2,6 +2,7 @@ import blessed from "blessed"
 import path from "node:path"
 import { showAction } from "../../actions/show.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
+import { openInEditor } from "../editor.js"
 import { runDashEffect } from "../runtime.js"
 import { LIST_STYLE, BOX_STYLE, DASH_COLORS } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
@@ -60,13 +61,20 @@ export function createRunDetailView(filePath: string): DashView {
         style: LIST_STYLE,
       })
       issueList.focus()
-      ctx.setStatus("↑/↓ move · enter open · backspace back · q quit")
+      ctx.setStatus("↑/↓ move · enter open · e editor · backspace back · q quit")
       ctx.screen.render()
 
       issueList.on("select", (_item, index) => {
         const issue = issues[index]
         if (!issue) return
         ctx.router.navigate({ kind: "issue-detail", filePath, issueId: issue.id })
+      })
+
+      issueList.key("e", () => {
+        void openInEditor(ctx.screen, filePath).catch((err) => {
+          ctx.setStatus(`editor failed: ${err instanceof Error ? err.message : String(err)}`)
+          ctx.screen.render()
+        })
       })
 
       void runDashEffect(showAction({ filePath })).then((result) => {

@@ -200,8 +200,15 @@ export function createRunWizardView(): DashView {
           analyze: false,
         }
 
+        ctx.setQuitGuard(() =>
+          phase.kind === "running"
+            ? "A review is still running. Quit anyway?"
+            : null,
+        )
+
         void runDashEffect(runAction({ command })).then((result) => {
           stopTicker()
+          ctx.setQuitGuard(null)
           if (phase.kind !== "running") return // user backed out
           if (result.kind === "error") {
             phase = { kind: "error", message: result.message }
@@ -230,6 +237,9 @@ export function createRunWizardView(): DashView {
       }
       root?.destroy()
       root = null
+      // Intentionally leave the quit guard in place: an in-flight run
+      // outlives the view, and the user should still be warned about
+      // discarding it. The guard clears itself when the run resolves.
     },
   }
 }

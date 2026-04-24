@@ -2,7 +2,7 @@ import blessed from "blessed"
 import { findCrevDir } from "../core/config.js"
 import { makeRouter } from "./router.js"
 import { DASH_COLORS, HEADER_STYLE, STATUSLINE_STYLE } from "./theme.js"
-import type { AppContext, DashRoute } from "./types.js"
+import type { AppContext, DashRoute, QuitGuard } from "./types.js"
 
 /**
  * App shell for `crev dash`.
@@ -70,12 +70,16 @@ export function runDash(opts: RunDashOptions = {}): Promise<void> {
 
   // ── Router + initial mount ──
   let ctxRef: AppContext | null = null
+  let quitGuard: QuitGuard | null = null
+  const setQuitGuard = (guard: QuitGuard | null) => {
+    quitGuard = guard
+  }
   const router = makeRouter(() => {
     if (!ctxRef) throw new Error("app context accessed before init")
     return ctxRef
   })
 
-  ctxRef = { screen, body, router, setStatus, crevDir }
+  ctxRef = { screen, body, router, setStatus, crevDir, setQuitGuard }
   router.navigate(opts.initialRoute ?? { kind: "home" })
 
   return new Promise<void>((resolve) => {
@@ -84,15 +88,57 @@ export function runDash(opts: RunDashOptions = {}): Promise<void> {
       resolve()
     }
 
+    const attemptQuit = (): void => {
+      const message = quitGuard?.()
+      if (!message) {
+        quit()
+        return
+      }
+      confirmQuit(screen, message).then((confirmed) => {
+        if (confirmed) {
+          setQuitGuard(null)
+          quit()
+        }
+      })
+    }
+
     // Global keybindings — views can still override locally.
-    screen.key(["q", "C-c"], () => quit())
+    screen.key(["q", "C-c"], () => attemptQuit())
     screen.key(["escape", "backspace"], () => {
       if (router.current().kind === "home") {
-        quit()
+        attemptQuit()
       } else {
         router.back()
       }
     })
+  })
+}
+
+function confirmQuit(screen: blessed.Widgets.Screen, message: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const modal = blessed.box({
+      parent: screen,
+      top: "center",
+      left: "center",
+      width: "60%",
+      height: 7,
+      tags: true,
+      border: "line",
+      label: " Quit? ",
+      padding: { left: 2, right: 2, top: 1, bottom: 1 },
+      style: { border: { fg: "yellow" } },
+      content: `${message}\n\n{gray-fg}y — quit   n — cancel{/gray-fg}`,
+    })
+    modal.focus()
+    screen.render()
+
+    const close = (confirmed: boolean) => {
+      modal.destroy()
+      screen.render()
+      resolve(confirmed)
+    }
+    modal.key(["y", "Y"], () => close(true))
+    modal.key(["n", "N", "escape"], () => close(false))
   })
 }
 
