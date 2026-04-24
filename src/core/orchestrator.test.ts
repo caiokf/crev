@@ -175,6 +175,8 @@ describe("buildPromptOnlyResult", () => {
 
   it("loads reviewer agent prompt content", () => {
     const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-prompt-only-agent-"))
+    const crevDir = path.join(tmpDir, ".crev")
+    fs.mkdirSync(crevDir, { recursive: true })
     const agentPath = path.join(tmpDir, "security.md")
     fs.writeFileSync(agentPath, "You are a security specialist.")
 
@@ -199,7 +201,7 @@ describe("buildPromptOnlyResult", () => {
           type: "all",
         },
         slug: "feature-branch",
-        crevDir: "/tmp",
+        crevDir,
         output: { kind: "prompt-only", format: "json" },
         target: { kind: "fresh" },
       })

@@ -290,7 +290,17 @@ export async function validateAgentRefs(
   const issues: ValidationIssue[] = []
   for (const reviewer of schema.reviewers) {
     if (reviewer.agent) {
-      const resolved = resolveAgentPath(reviewer.agent, ctx)
+      let resolved: string
+      try {
+        resolved = resolveAgentPath(reviewer.agent, ctx)
+      } catch (err) {
+        issues.push({
+          severity: "error",
+          reviewer: reviewer.name,
+          message: err instanceof Error ? err.message : String(err),
+        })
+        continue
+      }
       if (!fs.existsSync(resolved)) {
         issues.push({
           severity: "error",

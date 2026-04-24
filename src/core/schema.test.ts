@@ -232,19 +232,38 @@ describe("validateAgentRefs", () => {
     const agentFile = path.join(tmpDir, "security.md")
     fs.writeFileSync(agentFile, "persona")
 
-    const issues = await validateAgentRefs({
-      reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentFile }],
-    })
+    const issues = await validateAgentRefs(
+      {
+        reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: agentFile }],
+      },
+      { projectRoot: tmpDir },
+    )
     expect(issues).toHaveLength(0)
   })
 
   it("returns error for missing agent file", async () => {
-    const issues = await validateAgentRefs({
-      reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: "/nonexistent/missing.md" }],
-    })
+    const missingFile = path.join(tmpDir, "missing.md")
+    const issues = await validateAgentRefs(
+      {
+        reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: missingFile }],
+      },
+      { projectRoot: tmpDir },
+    )
     expect(issues).toHaveLength(1)
     expect(issues[0].severity).toBe("error")
     expect(issues[0].message).toContain("missing.md")
+  })
+
+  it("returns error when agent path escapes allowed roots", async () => {
+    const issues = await validateAgentRefs(
+      {
+        reviewers: [{ name: "Test", runtime: "claude", model: "sonnet", agent: "/etc/passwd" }],
+      },
+      { projectRoot: tmpDir, crevDir: path.join(tmpDir, ".crev") },
+    )
+    expect(issues).toHaveLength(1)
+    expect(issues[0].severity).toBe("error")
+    expect(issues[0].message).toMatch(/outside the allowed roots/)
   })
 
   it("skips reviewers without agent", async () => {

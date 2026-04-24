@@ -159,7 +159,9 @@ export function buildPromptOnlyResult(opts: OrchestrateOptions): PromptOnlyResul
       description: opts.target.kind === "fresh" ? opts.target.description : undefined,
     },
     prompts: reviewers.map((reviewer) => {
-      const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
+      const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze, {
+        crevDir: opts.crevDir,
+      })
       return {
         reviewer: reviewer.name,
         runtime: reviewer.runtime,
@@ -458,7 +460,9 @@ async function runSingleReviewer(
   outputFormat: string,
   signal?: AbortSignal,
 ): Promise<NormalizedReview> {
-  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze)
+  const built = buildReviewerPrompt(reviewer, opts.diff, outputFormat, opts.analyze, {
+    crevDir: opts.crevDir,
+  })
   const hasFailback = Object.keys(opts.config.failback).length > 0
 
   if (!hasFailback) {

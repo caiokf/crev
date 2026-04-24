@@ -1,5 +1,6 @@
 import { getRuntime } from "@caiokf/valet"
 import type { DiffInput } from "@caiokf/valet"
+import type { AgentPathContext } from "./agent-path.js"
 import { loadAgentPrompt } from "./config.js"
 import type { ReviewerConfig } from "./schema.js"
 import { DEFAULT_MODEL } from "./taxonomy.js"
@@ -17,13 +18,23 @@ export function buildReviewerPrompt(
   diff: DiffInput,
   outputFormat: string,
   analyze?: boolean,
+  agentCtx?: AgentPathContext,
 ): { model: string; fullPrompt: string } {
   const runtime = getRuntime(reviewer.runtime)
   const model = reviewer.model === DEFAULT_MODEL ? runtime.defaultModel : reviewer.model
 
   let prompt = reviewer.prompt ?? "Review the following code changes for issues."
   if (reviewer.agent) {
-    const persona = loadAgentPrompt(reviewer.agent)
+    let persona: string | null = null
+    try {
+      persona = loadAgentPrompt(reviewer.agent, agentCtx)
+    } catch (err) {
+      // Bounds-check rejections come out as throws; treat them as a
+      // missing persona so the reviewer falls back to its inline
+      // prompt (if any) instead of crashing the whole orchestration.
+      const msg = err instanceof Error ? err.message : String(err)
+      console.error(`Warning: Agent rejected for "${reviewer.name}": ${msg}`)
+    }
     if (persona) {
       prompt = `${persona}\n\n---\n\n${prompt}`
     } else {

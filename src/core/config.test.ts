@@ -136,12 +136,14 @@ describe("loadAgentPrompt", () => {
   it("loads agent file content", () => {
     const agentPath = path.join(tmpDir, "agents", "security.md")
     fs.writeFileSync(agentPath, "You are a security reviewer.")
-    const prompt = loadAgentPrompt(agentPath)
+    const prompt = loadAgentPrompt(agentPath, { projectRoot: tmpDir })
     expect(prompt).toBe("You are a security reviewer.")
   })
 
   it("returns null for missing agent", () => {
-    const prompt = loadAgentPrompt(path.join(tmpDir, "agents", "missing.md"))
+    const prompt = loadAgentPrompt(path.join(tmpDir, "agents", "missing.md"), {
+      projectRoot: tmpDir,
+    })
     expect(prompt).toBeNull()
   })
 
