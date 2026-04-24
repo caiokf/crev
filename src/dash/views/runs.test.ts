@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
-import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
+import { computeColumnWidths, formatRow as formatRunRow, matchesFilter } from "./runs-list.js"
 import { actionableMarker, computeIssueWidths, flattenIssues, formatIssueRow, renderMeta, ISSUE_LIST_OPTIONS } from "./run-detail.js"
-import { buildCopyPrompt, findIssue, formatDiff, renderIssue } from "./issue-detail.js"
+import { buildCopyPrompt, findIssue, formatCodeBlock, formatDiff, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 
 const issue: ReviewIssue = {
@@ -120,6 +120,38 @@ describe("runs list · computeColumnWidths", () => {
     ])
     expect(widths.slug).toBe(26)
     expect(widths.schema).toBe(17)
+  })
+})
+
+describe("runs list · matchesFilter", () => {
+  const row = {
+    filePath: "/repo/.crev/reviews/test.json",
+    slug: "add-feature",
+    schema: "quick",
+    timestamp: "2026-04-23T12:34:56Z",
+    totalIssues: 2,
+    reviewers: 1,
+  }
+
+  it("matches on slug substring (case-insensitive)", () => {
+    expect(matchesFilter(row, "feat")).toBe(true)
+    expect(matchesFilter(row, "ADD")).toBe(true)
+  })
+
+  it("matches on schema substring", () => {
+    expect(matchesFilter(row, "qui")).toBe(true)
+  })
+
+  it("matches on description when present", () => {
+    expect(matchesFilter({ ...row, description: "fixing login bug" }, "login")).toBe(true)
+  })
+
+  it("returns false when nothing matches", () => {
+    expect(matchesFilter(row, "nonexistent")).toBe(false)
+  })
+
+  it("handles missing description gracefully", () => {
+    expect(matchesFilter(row, "anything")).toBe(false)
   })
 })
 
@@ -346,5 +378,23 @@ describe("issue detail · formatDiff", () => {
     expect(out).toMatch(/\{gray-fg\}\{bold\}--- a\/foo\.ts/)
     // hunk header uses cyan foreground
     expect(out).toContain("{cyan-fg}@@ -1,2 +1,2 @@")
+  })
+})
+
+describe("issue detail · formatCodeBlock", () => {
+  it("delegates to formatDiff for diff language", () => {
+    const out = formatCodeBlock("+ added", "diff")
+    expect(out).toContain("{green-fg}")
+  })
+
+  it("wraps non-diff code in accent color", () => {
+    const out = formatCodeBlock("const x = 1", "ts")
+    expect(out).toContain("{cyan-fg}")
+    expect(out).toContain("const x = 1")
+  })
+
+  it("escapes blessed tags in non-diff code", () => {
+    const out = formatCodeBlock("{bold}not a tag{/bold}", "js")
+    expect(out).toContain("{open}bold{close}")
   })
 })
