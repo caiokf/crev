@@ -26,16 +26,33 @@ export function copyToClipboard(text: string): Promise<void> {
   return writeOsc52(text)
 }
 
-type NativeCopy = { readonly cmd: string; readonly args: readonly string[] }
+export type NativeCopy = { readonly cmd: string; readonly args: readonly string[] }
 
-function pickNativeCommand(): NativeCopy | null {
-  if (process.platform === "darwin") return { cmd: "pbcopy", args: [] }
-  if (process.platform === "win32") return { cmd: "clip", args: [] }
-  if (process.platform === "linux") {
-    if (process.env.WAYLAND_DISPLAY) return { cmd: "wl-copy", args: [] }
-    if (process.env.DISPLAY) return { cmd: "xclip", args: ["-selection", "clipboard"] }
+/**
+ * Pick the clipboard-writing CLI for the current platform. Exported
+ * so the selection logic (Wayland vs X11, no-op on headless linux)
+ * can be unit-tested without shelling out.
+ */
+export function pickNativeCommand(
+  platform: NodeJS.Platform = process.platform,
+  env: NodeJS.ProcessEnv = process.env,
+): NativeCopy | null {
+  if (platform === "darwin") return { cmd: "pbcopy", args: [] }
+  if (platform === "win32") return { cmd: "clip", args: [] }
+  if (platform === "linux") {
+    if (env.WAYLAND_DISPLAY) return { cmd: "wl-copy", args: [] }
+    if (env.DISPLAY) return { cmd: "xclip", args: ["-selection", "clipboard"] }
   }
   return null
+}
+
+/**
+ * Build the OSC 52 escape sequence for a payload. Exported for
+ * testing; `copyToClipboard` uses it internally.
+ */
+export function buildOsc52Escape(text: string): string {
+  const payload = Buffer.from(text, "utf8").toString("base64")
+  return `\x1b]52;c;${payload}\x07`
 }
 
 function runCopyCommand(cmd: string, args: readonly string[], text: string): Promise<void> {
@@ -57,8 +74,7 @@ function runCopyCommand(cmd: string, args: readonly string[], text: string): Pro
 function writeOsc52(text: string): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     try {
-      const payload = Buffer.from(text, "utf8").toString("base64")
-      const esc = `\x1b]52;c;${payload}\x07`
+      const esc = buildOsc52Escape(text)
       process.stdout.write(esc, (err) => {
         if (err) reject(err)
         else resolve()
