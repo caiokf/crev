@@ -2,6 +2,7 @@ import fs from "node:fs"
 import path from "node:path"
 import { getAllRuntimes, type RuntimeHealth } from "@caiokf/valet"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "./schema.js"
+import { loadLayeredConfig } from "./config.js"
 import { errorMessage } from "../util/cli-errors.js"
 
 export type SchemaReadiness = {
@@ -84,11 +85,42 @@ export function checkSchemaReadiness(
         }
       }
 
+      if (schema.fix?.runtime) {
+        const health = healthResults.find((h) => h.name === schema.fix!.runtime)
+        if (!health || !health.installed) {
+          issues.push(`${schema.fix.runtime}: not installed — fix agent will fail`)
+        } else if (health.authenticated === "no") {
+          issues.push(`${schema.fix.runtime}: not authenticated — fix agent will fail`)
+        }
+      }
+
       return { name, ready: issues.length === 0, issues }
     } catch (err) {
       return { name, ready: false, issues: [`failed to load schema: ${errorMessage(err)}`] }
     }
   })
+}
+
+/**
+ * Check whether the fix agent is configured. Returns true when either
+ * the global config or any loaded schema provides a fix runtime+model.
+ */
+export function isFixConfigured(crevDir: string): boolean {
+  try {
+    const config = loadLayeredConfig(crevDir)
+    if (config.fix?.runtime && config.fix?.model) return true
+  } catch { /* no config at all */ }
+
+  const schemas = listAllSchemas(crevDir)
+  for (const name of schemas) {
+    try {
+      const resolved = resolveSchemaPath(name, crevDir)
+      if (!resolved) continue
+      const schema = loadSchemaFile(resolved)
+      if (schema.fix?.runtime && schema.fix?.model) return true
+    } catch { /* skip broken schemas */ }
+  }
+  return false
 }
 
 /**
@@ -116,6 +148,13 @@ export function checkProjectSetup(crevDir: string): ProjectCheck[] {
     name: ".crev/reviews/",
     ok: reviewsExist,
     detail: reviewsExist ? "exists" : "missing",
+  })
+
+  const fixEnabled = isFixConfigured(crevDir)
+  checks.push({
+    name: "fix agent",
+    ok: fixEnabled,
+    detail: fixEnabled ? "configured" : "not configured — add fix.runtime + fix.model to config",
   })
 
   return checks

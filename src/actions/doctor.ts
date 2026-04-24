@@ -66,6 +66,11 @@ export const doctorAction = (
         referenced.add(triage.runtime)
         addUsage(runtimeUsage, triage.runtime, name)
       }
+      const fix = schema.right.fix
+      if (fix?.runtime) {
+        referenced.add(fix.runtime)
+        addUsage(runtimeUsage, fix.runtime, name)
+      }
     }
 
     const allRuntimes = getAllRuntimes()

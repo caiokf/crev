@@ -38,16 +38,21 @@ export const TriageSchema = z
     model: z.string().optional(),
     deduplicate: z.boolean().optional(),
     recategorize: z.boolean().optional(),
-    enrichComments: z.boolean().optional(),
   })
   .refine((t) => !t.enabled || (t.runtime && t.model), {
     message: "Triage requires runtime and model when enabled",
   })
 
+export const FixSchema = z.object({
+  runtime: RuntimeName.optional(),
+  model: z.string().optional(),
+})
+
 export const SchemaFile = z.object({
   description: z.string().optional(),
   reviewers: z.array(ReviewerSchema).min(1, "At least one reviewer is required"),
   triage: TriageSchema.optional(),
+  fix: FixSchema.optional(),
 })
 
 export const ValidatedSchemaFile = SchemaFile.superRefine((schema, ctx) => {
@@ -123,6 +128,12 @@ function applyModelAliases(schema: SchemaFileType, aliases: Record<string, strin
           model: schema.triage.model ? (aliases[schema.triage.model] ?? schema.triage.model) : schema.triage.model,
         }
       : schema.triage,
+    fix: schema.fix
+      ? {
+          ...schema.fix,
+          model: schema.fix.model ? (aliases[schema.fix.model] ?? schema.fix.model) : schema.fix.model,
+        }
+      : schema.fix,
   }
 }
 
