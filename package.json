@@ -1,6 +1,6 @@
 {
   "name": "@caiokf/crev",
-  "version": "0.7.1",
+  "version": "0.7.2",
   "type": "module",
   "bin": {
     "crev": "./dist/bin.js"
