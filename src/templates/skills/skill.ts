@@ -32,6 +32,9 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Show config layers          | \`crev config --layers\`                                   |
 | Review stats (latest)       | \`crev stats --schema <name>\`                             |
 | Review stats (all versions) | \`crev stats --schema <name> --history\`                   |
+| Open dashboard              | \`crev dash\`                                              |
+| Open a review in dashboard  | \`crev dash <review-file>\`                                |
+| Open an issue in dashboard  | \`crev dash <review-file> --issue <issue-id>\`             |
 | Detailed help               | \`crev help run\` / \`crev help schema\`                     |
 
 ## Configuration
@@ -64,10 +67,10 @@ To override a project schema locally, create \`.crev/schemas/<name>.local.yaml\`
 To add a personal schema available across all projects, place it in \`~/.crev/schemas/\`.
 
 **Files to gitignore:**
-\\\`\\\`\\\`
+\`\`\`
 .crev/config.local.yaml
 .crev/schemas/*.local.yaml
-\\\`\\\`\\\`
+\`\`\`
 
 ## Workflow
 
@@ -76,14 +79,14 @@ To add a personal schema available across all projects, place it in \`~/.crev/sc
 1. Pick a schema: \`crev list --schemas\`
 2. Run: \`crev run --schema <name> --base main\`
 3. Read output from \`.crev/reviews/<slug>.json\`
-4. For each actionable issue: either fix it or post it to the PR as a comment
+4. For each issue: fix it or set \`status: "wont-fix"\` when intentionally not fixing
 5. Re-run to merge: \`crev run --schema <name> --review-file .crev/reviews/<slug>.json\`
 
 ### Overriding Models at Runtime
 
 Use \`--model\` to override the runtime/model pair for reviewers without editing the schema file:
 
-\\\`\\\`\\\`bash
+\`\`\`bash
 # Override ALL reviewers to a different runtime/model
 crev run --schema standard --model codex/chatgpt-5.3
 
@@ -92,7 +95,7 @@ crev run --schema standard --model "Engineer=codex/chatgpt-5.3" --model "Securit
 
 # Mix: blanket default + per-reviewer override (per-reviewer wins)
 crev run --schema standard --model codex/chatgpt-5.3 --model "Security=claude/sonnet"
-\\\`\\\`\\\`
+\`\`\`
 
 Format: \`runtime/model\` for all reviewers, or \`Name=runtime/model\` for a specific reviewer. The flag is repeatable.
 
@@ -106,6 +109,7 @@ Output JSON structure:
 Each issue has:
 - \`severity\`: critical | high | medium | low
 - \`category\`: bug | security | performance | style | compliance | architecture
+- \`status\`: open | fixed | wont-fix (optional, defaults to open)
 - \`triage.verdict\`: actionable | deferred | dismissed (when triage enabled)
 - \`triage.reasoning\`: why triage decided that verdict
 - \`triage.enrichment\` (when \`triage.enrichComments: true\`):
@@ -118,7 +122,7 @@ Each issue has:
 - \`file\`, \`line\`, \`title\`, \`description\`
 
 Enrichment shape:
-\\\`\\\`\\\`json
+\`\`\`json
 {
   "triage": {
     "verdict": "actionable",
@@ -129,13 +133,13 @@ Enrichment shape:
       "minimalFix": {
         "summary": "Include the new secret ARN in \`secretsmanager:GetSecretValue\` resources.",
         "language": "diff",
-        "patch": "- old\\\\n+ new"
+        "patch": "- old\\n+ new"
       },
       "promptForAgents": "Verify the finding against current code and patch the role policy with the new ARN."
     }
   }
 }
-\\\`\\\`\\\`
+\`\`\`
 
 ### Posting PR Comments
 
@@ -148,14 +152,14 @@ When the user asks to post findings to the PR:
 2. Only post issues where \`triage.verdict === "actionable"\`.
 3. Post as a single PR review with one inline comment per issue.
 4. Use \`gh api\` to create a review with inline comments:
-   \\\`\\\`\\\`bash
-   gh api repos/{owner}/{repo}/pulls/{pr}/reviews \\\\
-     -f event=COMMENT \\\\
-     -f body="crev review: X actionable findings" \\\\
-     --jsonArray -f 'comments[][path]=file.ts' \\\\
-     -f 'comments[][line]=42' \\\\
+   \`\`\`bash
+   gh api repos/{owner}/{repo}/pulls/{pr}/reviews \\
+     -f event=COMMENT \\
+     -f body="crev review: X actionable findings" \\
+     --jsonArray -f 'comments[][path]=file.ts' \\
+     -f 'comments[][line]=42' \\
      -f 'comments[][body]=...'
-   \\\`\\\`\\\`
+   \`\`\`
    Each comment uses the issue's \`file\` and \`line\` fields.
    If an issue has no \`file\`/\`line\`, fall back to a plain
    PR comment instead.
@@ -175,7 +179,7 @@ Severity badge mapping:
 - \`low\` → \`🔵 Low\`
 
 Exact comment template:
-\\\`\\\`\\\`\\\`md
+\`\`\`\`md
 ⚠️ **Potential issue** | {{severity_badge}}
 
 **{{triage.enrichment.title}}**
@@ -187,34 +191,34 @@ Exact comment template:
 
 {{triage.enrichment.minimalFix.summary}}
 
-\\\`\\\`\\\`diff
+\`\`\`diff
 {{triage.enrichment.minimalFix.patch}}
-\\\`\\\`\\\`
+\`\`\`
 </details>
 
 <details>
 <summary>🔍 Prompt to fix it</summary>
 
-\\\`\\\`\\\`text
+\`\`\`text
 {{triage.enrichment.promptForAgents}}
-\\\`\\\`\\\`
+\`\`\`
 </details>
-\\\`\\\`\\\`\\\`
+\`\`\`\`
 
 The \`minimalFix.patch\` MUST use unified diff format with \`-\` and \`+\` line prefixes showing deletions and additions. Include a few lines of unchanged context (no prefix) around the change for readability. Example:
 
-\\\`\\\`\\\`diff
+\`\`\`diff
      databaseConnectionId: requireEnv("AUTH0_CONNECTION_ID"),
 -    merchantClientId: requireEnv("AUTH0_MERCHANT_CLIENT_ID", ""),
 +    merchantClientId: requireEnv("AUTH0_MERCHANT_CLIENT_ID"),
    },
-\\\`\\\`\\\`
+\`\`\`
 
 ### Creating a Schema
 
 Schemas live in \`.crev/schemas/<name>.yaml\`:
 
-\\\`\\\`\\\`yaml
+\`\`\`yaml
 description: What this schema reviews for
 reviewers:
   - name: Security
@@ -236,7 +240,7 @@ triage:
   runtime: claude
   model: opus
   enrichComments: true
-\\\`\\\`\\\`
+\`\`\`
 
 Per-reviewer fields:
 - \`prompt\` / \`agent\`: mutually exclusive. CodeRabbit accepts neither.
@@ -294,4 +298,10 @@ When running a review, tell the user:
 - Reviewers run in parallel (30-90s typical)
 - When done: summarize issue counts by severity
 - Ask which issues to fix vs dismiss
+- Offer a dashboard deep-link so the user can jump straight into
+  the new findings: \`crev dash .crev/reviews/<slug>.json\`. For a
+  specific issue, append \`--issue <issue-id>\` (the \`id\` field on
+  each issue in the JSON). Backspace/escape walks back through
+  run-detail → runs list → home as if the user had navigated in
+  manually.
 `

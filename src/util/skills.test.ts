@@ -120,6 +120,19 @@ describe("getInstalledSkills", () => {
   })
 })
 
+describe("skill template parity", () => {
+  it("stays byte-identical to the committed SKILL.md in this repo", () => {
+    // The template is the source of truth — `crev update` writes its
+    // decoded value verbatim into `.claude/skills/crev/SKILL.md`. If
+    // anyone edits one without the other they drift, and agents
+    // running `crev update` would clobber the real docs. Pin them.
+    const repoSkillPath = path.join(__dirname, "..", "..", ".claude/skills/crev/SKILL.md")
+    if (!fs.existsSync(repoSkillPath)) return // not checked out (e.g. published package)
+    const committed = fs.readFileSync(repoSkillPath, "utf-8")
+    expect(skillContent).toBe(committed)
+  })
+})
+
 describe("isSkillUpToDate", () => {
   let tmpDir: string
 
