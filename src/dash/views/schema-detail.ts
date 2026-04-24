@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import path from "node:path"
 import { showSchemaAction, type SchemaDetail } from "../../actions/schema.js"
 import { runDashEffect } from "../runtime.js"
@@ -12,7 +13,7 @@ import type { AppContext, DashView } from "../types.js"
  * need to see the error message to fix the schema.
  */
 export function createSchemaDetailView(name: string): DashView {
-  let box: blessed.Widgets.BoxElement | null = null
+  let box: Widgets.BoxElement | null = null
 
   return {
     route: { kind: "schema-detail", name },

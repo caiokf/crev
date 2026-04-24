@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import { showAction } from "../../actions/show.js"
 import type { ReviewIssue } from "../../core/types.js"
 import { copyToClipboard } from "../clipboard.js"
@@ -19,7 +20,7 @@ import type { AppContext, DashView } from "../types.js"
  * agent of choice.
  */
 export function createIssueDetailView(filePath: string, issueId: string): DashView {
-  let box: blessed.Widgets.BoxElement | null = null
+  let box: Widgets.BoxElement | null = null
   let currentIssue: ReviewIssue | null = null
 
   return {

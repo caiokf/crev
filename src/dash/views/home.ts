@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import { DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashRoute, DashView } from "../types.js"
 
@@ -23,7 +24,7 @@ const ENTRIES: ReadonlyArray<HomeEntry> = [
 ]
 
 export function createHomeView(): DashView {
-  let list: blessed.Widgets.ListElement | null = null
+  let list: Widgets.ListElement | null = null
 
   return {
     route: { kind: "home" },

@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import { listSchemasAction, type SchemaSummary } from "../../actions/list.js"
 import { runAction, type RunActionOutput } from "../../actions/run.js"
 import type { ProgressEvent } from "../../core/progress.js"
@@ -90,7 +91,7 @@ export const DIFF_CHOICES: ReadonlyArray<DiffChoice> = [
 
 export function createRunWizardView(): DashView {
   let phase: WizardPhase = { kind: "loading" }
-  let root: blessed.Widgets.BoxElement | null = null
+  let root: Widgets.BoxElement | null = null
   let tickTimer: NodeJS.Timeout | null = null
 
   const destroyChildren = () => {

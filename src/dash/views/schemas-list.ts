@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import { listSchemasAction, type SchemaSummary } from "../../actions/list.js"
 import { runDashEffect } from "../runtime.js"
 import { DASH_COLORS, LIST_STYLE } from "../theme.js"
@@ -14,7 +15,7 @@ import type { AppContext, DashView } from "../types.js"
  * failure instead of silently hiding it.
  */
 export function createSchemasListView(): DashView {
-  let list: blessed.Widgets.ListElement | null = null
+  let list: Widgets.ListElement | null = null
   let rows: SchemaSummary[] = []
 
   return {

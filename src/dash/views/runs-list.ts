@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import path from "node:path"
 import { listReviewsAction, type ReviewSummary } from "../../actions/show.js"
 import { runDashEffect } from "../runtime.js"
@@ -16,8 +17,8 @@ import type { AppContext, DashView } from "../types.js"
  * returns focus to the list.
  */
 export function createRunsListView(): DashView {
-  let list: blessed.Widgets.ListElement | null = null
-  let filterInput: blessed.Widgets.TextboxElement | null = null
+  let list: Widgets.ListElement | null = null
+  let filterInput: Widgets.TextboxElement | null = null
   let allRows: ReviewSummary[] = []
   let visibleRows: ReviewSummary[] = []
   let filter = ""

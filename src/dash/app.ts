@@ -1,7 +1,5 @@
-// Must precede `import blessed` so the shim's static requires land in
-// the bundle before blessed's own widget loader runs.
-import "./blessed-widgets-shim.js"
-import blessed from "blessed"
+import blessed from "./blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import { findCrevDir } from "../core/config.js"
 import { makeRouter } from "./router.js"
 import { DASH_COLORS, HEADER_STYLE, STATUSLINE_STYLE } from "./theme.js"
@@ -117,7 +115,7 @@ export function runDash(opts: RunDashOptions = {}): Promise<void> {
   })
 }
 
-function confirmQuit(screen: blessed.Widgets.Screen, message: string): Promise<boolean> {
+function confirmQuit(screen: Widgets.Screen, message: string): Promise<boolean> {
   return new Promise<boolean>((resolve) => {
     const modal = blessed.box({
       parent: screen,

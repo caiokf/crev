@@ -1,4 +1,5 @@
-import blessed from "blessed"
+import blessed from "../blessed-widgets-shim.js"
+import type { Widgets } from "blessed"
 import path from "node:path"
 import { showAction } from "../../actions/show.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
@@ -14,9 +15,9 @@ import type { AppContext, DashView } from "../types.js"
  * issue-detail view.
  */
 export function createRunDetailView(filePath: string): DashView {
-  let outer: blessed.Widgets.BoxElement | null = null
-  let meta: blessed.Widgets.BoxElement | null = null
-  let issueList: blessed.Widgets.ListElement | null = null
+  let outer: Widgets.BoxElement | null = null
+  let meta: Widgets.BoxElement | null = null
+  let issueList: Widgets.ListElement | null = null
   let issues: ReviewIssue[] = []
 
   return {
