@@ -27,8 +27,6 @@ export type FixInput = {
   readonly runtime?: string
   /** Override model. */
   readonly model?: string
-  /** Max agent turns per issue (default: 10). */
-  readonly maxTurns?: number
   readonly signal?: AbortSignal
   /** Called after each issue finishes. */
   readonly onProgress?: (completed: number, total: number, status: FixStatus) => void
@@ -78,7 +76,6 @@ export const fixAction = (
     let model = input.model ?? config.fix?.model ?? "sonnet"
 
     // Check schema-level fix overrides
-    let schemaMaxTurns: number | undefined
     const schemaName = result.metadata.schema
     if (schemaName) {
       const schemaPath = yield* Effect.sync(() => resolveSchemaPath(schemaName, crevDir))
@@ -87,7 +84,6 @@ export const fixAction = (
         if (schema._tag === "Right" && schema.right.fix) {
           runtime = input.runtime ?? schema.right.fix.runtime ?? runtime
           model = input.model ?? schema.right.fix.model ?? model
-          schemaMaxTurns = schema.right.fix.maxTurns
         }
       }
     }
@@ -113,15 +109,11 @@ export const fixAction = (
       })
     }
 
-    // CLI > schema > config > default (10)
-    const maxTurns = input.maxTurns ?? schemaMaxTurns ?? config.fix?.maxTurns
-
     const fixResult = yield* Effect.promise(() =>
       runFix({
         issues: eligible,
         runtime,
         model,
-        maxTurns,
         signal: input.signal,
         onProgress: input.onProgress,
       }),

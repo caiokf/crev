@@ -46,7 +46,6 @@ export const TriageSchema = z
 export const FixSchema = z.object({
   runtime: RuntimeName.optional(),
   model: z.string().optional(),
-  maxTurns: z.number().int().positive().optional(),
 })
 
 export const SchemaFile = z.object({

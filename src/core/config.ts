@@ -71,7 +71,6 @@ export const configSchema = z.object({
     .object({
       runtime: z.string().optional(),
       model: z.string().optional(),
-      maxTurns: z.number().int().positive().optional(),
     })
     .optional(),
 })

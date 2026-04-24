@@ -13,8 +13,6 @@ export type FixInput = {
   runtime: string
   model: string
   signal?: AbortSignal
-  /** Max agent turns per issue (default: 10). */
-  maxTurns?: number
   /** Called after each issue finishes. */
   onProgress?: (completed: number, total: number, status: FixStatus) => void
 }
@@ -32,7 +30,7 @@ export type FixResult = {
  */
 export async function runFix(input: FixInput): Promise<FixResult> {
   const start = performance.now()
-  const { issues, runtime, model, signal, maxTurns = 10, onProgress } = input
+  const { issues, runtime, model, signal, onProgress } = input
 
   const statuses: FixStatus[] = []
 
@@ -60,7 +58,6 @@ export async function runFix(input: FixInput): Promise<FixResult> {
         model,
         prompt: fixPrompt,
         signal,
-        extraArgs: ["--max-turns", String(maxTurns)],
       })
       const status = parseFixResponse(raw, issue.id)
       statuses.push(status)
