@@ -20,6 +20,8 @@ export const COMMAND_DESCRIPTIONS = {
   update: "Regenerate AI tool skills",
   help: "AI-friendly detailed help",
   dash: "Interactive dashboard (schemas, runs, reviews)",
+  verify: "Check which review issues have been fixed in the current code",
+  fix: "Auto-fix review issues using AI coding agents",
 } as const
 
 export type CommandPath =
@@ -27,6 +29,8 @@ export type CommandPath =
   | "show"
   | "diff"
   | "stats"
+  | "verify"
+  | "fix"
   | "config"
   | "doctor"
   | "list"
@@ -42,6 +46,8 @@ export const HELP_COMMAND_ORDER: readonly CommandPath[] = [
   "show",
   "diff",
   "stats",
+  "verify",
+  "fix",
   "config",
   "doctor",
   "list",
@@ -58,6 +64,8 @@ export const GENERAL_HELP_COMMANDS: ReadonlyArray<{ usage: string; description: 
   { usage: "crev show [file.json]", description: "Pretty-print a review (default: latest)" },
   { usage: "crev diff [flags]", description: "Preview what diff would be reviewed" },
   { usage: "crev stats", description: "Aggregate stats across reviews" },
+  { usage: "crev verify [file.json]", description: COMMAND_DESCRIPTIONS.verify },
+  { usage: "crev fix [file.json]", description: COMMAND_DESCRIPTIONS.fix },
   { usage: "crev config [--layers]", description: "Show resolved configuration" },
   { usage: "crev doctor [--all] [--json] [--ping]", description: "Health check" },
   { usage: "crev list [--schemas|--runtimes]", description: "Discover what's available" },

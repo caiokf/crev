@@ -12,6 +12,8 @@ import { registerUpdateCommand } from "./commands/update.js"
 import { registerStatsCommand } from "./commands/stats.js"
 import { registerConfigCommand } from "./commands/config.js"
 import { registerDashCommand } from "./commands/dash.js"
+import { registerVerifyCommand } from "./commands/verify.js"
+import { registerFixCommand } from "./commands/fix.js"
 import { ROOT_PROGRAM_DESCRIPTION } from "./commands/metadata.js"
 
 program
@@ -31,5 +33,7 @@ registerUpdateCommand(program)
 registerStatsCommand(program)
 registerConfigCommand(program)
 registerDashCommand(program)
+registerVerifyCommand(program)
+registerFixCommand(program)
 
 program.parse()
