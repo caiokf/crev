@@ -1,6 +1,6 @@
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { buildDoctorJsonPayload } from "./doctor.js"
+import { buildDoctorJsonPayload, sanitizeDetail, sanitizeVersion } from "./doctor.js"
 import { sanitizeRuntimeHealth, selectRuntimesToCheck } from "../core/runtimes.js"
 
 const valetMocks = vi.hoisted(() => ({
@@ -317,5 +317,48 @@ describe("selectRuntimesToCheck", () => {
   it("checks all runtimes when --all is enabled", () => {
     const selected = selectRuntimesToCheck(runtimes, new Set(["gemini"]), true)
     expect(selected.map((r) => r.name)).toEqual(["claude", "gemini", "codex"])
+  })
+})
+
+describe("sanitizeVersion", () => {
+  it("prefers a semver found anywhere in the raw output", () => {
+    expect(sanitizeVersion("2.1.98")).toBe("2.1.98")
+    expect(sanitizeVersion("Foo bar\nversion 0.23.0 (beta)")).toBe("0.23.0")
+  })
+
+  it("handles multi-line TUI banners by extracting the semver", () => {
+    const mastraOutput =
+      "Skills loaded from:\n - /repo/.claude/skills\n - /home/.claude/skills\nHooks: 3 hook(s) configured\nmastracode 1.25.0"
+    expect(sanitizeVersion(mastraOutput)).toBe("1.25.0")
+  })
+
+  it("strips ANSI + control bytes before matching", () => {
+    // eslint-disable-next-line no-control-regex
+    expect(sanitizeVersion("\x1B[32m\x00\x07v3.4.5\x1B[0m")).toBe("3.4.5")
+  })
+
+  it("falls back to the first printable line when no semver is present", () => {
+    expect(sanitizeVersion("\n\n  beta channel  \n")).toBe("beta channel")
+  })
+
+  it("returns an em-dash placeholder for null/empty input", () => {
+    expect(sanitizeVersion(null)).toBe("–")
+    expect(sanitizeVersion("")).toBe("–")
+    expect(sanitizeVersion(undefined)).toBe("–")
+  })
+})
+
+describe("sanitizeDetail", () => {
+  it("keeps a single clean line as-is", () => {
+    expect(sanitizeDetail("claude auth status: authenticated")).toBe(
+      "claude auth status: authenticated",
+    )
+  })
+
+  it("drops everything after the first line and strips control bytes", () => {
+    // eslint-disable-next-line no-control-regex
+    expect(sanitizeDetail("env: ANTHROPIC_API_KEY\n\x1B[31mgarbage\x07")).toBe(
+      "env: ANTHROPIC_API_KEY",
+    )
   })
 })
