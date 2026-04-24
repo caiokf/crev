@@ -169,10 +169,14 @@ export function createMultiSpinner(
   }
 
   stream.write(HIDE_CURSOR)
-  process.on("exit", () => {
+  // Keep a handle to the listener so stop()/clear() can remove it —
+  // test suites that spawn multiple spinners per process would
+  // otherwise accumulate listeners and hit MaxListenersExceededWarning.
+  const exitHandler = (): void => {
     stream.write(SHOW_CURSOR)
     teardownKeyboard()
-  })
+  }
+  process.on("exit", exitHandler)
   setupKeyboard()
   render()
   const interval = setInterval(render, 80)
@@ -203,6 +207,7 @@ export function createMultiSpinner(
       stopped = true
       clearInterval(interval)
       teardownKeyboard()
+      process.removeListener("exit", exitHandler)
       try {
         stopped = false
         render()
@@ -217,6 +222,7 @@ export function createMultiSpinner(
       stopped = true
       clearInterval(interval)
       teardownKeyboard()
+      process.removeListener("exit", exitHandler)
       if (lineCount > 0) {
         stream.write(`\x1B[${lineCount}A`)
         for (let i = 0; i < lineCount; i++) {
