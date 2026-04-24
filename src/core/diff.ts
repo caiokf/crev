@@ -71,11 +71,23 @@ async function getPrDiff(pr: string): Promise<string> {
   return stdout
 }
 
+// Refuse refs that could be interpreted as git flags. Git's own
+// check-ref-format forbids refs starting with `-`, so rejecting them
+// here is a narrow, correct defense against flag injection from
+// user-supplied --base / --base-commit values.
+function assertSafeRef(ref: string, label: string): void {
+  if (ref.startsWith("-")) {
+    throw new Error(`Invalid ${label} "${ref}": must not start with "-"`)
+  }
+}
+
 async function getBranchDiff(base: string, type: "all" | "committed" | "uncommitted"): Promise<string> {
   if (type === "uncommitted") {
     const { stdout } = await execFileAsync("git", ["diff"], { maxBuffer: MAX_BUFFER })
     return stdout
   }
+
+  assertSafeRef(base, "base")
 
   if (type === "committed") {
     const { stdout } = await execFileAsync("git", ["diff", `${base}...HEAD`], { maxBuffer: MAX_BUFFER })
@@ -87,6 +99,7 @@ async function getBranchDiff(base: string, type: "all" | "committed" | "uncommit
 }
 
 async function getCommitDiff(baseCommit: string): Promise<string> {
+  assertSafeRef(baseCommit, "base commit")
   const { stdout } = await execFileAsync("git", ["diff", `${baseCommit}...HEAD`], { maxBuffer: MAX_BUFFER })
   return stdout
 }
