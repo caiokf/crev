@@ -2,8 +2,10 @@ import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
+import { Effect, Exit } from "effect"
 import { findCrevDir } from "../core/config.js"
-import { listAllSchemas, resolveSchemaPath, parseSchemaFile, validateAgentRefs, loadSchemaFile } from "../core/schema.js"
+import { showSchemaAction, validateSchemaAction } from "../actions/schema.js"
+import { CliLive } from "../layers.js"
 import { getSchemasDir } from "../util/paths.js"
 import { exitWithCode, exitWithError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
@@ -20,12 +22,15 @@ export function registerSchemaCommand(program: Command): void {
   const schema = program.command("schema").description(COMMAND_DESCRIPTIONS.schema)
 
   // --- schema init ---
+  // (Still uses direct fs — to be migrated alongside Prompter/init action.)
   schema
     .command("init <name>")
     .description(COMMAND_DESCRIPTIONS.schemaInit)
-    .action((name) => {
+    .action((name: string) => {
       if (!/^[a-zA-Z0-9._-]{1,100}$/.test(name)) {
-        exitWithError(chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"))
+        exitWithError(
+          chalk.red("Error: Schema name must be 1-100 alphanumeric, dash, dot, or underscore characters"),
+        )
       }
 
       const crevDir = findCrevDir()
@@ -46,45 +51,58 @@ export function registerSchemaCommand(program: Command): void {
     .command("show <name>")
     .description(COMMAND_DESCRIPTIONS.schemaShow)
     .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
-    .action((schemaName, opts) => {
-      const crevDir = findCrevDir()
-      const schemaPath = resolveSchemaPath(schemaName, crevDir)
+    .action(async (schemaName: string, opts: { json?: boolean }) => {
+      const exit = await Effect.runPromiseExit(
+        showSchemaAction(schemaName).pipe(Effect.provide(CliLive)),
+      )
 
-      if (!schemaPath) {
-        exitWithError(chalk.red(`Error: Schema "${schemaName}" not found`))
+      if (Exit.isFailure(exit)) {
+        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        if (err?._tag === "SchemaNotFoundError") {
+          exitWithError(chalk.red(`Error: Schema "${schemaName}" not found`))
+        }
+        if (err?._tag === "SchemaInvalidError") {
+          exitWithError(chalk.red(`Error: ${err.reason}`))
+        }
+        exitWithError(chalk.red(`Error: ${err?._tag ?? "unknown"}`))
       }
 
-      try {
-        const s = loadSchemaFile(schemaPath)
+      const detail = exit.value
 
-        if (opts.json) {
-          console.log(JSON.stringify({ name: schemaName, ...s }, null, 2))
-          return
-        }
-
-        console.log(`\n  ${chalk.bold(schemaName)}`)
-        if (s.description) {
-          console.log(`  ${chalk.dim(s.description)}`)
-        }
-        console.log()
-        console.log(`  ${chalk.bold("Reviewers")} (${s.reviewers.length})`)
-        for (const r of s.reviewers) {
-          const source = r.agent ? chalk.dim(` → ${r.agent}`) : r.prompt ? chalk.dim(` (inline prompt)`) : ""
-          console.log(`    ${chalk.cyan(r.name)} ${chalk.dim(`${r.runtime}/${r.model}`)}${source}`)
-        }
-
-        if (s.triage) {
-          console.log()
-          console.log(`  ${chalk.bold("Triage")}`)
-          console.log(`    enabled: ${s.triage.enabled ? chalk.green("yes") : chalk.dim("no")}`)
-          if (s.triage.enabled) {
-            console.log(`    runtime: ${s.triage.runtime}/${s.triage.model}`)
-          }
-        }
-        console.log()
-      } catch (e) {
-        exitWithError(chalk.red(`Error: ${e instanceof Error ? e.message : String(e)}`))
+      if (opts.json) {
+        // Historical JSON shape: schema fields with `name` prefix, no `path`.
+        const { path: _path, name, ...schemaFields } = detail
+        void _path
+        console.log(JSON.stringify({ name, ...schemaFields }, null, 2))
+        return
       }
+
+      console.log(`\n  ${chalk.bold(detail.name)}`)
+      if (detail.description) {
+        console.log(`  ${chalk.dim(detail.description)}`)
+      }
+      console.log()
+      console.log(`  ${chalk.bold("Reviewers")} (${detail.reviewers.length})`)
+      for (const r of detail.reviewers) {
+        const source = r.agent
+          ? chalk.dim(` → ${r.agent}`)
+          : r.prompt
+            ? chalk.dim(` (inline prompt)`)
+            : ""
+        console.log(`    ${chalk.cyan(r.name)} ${chalk.dim(`${r.runtime}/${r.model}`)}${source}`)
+      }
+
+      if (detail.triage) {
+        console.log()
+        console.log(`  ${chalk.bold("Triage")}`)
+        console.log(
+          `    enabled: ${detail.triage.enabled ? chalk.green("yes") : chalk.dim("no")}`,
+        )
+        if (detail.triage.enabled) {
+          console.log(`    runtime: ${detail.triage.runtime}/${detail.triage.model}`)
+        }
+      }
+      console.log()
     })
 
   // --- schema validate ---
@@ -93,32 +111,26 @@ export function registerSchemaCommand(program: Command): void {
     .description(COMMAND_DESCRIPTIONS.schemaValidate)
     .option("--all", "Validate all schemas in .crev/schemas/")
     .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
-    .action(async (file, opts) => {
-      const crevDir = findCrevDir()
+    .action(async (file: string | undefined, opts: { all?: boolean; json?: boolean }) => {
       const jsonOutput = opts.json ?? false
 
-      const results: Array<{ file: string; valid: boolean; errors: string[] }> = []
-
-      if (opts.all) {
-        const schemas = listAllSchemas(crevDir)
-        if (schemas.length === 0) {
-          if (jsonOutput) {
-            console.log(JSON.stringify({ schemas: [], valid: true }))
-          } else {
-            console.log("No schemas found")
-          }
-          return
-        }
-
-        for (const name of schemas) {
-          const resolved = resolveSchemaPath(name, crevDir)
-          if (resolved) results.push(await validateSingleSchema(resolved, crevDir))
-        }
-      } else if (file) {
-        const schemaPath = path.resolve(file)
-        results.push(await validateSingleSchema(schemaPath, crevDir))
-      } else {
+      if (!opts.all && !file) {
         exitWithError(chalk.red("Specify a schema file or use --all"))
+      }
+
+      const input = opts.all ? ({ all: true } as const) : ({ file: file as string } as const)
+
+      const results = await Effect.runPromise(
+        validateSchemaAction(input).pipe(Effect.provide(CliLive)),
+      )
+
+      if (opts.all && results.length === 0) {
+        if (jsonOutput) {
+          console.log(JSON.stringify({ schemas: [], valid: true }))
+        } else {
+          console.log("No schemas found")
+        }
+        return
       }
 
       if (jsonOutput) {
@@ -145,34 +157,4 @@ export function registerSchemaCommand(program: Command): void {
         exitWithCode(1)
       }
     })
-}
-
-async function validateSingleSchema(
-  schemaPath: string,
-  crevDir?: string,
-): Promise<{ file: string; valid: boolean; errors: string[] }> {
-  const errors: string[] = []
-
-  if (!fs.existsSync(schemaPath)) {
-    return { file: schemaPath, valid: false, errors: [`File not found: ${schemaPath}`] }
-  }
-
-  const content = fs.readFileSync(schemaPath, "utf-8")
-  const parseResult = parseSchemaFile(content)
-
-  if (!parseResult.success) {
-    for (const issue of parseResult.error.issues) {
-      errors.push(`${issue.path.join(".")}: ${issue.message}`)
-    }
-    return { file: schemaPath, valid: false, errors }
-  }
-
-  // Validate agent refs
-  const schema = loadSchemaFile(schemaPath)
-  const agentIssues = await validateAgentRefs(schema, { schemaPath, crevDir })
-  for (const issue of agentIssues) {
-    errors.push(issue.message)
-  }
-
-  return { file: schemaPath, valid: errors.length === 0, errors }
 }

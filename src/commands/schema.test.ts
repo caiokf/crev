@@ -4,16 +4,23 @@ import path from "node:path"
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+// Shim-level tests. `schema show` and `schema validate` are thin
+// wrappers around `showSchemaAction` / `validateSchemaAction`; the
+// actions are exercised in src/actions/schema.test.ts against test
+// layers. Here we only verify the shim maps results/errors to
+// stdout and the exit behavior users depend on.
+//
+// `schema init` still touches the filesystem directly (it's slated
+// for migration alongside the Prompter service), so those tests use
+// real temp dirs.
+
 const configMocks = vi.hoisted(() => ({
   findCrevDir: vi.fn(),
 }))
 
-const schemaMocks = vi.hoisted(() => ({
-  listAllSchemas: vi.fn(),
-  resolveSchemaPath: vi.fn(),
-  parseSchemaFile: vi.fn(),
-  validateAgentRefs: vi.fn(),
-  loadSchemaFile: vi.fn(),
+const actionMocks = vi.hoisted(() => ({
+  showSchemaAction: vi.fn(),
+  validateSchemaAction: vi.fn(),
 }))
 
 const pathMocks = vi.hoisted(() => ({
@@ -24,13 +31,24 @@ vi.mock("../core/config.js", () => ({
   findCrevDir: configMocks.findCrevDir,
 }))
 
-vi.mock("../core/schema.js", () => ({
-  listAllSchemas: schemaMocks.listAllSchemas,
-  resolveSchemaPath: schemaMocks.resolveSchemaPath,
-  parseSchemaFile: schemaMocks.parseSchemaFile,
-  validateAgentRefs: schemaMocks.validateAgentRefs,
-  loadSchemaFile: schemaMocks.loadSchemaFile,
-}))
+vi.mock("../actions/schema.js", async () => {
+  const { Effect } = await import("effect")
+  return {
+    showSchemaAction: (name: string) =>
+      Effect.suspend(() => {
+        const result = actionMocks.showSchemaAction(name)
+        if (result && typeof result === "object" && "_op" in result) {
+          return result as ReturnType<typeof Effect.succeed>
+        }
+        return Effect.succeed(result)
+      }),
+    validateSchemaAction: (input: unknown) =>
+      Effect.suspend(() => {
+        const result = actionMocks.validateSchemaAction(input)
+        return Effect.succeed(result)
+      }),
+  }
+})
 
 vi.mock("../util/paths.js", () => ({
   getSchemasDir: pathMocks.getSchemasDir,
@@ -56,11 +74,8 @@ describe("registerSchemaCommand", () => {
 
   beforeEach(() => {
     configMocks.findCrevDir.mockReset()
-    schemaMocks.listAllSchemas.mockReset()
-    schemaMocks.resolveSchemaPath.mockReset()
-    schemaMocks.parseSchemaFile.mockReset()
-    schemaMocks.validateAgentRefs.mockReset()
-    schemaMocks.loadSchemaFile.mockReset()
+    actionMocks.showSchemaAction.mockReset()
+    actionMocks.validateSchemaAction.mockReset()
     pathMocks.getSchemasDir.mockReset()
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
@@ -96,9 +111,9 @@ describe("registerSchemaCommand", () => {
   })
 
   it("prints schema details in JSON for `schema show --json`", async () => {
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    schemaMocks.resolveSchemaPath.mockReturnValue("/repo/.crev/schemas/quick.yaml")
-    schemaMocks.loadSchemaFile.mockReturnValue({
+    actionMocks.showSchemaAction.mockReturnValue({
+      name: "quick",
+      path: "/repo/.crev/schemas/quick.yaml",
       description: "Quick checks",
       reviewers: [{ name: "Engineer", runtime: "claude", model: "sonnet", prompt: "..." }],
     })
@@ -108,11 +123,26 @@ describe("registerSchemaCommand", () => {
     const payload = JSON.parse(logSpy.mock.calls[0][0] as string)
     expect(payload.name).toBe("quick")
     expect(payload.reviewers).toHaveLength(1)
+    // Historical shape: `path` is not part of JSON output
+    expect(payload.path).toBeUndefined()
+  })
+
+  it("exits with error when schema show cannot resolve the name", async () => {
+    const exitSpy = mockExit()
+    const { Effect } = await import("effect")
+    const { SchemaNotFoundError } = await import("../errors.js")
+
+    actionMocks.showSchemaAction.mockReturnValue(
+      Effect.fail(new SchemaNotFoundError({ name: "missing", searched: [] })),
+    )
+
+    await expect(runSchema(["show", "missing"])).rejects.toThrow("process.exit:1")
+    expect(errorSpy.mock.calls[0][0]).toContain('Schema "missing" not found')
+    expect(exitSpy).toHaveBeenCalledWith(1)
   })
 
   it("reports empty set for `schema validate --all`", async () => {
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    schemaMocks.listAllSchemas.mockReturnValue([])
+    actionMocks.validateSchemaAction.mockReturnValue([])
 
     await runSchema(["validate", "--all"])
 
@@ -121,20 +151,13 @@ describe("registerSchemaCommand", () => {
 
   it("fails validation when agent refs are invalid", async () => {
     const exitSpy = mockExit()
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-schema-validate-"))
-    const schemaFile = path.join(tmp, "quick.yaml")
-    fs.writeFileSync(schemaFile, "reviewers: []", "utf-8")
+    actionMocks.validateSchemaAction.mockReturnValue([
+      { file: "/repo/quick.yaml", valid: false, errors: ["Agent file missing: reviewer.md"] },
+    ])
 
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    schemaMocks.parseSchemaFile.mockReturnValue({ success: true })
-    schemaMocks.loadSchemaFile.mockReturnValue({ reviewers: [] })
-    schemaMocks.validateAgentRefs.mockResolvedValue([{ message: "Agent file missing: reviewer.md" }])
-
-    await expect(runSchema(["validate", schemaFile])).rejects.toThrow("process.exit:1")
+    await expect(runSchema(["validate", "/repo/quick.yaml"])).rejects.toThrow("process.exit:1")
     expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("Agent file missing"))).toBe(true)
     expect(exitSpy).toHaveBeenCalledWith(1)
-
-    fs.rmSync(tmp, { recursive: true, force: true })
   })
 })
 
