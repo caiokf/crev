@@ -1,5 +1,7 @@
 import { createHomeView } from "./views/home.js"
 import { createPlaceholderView } from "./views/placeholder.js"
+import { createSchemaDetailView } from "./views/schema-detail.js"
+import { createSchemasListView } from "./views/schemas-list.js"
 import type { AppContext, DashRoute, DashRouter, DashView } from "./types.js"
 
 /**
@@ -50,13 +52,9 @@ export const defaultResolver: ViewResolver = (route) => {
     case "home":
       return createHomeView()
     case "schemas":
-      return createPlaceholderView(route, "Schemas", "Schemas list — coming in task #3.")
+      return createSchemasListView()
     case "schema-detail":
-      return createPlaceholderView(
-        route,
-        `Schema · ${route.name}`,
-        `Schema detail for "${route.name}" — coming in task #3.`,
-      )
+      return createSchemaDetailView(route.name)
     case "runs":
       return createPlaceholderView(route, "Runs", "Runs list — coming in task #8.")
     case "run-detail":
