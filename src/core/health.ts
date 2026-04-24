@@ -106,7 +106,7 @@ export function checkProjectSetup(crevDir: string): ProjectCheck[] {
 
   const schemaCount = listAllSchemas(crevDir).length
   checks.push({
-    name: "schemas",
+    name: ".crev/schemas/",
     ok: schemaCount > 0,
     detail: schemaCount > 0 ? `${schemaCount} schema${schemaCount !== 1 ? "s" : ""}` : "empty",
   })

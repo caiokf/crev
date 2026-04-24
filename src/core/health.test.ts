@@ -20,7 +20,7 @@ describe("checkProjectSetup", () => {
     fs.mkdirSync(tmpDir, { recursive: true })
     const checks = checkProjectSetup(tmpDir)
     expect(checks.find((c) => c.name === ".crev/config.yaml")?.ok).toBe(false)
-    expect(checks.find((c) => c.name === "schemas")?.ok).toBe(false)
+    expect(checks.find((c) => c.name === ".crev/schemas/")?.ok).toBe(false)
     expect(checks.find((c) => c.name === ".crev/reviews/")?.ok).toBe(false)
   })
 
@@ -35,8 +35,8 @@ describe("checkProjectSetup", () => {
 
     const checks = checkProjectSetup(tmpDir)
     expect(checks.find((c) => c.name === ".crev/config.yaml")?.ok).toBe(true)
-    expect(checks.find((c) => c.name === "schemas")?.ok).toBe(true)
-    expect(checks.find((c) => c.name === "schemas")?.detail).toBe("1 schema")
+    expect(checks.find((c) => c.name === ".crev/schemas/")?.ok).toBe(true)
+    expect(checks.find((c) => c.name === ".crev/schemas/")?.detail).toBe("1 schema")
     expect(checks.find((c) => c.name === ".crev/reviews/")?.ok).toBe(true)
   })
 
@@ -53,7 +53,7 @@ describe("checkProjectSetup", () => {
     )
 
     const checks = checkProjectSetup(tmpDir)
-    expect(checks.find((c) => c.name === "schemas")?.detail).toBe("2 schemas")
+    expect(checks.find((c) => c.name === ".crev/schemas/")?.detail).toBe("2 schemas")
   })
 })
 
