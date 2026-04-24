@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
 import { computeIssueWidths, flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
-import { findIssue, renderIssue } from "./issue-detail.js"
+import { buildCopyPrompt, findIssue, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 
 const issue: ReviewIssue = {
@@ -176,10 +176,11 @@ describe("issue detail · findIssue / renderIssue", () => {
   it("renders title, metadata, file and description", () => {
     const out = renderIssue(issue)
     expect(out).toContain("Null deref")
-    expect(out).toContain("high")
+    expect(out).toContain("HIGH")
     expect(out).toContain("bug")
     expect(out).toContain("src/foo.ts:42")
     expect(out).toContain("calling .trim()")
+    expect(out).toContain("description")
   })
 
   it("renders triage verdict + enrichment when present", () => {
@@ -190,16 +191,50 @@ describe("issue detail · findIssue / renderIssue", () => {
         reasoning: "real bug",
         enrichment: {
           title: "Null deref",
-          context: "...",
-          minimalFix: { summary: "guard the call", patch: "if (x) x.trim()" },
-          promptForAgents: "fix it",
+          context: "surrounding context here",
+          minimalFix: { summary: "guard the call", patch: "if (x) x.trim()", language: "ts" },
+          promptForAgents: "Verify + patch the null guard",
         },
       },
     }
     const out = renderIssue(triaged)
     expect(out).toContain("triage")
-    expect(out).toContain("verdict: actionable")
+    expect(out).toContain("verdict:")
+    expect(out).toContain("actionable")
+    expect(out).toContain("context")
+    expect(out).toContain("surrounding context here")
+    expect(out).toContain("suggested fix")
     expect(out).toContain("guard the call")
     expect(out).toContain("if (x) x.trim()")
+    expect(out).toContain("prompt for ai agents")
+    expect(out).toContain("Verify + patch the null guard")
+  })
+})
+
+describe("issue detail · buildCopyPrompt", () => {
+  it("returns the enrichment promptForAgents verbatim when present", () => {
+    const triaged: ReviewIssue = {
+      ...issue,
+      triage: {
+        verdict: "actionable",
+        reasoning: "real bug",
+        enrichment: {
+          title: "Null deref",
+          context: "...",
+          minimalFix: { summary: "guard", patch: "if (x) x.trim()" },
+          promptForAgents: "Verify + patch the null guard",
+        },
+      },
+    }
+    expect(buildCopyPrompt(triaged)).toBe("Verify + patch the null guard")
+  })
+
+  it("falls back to a synthesized prompt when enrichment is missing", () => {
+    const out = buildCopyPrompt(issue)
+    expect(out).toContain("high")
+    expect(out).toContain("bug")
+    expect(out).toContain("src/foo.ts:42")
+    expect(out).toContain("Null deref")
+    expect(out).toContain("calling .trim()")
   })
 })

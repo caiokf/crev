@@ -1,6 +1,7 @@
 import blessed from "blessed"
 import { showAction } from "../../actions/show.js"
 import type { ReviewIssue } from "../../core/types.js"
+import { copyToClipboard } from "../clipboard.js"
 import { runDashEffect } from "../runtime.js"
 import { BOX_STYLE, DASH_COLORS } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
@@ -10,11 +11,16 @@ import type { AppContext, DashView } from "../types.js"
  * run-detail view) and surfaces the selected issue's full body plus
  * its triage verdict + enrichment if present.
  *
- * The view is deliberately read-only; editing/dismissing triage
- * verdicts from the dash is out of scope for this task.
+ * Sections are laid out as colored/bold headers so the eye can skip
+ * between "what's wrong", "triage verdict", "suggested fix", and
+ * "prompt for ai agents". `[c]` copies the agent prompt (or, if
+ * enrichment is missing, a fallback synthesized from the issue body)
+ * to the system clipboard so the user can paste it into their coding
+ * agent of choice.
  */
 export function createIssueDetailView(filePath: string, issueId: string): DashView {
   let box: blessed.Widgets.BoxElement | null = null
+  let currentIssue: ReviewIssue | null = null
 
   return {
     route: { kind: "issue-detail", filePath, issueId },
@@ -38,8 +44,28 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("[↑/↓] or [j/k] scroll · [bksp] back · [q] quit")
+      ctx.setStatus("[↑/↓] or [j/k] scroll · [c] copy prompt · [bksp] back · [q] quit")
       ctx.screen.render()
+
+      box.key("c", () => {
+        if (!currentIssue) return
+        const prompt = buildCopyPrompt(currentIssue)
+        if (!prompt) {
+          ctx.setStatus(`{${DASH_COLORS.warn}-fg}no prompt to copy yet — run triage first{/${DASH_COLORS.warn}-fg}`)
+          ctx.screen.render()
+          return
+        }
+        void copyToClipboard(prompt)
+          .then(() => {
+            ctx.setStatus(`{${DASH_COLORS.ok}-fg}✓ copied prompt for ai agents to clipboard{/${DASH_COLORS.ok}-fg}`)
+            ctx.screen.render()
+          })
+          .catch((err: unknown) => {
+            const msg = err instanceof Error ? err.message : String(err)
+            ctx.setStatus(`{${DASH_COLORS.danger}-fg}copy failed: ${msg}{/${DASH_COLORS.danger}-fg}`)
+            ctx.screen.render()
+          })
+      })
 
       void runDashEffect(showAction({ filePath })).then((result) => {
         if (!box) return
@@ -52,6 +78,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         if (!issue) {
           box.setContent(`{${DASH_COLORS.warn}-fg}issue not found in review{/${DASH_COLORS.warn}-fg}`)
         } else {
+          currentIssue = issue
           box.setContent(renderIssue(issue))
         }
         ctx.screen.render()
@@ -60,6 +87,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
     unmount() {
       box?.destroy()
       box = null
+      currentIssue = null
     },
   }
 }
@@ -68,41 +96,131 @@ export function findIssue(issues: readonly ReviewIssue[], id: string): ReviewIss
   return issues.find((i) => i.id === id)
 }
 
+/**
+ * Build the text that `[c]` copies to the clipboard. Prefers the
+ * triage-enrichment prompt (canonical per the prompt skill); falls
+ * back to a lightweight synthesized prompt so the copy key still
+ * does something useful on un-triaged issues.
+ */
+export function buildCopyPrompt(issue: ReviewIssue): string {
+  const enriched = issue.triage?.enrichment?.promptForAgents?.trim()
+  if (enriched) return enriched
+
+  const where = issue.file
+    ? `${issue.file}${issue.line ? `:${issue.line}` : ""}`
+    : "(location unknown)"
+  return [
+    `Investigate and fix the following ${issue.severity} ${issue.category} issue in ${where}.`,
+    "",
+    `Title: ${issue.title}`,
+    "",
+    "Details:",
+    issue.description,
+  ].join("\n")
+}
+
 export function renderIssue(issue: ReviewIssue): string {
   const lines: string[] = []
-  const sevColor =
-    issue.severity === "critical" || issue.severity === "high"
-      ? DASH_COLORS.danger
-      : issue.severity === "medium"
-        ? DASH_COLORS.warn
-        : "gray"
+  const sevColor = severityColor(issue.severity)
+  const catColor = categoryColor(issue.category)
 
+  // ── Title + severity/category pill row ──
   lines.push(`{bold}${issue.title}{/bold}`)
   lines.push(
-    `{${sevColor}-fg}${issue.severity}{/${sevColor}-fg} · ${issue.category} · ${issue.reviewer} {gray-fg}(${issue.runtime}/${issue.model}){/gray-fg}`,
+    `{${sevColor}-fg}{bold}${issue.severity.toUpperCase()}{/bold}{/${sevColor}-fg}` +
+      `  {${catColor}-fg}${issue.category}{/${catColor}-fg}` +
+      `  {${DASH_COLORS.accent}-fg}${issue.reviewer}{/${DASH_COLORS.accent}-fg}` +
+      `  {gray-fg}${issue.runtime}/${issue.model}{/gray-fg}`,
   )
   if (issue.file) {
-    lines.push(`{gray-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/gray-fg}`)
+    lines.push(
+      `{gray-fg}↳{/gray-fg} {${DASH_COLORS.accent}-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/${DASH_COLORS.accent}-fg}`,
+    )
   }
+
+  // ── Description ──
   lines.push("")
+  lines.push(sectionHeader("description"))
   lines.push(issue.description)
 
+  // ── Triage (if present) ──
   if (issue.triage) {
+    const verdict = issue.triage.verdict
+    const verdictColor =
+      verdict === "actionable"
+        ? DASH_COLORS.ok
+        : verdict === "deferred"
+          ? DASH_COLORS.warn
+          : "gray"
+
     lines.push("")
-    lines.push(`{bold}triage{/bold}`)
-    lines.push(`verdict: ${issue.triage.verdict}`)
-    lines.push(`reasoning: ${issue.triage.reasoning}`)
+    lines.push(sectionHeader("triage"))
+    lines.push(
+      `{gray-fg}verdict:{/gray-fg} {${verdictColor}-fg}{bold}${verdict}{/bold}{/${verdictColor}-fg}`,
+    )
+    lines.push(`{gray-fg}reasoning:{/gray-fg} ${issue.triage.reasoning}`)
+
     const enrich = issue.triage.enrichment
     if (enrich) {
+      if (enrich.context) {
+        lines.push("")
+        lines.push(sectionHeader("context"))
+        lines.push(enrich.context)
+      }
+
       lines.push("")
-      lines.push(`{bold}suggested fix{/bold}`)
+      lines.push(sectionHeader("suggested fix"))
       lines.push(enrich.minimalFix.summary)
       if (enrich.minimalFix.patch) {
         lines.push("")
-        lines.push(enrich.minimalFix.patch)
+        const lang = enrich.minimalFix.language ?? ""
+        lines.push(`{gray-fg}\`\`\`${lang}{/gray-fg}`)
+        lines.push(`{${DASH_COLORS.accent}-fg}${enrich.minimalFix.patch}{/${DASH_COLORS.accent}-fg}`)
+        lines.push(`{gray-fg}\`\`\`{/gray-fg}`)
+      }
+
+      if (enrich.promptForAgents) {
+        lines.push("")
+        lines.push(sectionHeader("prompt for ai agents"))
+        lines.push(`{gray-fg}(press [c] to copy){/gray-fg}`)
+        lines.push("")
+        lines.push(enrich.promptForAgents)
       }
     }
   }
 
   return lines.join("\n")
+}
+
+function sectionHeader(label: string): string {
+  return `{${DASH_COLORS.accent}-fg}{bold}❯ ${label}{/bold}{/${DASH_COLORS.accent}-fg}`
+}
+
+function severityColor(severity: ReviewIssue["severity"]): string {
+  switch (severity) {
+    case "critical":
+    case "high":
+      return DASH_COLORS.danger
+    case "medium":
+      return DASH_COLORS.warn
+    case "low":
+      return "gray"
+  }
+}
+
+function categoryColor(category: ReviewIssue["category"]): string {
+  switch (category) {
+    case "security":
+      return DASH_COLORS.danger
+    case "bug":
+      return DASH_COLORS.warn
+    case "performance":
+      return DASH_COLORS.accent
+    case "compliance":
+      return DASH_COLORS.warn
+    case "architecture":
+      return DASH_COLORS.accent
+    case "style":
+      return "gray"
+  }
 }
