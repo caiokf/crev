@@ -1,16 +1,10 @@
-import fs from "node:fs"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { checkbox, confirm } from "@inquirer/prompts"
+import { Effect } from "effect"
 import { detectAITools, type AITool } from "../util/detect-tools.js"
-import { writeSkill } from "../util/skills.js"
-import { writeIfNew } from "../util/paths.js"
-import { configTemplate } from "../templates/config.js"
-import { quickSchema } from "../templates/schemas/quick.js"
-import { standardSchema } from "../templates/schemas/standard.js"
-import { thoroughSchema } from "../templates/schemas/thorough.js"
-import { errorMessage } from "../util/cli-errors.js"
+import { initAction, SCHEMA_TEMPLATES } from "../actions/init.js"
+import { Prompter, PrompterLive } from "../services/Prompter.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 const BANNER = `
@@ -23,11 +17,7 @@ const BANNER = `
  ${chalk.dim("AI-powered multi-reviewer code review")}
 `
 
-const SCHEMAS: Record<string, { label: string; content: string }> = {
-  quick: { label: "quick       — Fast review (1 reviewer, sonnet)", content: quickSchema },
-  standard: { label: "standard    — Balanced review (3 reviewers)", content: standardSchema },
-  thorough: { label: "thorough    — Comprehensive (6 reviewers)", content: thoroughSchema },
-}
+type InitOptions = { tools?: string; schemas?: string }
 
 export function registerInitCommand(program: Command): void {
   program
@@ -35,67 +25,76 @@ export function registerInitCommand(program: Command): void {
     .description(COMMAND_DESCRIPTIONS.init)
     .option("--tools <list>", "Comma-separated tool IDs (all/none/claude,cursor,...)")
     .option("--schemas <list>", "Comma-separated schema names (all/quick,standard,...)")
-    .action(async (initPath, opts) => {
+    .action(async (initPath: string | undefined, opts: InitOptions) => {
       const projectRoot = initPath ? path.resolve(initPath) : process.cwd()
-      const crevDir = path.join(projectRoot, ".crev")
 
       const isInteractive = !opts.tools && !opts.schemas && process.stdin.isTTY
 
-      if (isInteractive) {
-        await runInteractive(projectRoot, crevDir)
-      } else {
-        await runNonInteractive(projectRoot, crevDir, opts)
-      }
+      const selections = isInteractive
+        ? await resolveInteractive(projectRoot)
+        : resolveNonInteractive(projectRoot, opts)
+
+      const output = await Effect.runPromise(
+        initAction({
+          projectRoot,
+          tools: selections.tools,
+          schemaNames: selections.schemaNames,
+        }),
+      )
+
+      renderPostInit(output)
     })
 }
 
-async function runInteractive(projectRoot: string, crevDir: string): Promise<void> {
+type Selections = { tools: AITool[]; schemaNames: string[] }
+
+async function resolveInteractive(projectRoot: string): Promise<Selections> {
   console.log(BANNER)
   console.log(chalk.dim("─".repeat(Math.max(0, Math.min(60, (process.stdout.columns || 80) - 4)))))
   console.log()
 
-  // Detect AI tools
   const tools = detectAITools(projectRoot)
 
-  let selectedTools: AITool[] = []
-  if (tools.length > 0) {
-    const choices = tools.map((t) => ({
-      name: `${t.name}${t.detected ? chalk.dim(` (detected: ${t.detectionPath})`) : ""}`,
-      value: t.id,
-      checked: t.detected,
-    }))
+  const program = Effect.gen(function* () {
+    const prompter = yield* Prompter
 
-    const selected = await checkbox({
-      message: "Select AI tools to configure skills for:",
-      choices,
+    let selectedTools: AITool[] = []
+    if (tools.length > 0) {
+      const selected = yield* prompter.checkbox<string>({
+        message: "Select AI tools to configure skills for:",
+        choices: tools.map((t) => ({
+          name: `${t.name}${t.detected ? chalk.dim(` (detected: ${t.detectionPath})`) : ""}`,
+          value: t.id,
+          checked: t.detected,
+        })),
+      })
+      selectedTools = tools.filter((t) => selected.includes(t.id))
+    }
+
+    const includeSchemas = yield* prompter.confirm({
+      message: "Include starter schemas?",
+      default: true,
     })
 
-    selectedTools = tools.filter((t) => selected.includes(t.id))
-  }
+    let schemaNames: string[] = []
+    if (includeSchemas) {
+      schemaNames = yield* prompter.checkbox<string>({
+        message: "Select schemas:",
+        choices: Object.entries(SCHEMA_TEMPLATES).map(([key, val]) => ({
+          name: val.label,
+          value: key,
+          checked: key !== "thorough",
+        })),
+      })
+    }
 
-  // Schema selection
-  const includeSchemas = await confirm({ message: "Include starter schemas?", default: true })
-  let selectedSchemas: string[] = []
-  if (includeSchemas) {
-    selectedSchemas = await checkbox({
-      message: "Select schemas:",
-      choices: Object.entries(SCHEMAS).map(([key, val]) => ({
-        name: val.label,
-        value: key,
-        checked: key !== "thorough",
-      })),
-    })
-  }
+    return { tools: selectedTools, schemaNames }
+  })
 
-  // Scaffold
-  await scaffold(projectRoot, crevDir, selectedSchemas, selectedTools)
+  return Effect.runPromise(program.pipe(Effect.provide(PrompterLive)))
 }
 
-async function runNonInteractive(
-  projectRoot: string,
-  crevDir: string,
-  opts: { tools?: string; schemas?: string },
-): Promise<void> {
+function resolveNonInteractive(projectRoot: string, opts: InitOptions): Selections {
   const tools = detectAITools(projectRoot)
 
   const selectedTools =
@@ -109,51 +108,32 @@ async function runNonInteractive(
 
   const selectedSchemas =
     opts.schemas === "all"
-      ? Object.keys(SCHEMAS)
+      ? Object.keys(SCHEMA_TEMPLATES)
       : opts.schemas
-        ? opts.schemas.split(",").filter((s) => s in SCHEMAS)
+        ? opts.schemas.split(",").filter((s) => s in SCHEMA_TEMPLATES)
         : ["quick", "standard"]
 
-  await scaffold(projectRoot, crevDir, selectedSchemas, selectedTools)
+  return { tools: selectedTools, schemaNames: selectedSchemas }
 }
 
-async function scaffold(
-  projectRoot: string,
-  crevDir: string,
-  schemas: string[],
-  tools: AITool[],
-): Promise<void> {
-  // Create directories
-  fs.mkdirSync(path.join(crevDir, "schemas"), { recursive: true })
-
-  // Write config
-  writeIfNew(path.join(crevDir, "config.yaml"), configTemplate)
-
-  // Write schemas
-  for (const name of schemas) {
-    const schema = SCHEMAS[name]
-    if (schema) {
-      writeIfNew(path.join(crevDir, "schemas", `${name}.yaml`), schema.content)
-    }
-  }
-
-  // Write skills for selected tools
-  for (const tool of tools) {
-    writeSkill(projectRoot, tool)
-  }
-
-  // Run auto-doctor using shared health service
+function renderPostInit(output: {
+  crevDir: string
+  runtimeHealth: ReadonlyArray<{
+    name: string
+    installed: boolean
+    authenticated: "yes" | "no" | "unknown"
+  }>
+  schemaReadiness: ReadonlyArray<{ name: string; ready: boolean; issues: string[] }>
+  healthError?: string
+}): void {
   console.log()
   console.log(chalk.dim("Running health check..."))
   console.log()
 
-  try {
-    const { collectRuntimeHealth, checkSchemaReadiness } = await import("../core/health.js")
-
-    const healthResults = await collectRuntimeHealth()
-
-    // Show only installed runtimes
-    for (const health of healthResults) {
+  if (output.healthError) {
+    console.error(`  ${chalk.dim("Health check failed:")} ${output.healthError}`)
+  } else {
+    for (const health of output.runtimeHealth) {
       if (!health.installed) continue
       const installed = chalk.green("✓ installed")
       const auth =
@@ -165,11 +145,9 @@ async function scaffold(
       console.log(`  ${health.name.padEnd(16)} ${installed}  ${auth}`)
     }
 
-    // Schema readiness
-    const schemaReadiness = checkSchemaReadiness(crevDir, healthResults)
-    if (schemaReadiness.length > 0) {
+    if (output.schemaReadiness.length > 0) {
       console.log()
-      for (const schema of schemaReadiness) {
+      for (const schema of output.schemaReadiness) {
         const label = `${schema.name}.yaml`.padEnd(20)
         if (schema.ready) {
           console.log(`  ${label}${chalk.green("✓ ready")}`)
@@ -178,8 +156,6 @@ async function scaffold(
         }
       }
     }
-  } catch (err) {
-    console.error(`  ${chalk.dim("Health check failed:")} ${errorMessage(err)}`)
   }
 
   console.log()
@@ -188,3 +164,4 @@ async function scaffold(
   console.log(`  Run ${chalk.cyan("crev run --schema quick")} to start your first review.`)
   console.log()
 }
+
