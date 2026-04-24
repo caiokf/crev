@@ -28,6 +28,7 @@
   "dependencies": {
     "@caiokf/valet": "^0.1.1",
     "@inquirer/prompts": "^7.5.0",
+    "blessed": "0.1.81",
     "chalk": "^5.4.1",
     "commander": "^14.0.0",
     "effect": "3.21.2",
@@ -37,6 +38,7 @@
   },
   "devDependencies": {
     "@effect/vitest": "0.29.0",
+    "@types/blessed": "0.1.27",
     "@types/node": "25.5.2",
     "tsup": "^8.4.0",
     "tsx": "4.21.0",

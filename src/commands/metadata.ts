@@ -19,6 +19,7 @@ export const COMMAND_DESCRIPTIONS = {
   init: "Interactive TUI setup",
   update: "Regenerate AI tool skills",
   help: "AI-friendly detailed help",
+  dash: "Interactive dashboard (schemas, runs, reviews)",
 } as const
 
 export type CommandPath =

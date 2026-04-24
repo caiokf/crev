@@ -1,0 +1,71 @@
+import { createHomeView } from "./views/home.js"
+import { createPlaceholderView } from "./views/placeholder.js"
+import type { AppContext, DashRoute, DashRouter, DashView } from "./types.js"
+
+/**
+ * Build the dash router. Owns the view stack, mounting the active
+ * view into the shell's body and calling `unmount()` on the outgoing
+ * view so blessed elements + listeners are released cleanly.
+ *
+ * `resolveView` is injected so tests can exercise the stack/navigation
+ * logic without pulling in blessed. The default resolver returns real
+ * views (home + placeholders for as-yet-unbuilt detail views).
+ */
+
+export type ViewResolver = (route: DashRoute) => DashView
+
+export function makeRouter(
+  ctx: () => AppContext,
+  resolveView: ViewResolver = defaultResolver,
+): DashRouter {
+  const stack: DashRoute[] = []
+  let active: DashView | null = null
+
+  const mount = (route: DashRoute): void => {
+    const next = resolveView(route)
+    active?.unmount()
+    active = next
+    active.mount(ctx())
+  }
+
+  return {
+    navigate(route) {
+      stack.push(route)
+      mount(route)
+    },
+    back() {
+      if (stack.length <= 1) return
+      stack.pop()
+      const prev = stack[stack.length - 1]!
+      mount(prev)
+    },
+    current() {
+      return stack[stack.length - 1] ?? { kind: "home" }
+    },
+  }
+}
+
+export const defaultResolver: ViewResolver = (route) => {
+  switch (route.kind) {
+    case "home":
+      return createHomeView()
+    case "schemas":
+      return createPlaceholderView(route, "Schemas", "Schemas list — coming in task #3.")
+    case "schema-detail":
+      return createPlaceholderView(
+        route,
+        `Schema · ${route.name}`,
+        `Schema detail for "${route.name}" — coming in task #3.`,
+      )
+    case "runs":
+      return createPlaceholderView(route, "Runs", "Runs list — coming in task #8.")
+    case "run-detail":
+      return createPlaceholderView(
+        route,
+        `Run · ${route.slug}`,
+        `Run detail for "${route.slug}" — coming in task #8.`,
+      )
+    case "run-wizard":
+      return createPlaceholderView(route, "New review", "Review wizard — coming in task #4.")
+  }
+}

@@ -1,0 +1,101 @@
+import blessed from "blessed"
+import { findCrevDir } from "../core/config.js"
+import { makeRouter } from "./router.js"
+import { DASH_COLORS, HEADER_STYLE, STATUSLINE_STYLE } from "./theme.js"
+import type { AppContext, DashRoute } from "./types.js"
+
+/**
+ * App shell for `crev dash`.
+ *
+ * Owns the blessed screen, renders a persistent header + statusline,
+ * and delegates the body region to the router. Global keys (q, esc,
+ * backspace, ctrl-c) are wired here so every view inherits a
+ * consistent quit/back behavior without each view re-binding them.
+ *
+ * Returns a promise that resolves when the user quits — callers
+ * (the CLI shim) can await it and return to a clean terminal.
+ */
+
+export type RunDashOptions = {
+  readonly initialRoute?: DashRoute
+  /** Allows the CLI shim to override where config/schemas are read from (used by tests). */
+  readonly crevDir?: string
+}
+
+export function runDash(opts: RunDashOptions = {}): Promise<void> {
+  const crevDir = opts.crevDir ?? findCrevDir()
+
+  const screen = blessed.screen({
+    smartCSR: true,
+    title: "crev dash",
+    fullUnicode: true,
+    // Debug + warnings go to stderr via blessed; silence noisy output.
+    warnings: false,
+  })
+
+  const header = blessed.box({
+    parent: screen,
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    content: `{${DASH_COLORS.accent}-fg}{bold}crev dash{/bold}{/${DASH_COLORS.accent}-fg}  ${dim(crevDir)}`,
+    style: HEADER_STYLE,
+  })
+  void header
+
+  const body = blessed.box({
+    parent: screen,
+    top: 1,
+    left: 0,
+    right: 0,
+    bottom: 1,
+  })
+
+  const statusline = blessed.box({
+    parent: screen,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 1,
+    tags: true,
+    style: STATUSLINE_STYLE,
+  })
+
+  const setStatus = (text: string): void => {
+    statusline.setContent(` ${text}`)
+    screen.render()
+  }
+
+  // ── Router + initial mount ──
+  let ctxRef: AppContext | null = null
+  const router = makeRouter(() => {
+    if (!ctxRef) throw new Error("app context accessed before init")
+    return ctxRef
+  })
+
+  ctxRef = { screen, body, router, setStatus, crevDir }
+  router.navigate(opts.initialRoute ?? { kind: "home" })
+
+  return new Promise<void>((resolve) => {
+    const quit = (): void => {
+      screen.destroy()
+      resolve()
+    }
+
+    // Global keybindings — views can still override locally.
+    screen.key(["q", "C-c"], () => quit())
+    screen.key(["escape", "backspace"], () => {
+      if (router.current().kind === "home") {
+        quit()
+      } else {
+        router.back()
+      }
+    })
+  })
+}
+
+function dim(text: string): string {
+  return `{${DASH_COLORS.muted}-fg}${text}{/${DASH_COLORS.muted}-fg}`
+}
