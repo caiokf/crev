@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest"
-import { renderDoctor } from "./doctor.js"
+import { describe, expect, it, vi } from "vitest"
+import { renderDoctor, buildDoctorRows, type DoctorRow } from "./doctor.js"
 import type { DoctorSnapshot } from "../../actions/doctor.js"
 import type { RuntimeHealth } from "@caiokf/valet"
 
@@ -148,5 +148,125 @@ describe("doctor · renderDoctor", () => {
       }),
     )
     expect(out).toContain("no runtimes to check")
+  })
+})
+
+describe("doctor · buildDoctorRows", () => {
+  it("returns DoctorRow objects with text property", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        runtimes: [health({})],
+        projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+      }),
+    )
+    expect(rows.length).toBeGreaterThan(0)
+    for (const row of rows) {
+      expect(row).toHaveProperty("text")
+    }
+  })
+
+  it("marks passing project checks as non-fixable", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+      }),
+    )
+    const configRow = rows.find((r) => r.text.includes(".crev/config.yaml"))
+    expect(configRow).toBeDefined()
+    expect(configRow!.fix).toBeUndefined()
+  })
+
+  it("attaches fix action to missing config.yaml", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [{ name: ".crev/config.yaml", ok: false, detail: "missing" }],
+      }),
+    )
+    const configRow = rows.find((r) => r.text.includes(".crev/config.yaml"))
+    expect(configRow).toBeDefined()
+    expect(configRow!.fix).toBeDefined()
+    expect(configRow!.fix!.label).toBe("create config.yaml")
+  })
+
+  it("attaches fix action to missing schemas directory", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [
+          { name: ".crev/config.yaml", ok: true, detail: "valid" },
+          { name: ".crev/schemas/", ok: false, detail: "missing" },
+        ],
+      }),
+    )
+    const schemasRow = rows.find((r) => r.text.includes(".crev/schemas/"))
+    expect(schemasRow).toBeDefined()
+    expect(schemasRow!.fix).toBeDefined()
+    expect(schemasRow!.fix!.label).toBe("create schemas directory")
+  })
+
+  it("attaches fix action to missing reviews directory", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [
+          { name: ".crev/config.yaml", ok: true, detail: "valid" },
+          { name: ".crev/reviews/", ok: false, detail: "missing" },
+        ],
+      }),
+    )
+    const reviewsRow = rows.find((r) => r.text.includes(".crev/reviews/"))
+    expect(reviewsRow).toBeDefined()
+    expect(reviewsRow!.fix).toBeDefined()
+    expect(reviewsRow!.fix!.label).toBe("create reviews directory")
+  })
+
+  it("attaches fix action to outdated skills", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+        skills: [
+          { tool: "cursor", id: "crev", upToDate: false },
+        ],
+      }),
+    )
+    const skillRow = rows.find((r) => r.text.includes("cursor") && r.text.includes("outdated"))
+    expect(skillRow).toBeDefined()
+    expect(skillRow!.fix).toBeDefined()
+    expect(skillRow!.fix!.label).toBe("update cursor skill")
+  })
+
+  it("does not attach fix to up-to-date skills", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+        skills: [
+          { tool: "claude-code", id: "crev", upToDate: true },
+        ],
+      }),
+    )
+    const skillRow = rows.find((r) => r.text.includes("claude-code"))
+    expect(skillRow).toBeDefined()
+    expect(skillRow!.fix).toBeUndefined()
+  })
+
+  it("includes spacer rows between sections", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        runtimes: [health({})],
+        schemaReadiness: [{ name: "quick", ready: true, issues: [] }],
+        projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+        skills: [{ tool: "claude-code", id: "crev", upToDate: true }],
+      }),
+    )
+    const spacers = rows.filter((r) => r.text === "")
+    expect(spacers.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it("renderDoctor produces the same text as joining buildDoctorRows", () => {
+    const snap = snapshot({
+      runtimes: [health({})],
+      projectChecks: [{ name: ".crev/config.yaml", ok: true, detail: "valid" }],
+    })
+    const rendered = renderDoctor(snap)
+    const fromRows = buildDoctorRows(snap).map((r) => r.text).join("\n")
+    expect(rendered).toBe(fromRows)
   })
 })
