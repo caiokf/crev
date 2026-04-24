@@ -2,7 +2,8 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { writeSkill } from "./skills.js"
+import { writeSkill, getInstalledSkills, isSkillUpToDate } from "./skills.js"
+import { skillContent } from "../templates/skills/skill.js"
 import type { AITool } from "./detect-tools.js"
 
 describe("writeSkill (codex-cli)", () => {
@@ -69,5 +70,90 @@ describe("writeSkill (codex-cli)", () => {
     expect(agents).toContain("## crev")
     expect(agents).not.toContain("stale content")
     expect(agents).toContain("## Other")
+  })
+})
+
+describe("getInstalledSkills", () => {
+  let tmpDir: string
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-installed-"))
+    vi.spyOn(console, "log").mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it("returns only tools that have skill files installed", () => {
+    // Create marker dirs for claude and cursor
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true })
+    fs.mkdirSync(path.join(tmpDir, ".cursor"), { recursive: true })
+
+    // Only install skill for claude
+    fs.mkdirSync(path.join(tmpDir, ".claude/skills/crev"), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, ".claude/skills/crev/SKILL.md"), skillContent)
+
+    const installed = getInstalledSkills(tmpDir)
+    expect(installed).toHaveLength(1)
+    expect(installed[0].id).toBe("claude")
+  })
+
+  it("returns empty list when no skills are installed", () => {
+    // Marker dirs exist but no skill files
+    fs.mkdirSync(path.join(tmpDir, ".claude"), { recursive: true })
+    fs.mkdirSync(path.join(tmpDir, ".cursor"), { recursive: true })
+
+    const installed = getInstalledSkills(tmpDir)
+    expect(installed).toHaveLength(0)
+  })
+
+  it("detects codex-cli skill via managed section in AGENTS.md", () => {
+    fs.writeFileSync(
+      path.join(tmpDir, "AGENTS.md"),
+      "# Agents\n\n<!-- crev:codex:start -->\n## crev\n<!-- crev:codex:end -->\n",
+    )
+
+    const installed = getInstalledSkills(tmpDir)
+    expect(installed.some((t) => t.id === "codex-cli")).toBe(true)
+  })
+})
+
+describe("isSkillUpToDate", () => {
+  let tmpDir: string
+
+  const claudeTool: AITool = {
+    name: "Claude Code",
+    id: "claude",
+    detected: true,
+    detectionPath: ".claude",
+    skillPath: ".claude/skills/crev",
+  }
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "crev-uptodate-"))
+  })
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true })
+  })
+
+  it("returns true when skill file matches template", () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude/skills/crev"), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, ".claude/skills/crev/SKILL.md"), skillContent)
+
+    expect(isSkillUpToDate(tmpDir, claudeTool)).toBe(true)
+  })
+
+  it("returns false when skill file is outdated", () => {
+    fs.mkdirSync(path.join(tmpDir, ".claude/skills/crev"), { recursive: true })
+    fs.writeFileSync(path.join(tmpDir, ".claude/skills/crev/SKILL.md"), "old content")
+
+    expect(isSkillUpToDate(tmpDir, claudeTool)).toBe(false)
+  })
+
+  it("returns false when skill file does not exist", () => {
+    expect(isSkillUpToDate(tmpDir, claudeTool)).toBe(false)
   })
 })
