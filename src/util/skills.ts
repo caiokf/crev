@@ -1,7 +1,7 @@
 import fs from "node:fs"
 import path from "node:path"
 import chalk from "chalk"
-import type { AITool } from "./detect-tools.js"
+import { detectAITools, type AITool } from "./detect-tools.js"
 import { writeIfNew } from "./paths.js"
 import { skillContent } from "../templates/skills/skill.js"
 
@@ -55,4 +55,44 @@ function buildCodexSection(): string {
     "- `crev schema validate --all`",
     CODEX_SECTION_END,
   ].join("\n")
+}
+
+/**
+ * Returns AI tools that have crev skills actually installed (skill file exists),
+ * as opposed to tools that are merely detected by marker directory.
+ */
+export function getInstalledSkills(projectRoot: string): AITool[] {
+  const tools = detectAITools(projectRoot)
+  return tools.filter((tool) => hasSkillInstalled(projectRoot, tool))
+}
+
+function hasSkillInstalled(projectRoot: string, tool: AITool): boolean {
+  if (tool.id === "codex-cli") {
+    const agentsPath = path.join(projectRoot, "AGENTS.md")
+    if (!fs.existsSync(agentsPath)) return false
+    const content = fs.readFileSync(agentsPath, "utf-8")
+    return CODEX_SECTION_REGEX.test(content)
+  }
+
+  const filePath = path.join(projectRoot, tool.skillPath, "SKILL.md")
+  return fs.existsSync(filePath)
+}
+
+/**
+ * Checks whether the installed skill file matches the current template.
+ */
+export function isSkillUpToDate(projectRoot: string, tool: AITool): boolean {
+  if (tool.id === "codex-cli") {
+    const agentsPath = path.join(projectRoot, "AGENTS.md")
+    if (!fs.existsSync(agentsPath)) return false
+    const content = fs.readFileSync(agentsPath, "utf-8")
+    const match = content.match(CODEX_SECTION_REGEX)
+    if (!match) return false
+    return match[0] === buildCodexSection()
+  }
+
+  const filePath = path.join(projectRoot, tool.skillPath, "SKILL.md")
+  if (!fs.existsSync(filePath)) return false
+  const current = fs.readFileSync(filePath, "utf-8")
+  return current === skillContent
 }
