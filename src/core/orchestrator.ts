@@ -55,7 +55,10 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
   const outputFormat = getOutputFormat()
   const timestamp = new Date().toISOString()
 
-  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+  const isQuiet =
+    opts.output.kind === "json" ||
+    opts.output.kind === "prompt-only" ||
+    opts.output.kind === "dash"
   const isPlain = opts.output.kind === "plain"
 
   if (!isQuiet) {
@@ -158,7 +161,10 @@ async function executeReviewersPlain(
   opts: OrchestrateOptions,
   outputFormat: string,
 ): Promise<NormalizedReview[]> {
-  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+  const isQuiet =
+    opts.output.kind === "json" ||
+    opts.output.kind === "prompt-only" ||
+    opts.output.kind === "dash"
 
   const promises = reviewers.map(async (reviewer) => {
     if (!isQuiet) {
@@ -293,7 +299,10 @@ async function runTriagePass(
 
   const triageDetail = `${effectiveConfig.triage.runtime}/${effectiveConfig.triage.model}`
 
-  const isQuiet = opts.output.kind === "json" || opts.output.kind === "prompt-only"
+  const isQuiet =
+    opts.output.kind === "json" ||
+    opts.output.kind === "prompt-only" ||
+    opts.output.kind === "dash"
 
   if (spinner) {
     spinner.addEntry("Triage", triageDetail)

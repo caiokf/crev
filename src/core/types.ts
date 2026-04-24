@@ -25,6 +25,8 @@ export type OutputMode =
   | { kind: "plain" }
   | { kind: "json" }
   | { kind: "prompt-only"; format: "json" }
+  /** Dash-owned execution: orchestrator stays silent so blessed owns the screen. */
+  | { kind: "dash" }
 
 // ── Review target: fresh or merge into existing ──
 

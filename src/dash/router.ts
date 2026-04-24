@@ -1,7 +1,7 @@
 import { createHomeView } from "./views/home.js"
 import { createIssueDetailView } from "./views/issue-detail.js"
-import { createPlaceholderView } from "./views/placeholder.js"
 import { createRunDetailView } from "./views/run-detail.js"
+import { createRunWizardView } from "./views/run-wizard.js"
 import { createRunsListView } from "./views/runs-list.js"
 import { createSchemaDetailView } from "./views/schema-detail.js"
 import { createSchemasListView } from "./views/schemas-list.js"
@@ -13,8 +13,8 @@ import type { AppContext, DashRoute, DashRouter, DashView } from "./types.js"
  * view so blessed elements + listeners are released cleanly.
  *
  * `resolveView` is injected so tests can exercise the stack/navigation
- * logic without pulling in blessed. The default resolver returns real
- * views (home + placeholders for as-yet-unbuilt detail views).
+ * logic without pulling in blessed. The default resolver wires in the
+ * real view factories.
  */
 
 export type ViewResolver = (route: DashRoute) => DashView
@@ -65,6 +65,6 @@ export const defaultResolver: ViewResolver = (route) => {
     case "issue-detail":
       return createIssueDetailView(route.filePath, route.issueId)
     case "run-wizard":
-      return createPlaceholderView(route, "New review", "Review wizard — coming in task #4.")
+      return createRunWizardView()
   }
 }
