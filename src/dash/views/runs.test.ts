@@ -166,19 +166,41 @@ describe("run detail · flattenIssues / formatIssueRow", () => {
     expect(fileAt(rowA)).toBeGreaterThan(0)
   })
 
-  it("prepends a green dot to actionable issues and preserves alignment", () => {
-    const triaged: ReviewIssue = {
+  it("prepends a coloured dot per verdict (green/yellow/gray) and preserves alignment", () => {
+    const actionableIssue: ReviewIssue = {
       ...issue,
       triage: { verdict: "actionable", reasoning: "real bug" },
     }
-    const widths = computeIssueWidths([issue, triaged])
+    const deferredIssue: ReviewIssue = {
+      ...issue,
+      id: "i-def",
+      triage: { verdict: "deferred", reasoning: "later" },
+    }
+    const dismissedIssue: ReviewIssue = {
+      ...issue,
+      id: "i-dis",
+      triage: { verdict: "dismissed", reasoning: "false positive" },
+    }
+    const widths = computeIssueWidths([issue, actionableIssue, deferredIssue, dismissedIssue])
     const plain = formatIssueRow(issue, widths)
-    const actionable = formatIssueRow(triaged, widths)
-    expect(actionable).toContain("●")
+    const actionable = formatIssueRow(actionableIssue, widths)
+    const deferred = formatIssueRow(deferredIssue, widths)
+    const dismissed = formatIssueRow(dismissedIssue, widths)
+
+    // Verdict dots use the sidebar palette: green/yellow/gray.
+    expect(actionable).toContain("{green-fg}●")
+    expect(deferred).toContain("{yellow-fg}●")
+    expect(dismissed).toContain("{gray-fg}●")
     expect(plain).not.toContain("●")
-    // HIGH severity tag should sit at the same visible column in both rows
+
+    // Severity tag should sit at the same visible column across all four
+    // rows — dots must not shift the layout.
     const stripTags = (s: string) => s.replace(/\{[^}]+\}/g, "")
-    expect(stripTags(plain).indexOf("HIGH")).toBe(stripTags(actionable).indexOf("HIGH"))
+    const col = stripTags(plain).indexOf("HIGH")
+    expect(col).toBeGreaterThan(0)
+    expect(stripTags(actionable).indexOf("HIGH")).toBe(col)
+    expect(stripTags(deferred).indexOf("HIGH")).toBe(col)
+    expect(stripTags(dismissed).indexOf("HIGH")).toBe(col)
   })
 })
 

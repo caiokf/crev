@@ -212,13 +212,21 @@ export function formatIssueRow(issue: ReviewIssue, widths: IssueColumnWidths): s
 }
 
 /**
- * Green dot prefix for actionable issues, two blanks otherwise, so the
- * severity column stays aligned regardless of triage verdict.
+ * Coloured dot prefix that mirrors the sidebar's verdict palette:
+ *   actionable → green · deferred → yellow · dismissed → gray.
+ * Untriaged issues get a blank so the severity column stays aligned.
  */
 function actionableMarker(issue: ReviewIssue): string {
-  return issue.triage?.verdict === "actionable"
-    ? `{${DASH_COLORS.ok}-fg}●{/${DASH_COLORS.ok}-fg}`
-    : " "
+  switch (issue.triage?.verdict) {
+    case "actionable":
+      return `{${DASH_COLORS.ok}-fg}●{/${DASH_COLORS.ok}-fg}`
+    case "deferred":
+      return `{${DASH_COLORS.warn}-fg}●{/${DASH_COLORS.warn}-fg}`
+    case "dismissed":
+      return `{gray-fg}●{/gray-fg}`
+    default:
+      return " "
+  }
 }
 
 function fitCell(value: string, width: number): string {
