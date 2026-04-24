@@ -188,7 +188,12 @@ async function executeReviewers(
 
   try {
     return await executeReviewersWithTui(reviewers, opts, outputFormat)
-  } catch {
+  } catch (err) {
+    // Surface the original TUI error before falling back. If the
+    // fallback also fails we'd otherwise have no signal about what
+    // went wrong inside the TUI path (e.g. stdin raw-mode crashes).
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error(`Warning: TUI mode failed, falling back to plain output: ${msg}`)
     return { reviews: await executeReviewersPlain(reviewers, opts, outputFormat), spinner: null }
   }
 }
