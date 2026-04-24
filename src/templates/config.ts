@@ -31,5 +31,5 @@ triage:
   enabled: false
   runtime: claude
   model: opus
-  enrichComments: false
+  enrichComments: true    # adds context + minimal fix + prompt-for-agents to each actionable issue
 `

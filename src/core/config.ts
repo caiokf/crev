@@ -51,7 +51,7 @@ export const configSchema = z.object({
       model: z.string().default("opus"),
       deduplicate: z.boolean().default(false),
       recategorize: z.boolean().default(false),
-      enrichComments: z.boolean().default(false),
+      enrichComments: z.boolean().default(true),
       prompt: z
         .string()
         .default(

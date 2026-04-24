@@ -46,7 +46,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const flags: TriageFlags = {
     deduplicate: config.triage.deduplicate,
     recategorize: config.triage.recategorize,
-    enrichComments: config.triage.enrichComments ?? false,
+    enrichComments: config.triage.enrichComments ?? true,
   }
 
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)

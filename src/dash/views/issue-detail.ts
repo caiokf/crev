@@ -45,19 +45,18 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("[↑/↓] or [j/k] scroll · [c] copy prompt · [bksp] back · [q] quit")
+      const baseStatus = "[↑/↓] or [j/k] scroll · [bksp] back · [q] quit"
+      const statusWithCopy = `[↑/↓] or [j/k] scroll · [c] copy prompt · [bksp] back · [q] quit`
+      ctx.setStatus(baseStatus)
       ctx.screen.render()
 
+      // `[c]` is only bound once we know the issue has an enrichment
+      // prompt — hiding the shortcut otherwise keeps the status line
+      // honest about what the user can actually do.
       box.key("c", () => {
         if (!currentIssue) return
         const prompt = buildCopyPrompt(currentIssue)
-        if (!prompt) {
-          ctx.setStatus(
-            `{${DASH_COLORS.warn}-fg}no prompt for ai agents — run with triage.enrichComments: true{/${DASH_COLORS.warn}-fg}`,
-          )
-          ctx.screen.render()
-          return
-        }
+        if (!prompt) return
         void copyToClipboard(prompt)
           .then(() => {
             ctx.setStatus(`{${DASH_COLORS.ok}-fg}✓ copied prompt for ai agents to clipboard{/${DASH_COLORS.ok}-fg}`)
@@ -83,6 +82,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         } else {
           currentIssue = issue
           box.setContent(renderIssue(issue))
+          if (buildCopyPrompt(issue)) ctx.setStatus(statusWithCopy)
         }
         ctx.screen.render()
       })
