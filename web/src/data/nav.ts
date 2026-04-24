@@ -10,6 +10,7 @@ export const docSections: NavSection[] = [
   { id: "runtimes", label: "Runtimes" },
   { id: "models", label: "Models" },
   { id: "triage", label: "Triage" },
+  { id: "fix", label: "Auto-Fix" },
   { id: "cli", label: "CLI Reference" },
   { id: "ci-cd", label: "CI/CD" },
   { id: "output", label: "Output Format" },

@@ -453,6 +453,60 @@ crev list --runtimes</code></pre>
         </div>
       </section>
 
+      <!-- Fix -->
+      <section id="fix">
+        <h1>Auto-Fix</h1>
+        <p class="lead">
+          After triage enriches issues with fix instructions, <code>crev fix</code>
+          dispatches them to an AI coding agent that applies the changes automatically.
+        </p>
+
+        <h2>Configuration</h2>
+        <p>
+          Add a <code>fix</code> section to your <code>config.yaml</code> or schema file
+          to enable the fix agent. Without this config, the fix command and dashboard
+          <code>[f]</code> keybinding are hidden.
+        </p>
+        <div class="code-block">
+          <div class="code-label">config.yaml</div>
+          <pre><code><span class="y-key">fix</span>:
+  <span class="y-key">runtime</span>: <span class="y-val">claude</span>
+  <span class="y-key">model</span>: <span class="y-val">sonnet</span></code></pre>
+        </div>
+
+        <h2>Usage</h2>
+        <div class="code-block">
+          <pre><code><span class="c-dim"># Fix all actionable issues in the latest review</span>
+crev fix
+
+<span class="c-dim"># Fix a specific review</span>
+crev fix .crev/reviews/my-review.json
+
+<span class="c-dim"># Fix a single issue</span>
+crev fix --issue i-abc123
+
+<span class="c-dim"># Include deferred issues</span>
+crev fix --include-deferred
+
+<span class="c-dim"># Override runtime/model</span>
+crev fix --model claude/opus</code></pre>
+        </div>
+
+        <p>
+          Issues are processed sequentially since each fix modifies the codebase.
+          Fixed issues are automatically marked with <code>status: "fixed"</code>
+          in the review file. Use <code>crev verify</code> afterwards to confirm
+          the fixes.
+        </p>
+
+        <p>
+          In the dashboard, press <code>[f]</code> on the run detail view to fix
+          all actionable issues, or on an individual issue to fix just that one.
+          Fixes run in the background &mdash; you can continue navigating while
+          they execute.
+        </p>
+      </section>
+
       <!-- CLI Reference -->
       <section id="cli">
         <h1>CLI Reference</h1>
@@ -530,6 +584,14 @@ crev list --runtimes</code></pre>
           <div class="prop-row">
             <code class="prop-name">crev stats</code>
             <span class="prop-desc">Aggregate review statistics across runs.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">crev fix [file]</code>
+            <span class="prop-desc">Auto-fix review issues using AI coding agents.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">crev verify [file]</code>
+            <span class="prop-desc">Check which review issues have been fixed in current code.</span>
           </div>
           <div class="prop-row">
             <code class="prop-name">crev schema init &lt;name&gt;</code>

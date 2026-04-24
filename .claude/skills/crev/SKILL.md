@@ -32,6 +32,9 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Show config layers          | `crev config --layers`                                   |
 | Review stats (latest)       | `crev stats --schema <name>`                             |
 | Review stats (all versions) | `crev stats --schema <name> --history`                   |
+| Fix actionable issues       | `crev fix`                                               |
+| Fix a single issue          | `crev fix --issue <issue-id>`                             |
+| Fix with model override     | `crev fix --model claude/opus`                           |
 | Open dashboard              | `crev dash`                                              |
 | Open a review in dashboard  | `crev dash <review-file>`                                |
 | Open an issue in dashboard  | `crev dash <review-file> --issue <issue-id>`             |
@@ -82,6 +85,93 @@ To add a personal schema available across all projects, place it in `~/.crev/sch
 4. For each issue: fix it or set `status: "wont-fix"` when intentionally not fixing
 5. Re-run to merge: `crev run --schema <name> --review-file .crev/reviews/<slug>.json`
 
+### Fixing Issues from a Review
+
+When asked to fix issues from a review file, after fixing each issue in the codebase, update
+the review JSON to mark it as resolved. For each fixed issue, set `"status": "fixed"` on the
+issue object in the review file. This allows the dashboard to show a green checkmark next to
+resolved findings.
+
+```bash
+# Example: read the review, fix the code, then update the JSON
+# For each issue you fix, set its status field:
+#   "status": "fixed"
+# For issues you intentionally skip:
+#   "status": "wont-fix"
+# Issues default to "open" when not set.
+```
+
+The review file is at `.crev/reviews/<slug>.json`. Each issue lives under
+`reviews[].issues[]`. Find the issue by its `id` field and add/update the
+`"status"` key. Do NOT modify any other fields on the issue.
+
+### Verifying Fixes
+
+After issues have been fixed (by you, another agent, or a human), use `crev verify` to
+automatically check which issues are still present in the current code:
+
+```bash
+# Verify a specific review file
+crev verify .crev/reviews/<slug>.json
+
+# Verify the latest review
+crev verify
+
+# JSON output
+crev verify --json
+```
+
+This reads the current source files, compares against each open issue, and updates
+`status: "fixed"` for issues that have been resolved. It does NOT re-run reviewers
+or change triage verdicts — it only checks whether reported problems still exist.
+
+In the dashboard, use `[v]` on the run detail view to trigger verification.
+
+### Auto-Fixing Issues
+
+After a triage pass has enriched issues with fix instructions, use `crev fix` to
+automatically dispatch them to a coding agent:
+
+```bash
+# Fix all actionable issues in the latest review
+crev fix
+
+# Fix all actionable issues in a specific review
+crev fix .crev/reviews/<slug>.json
+
+# Fix a single issue
+crev fix --issue <issue-id>
+
+# Include deferred issues too
+crev fix --include-deferred
+
+# Override the coding agent runtime/model
+crev fix --model claude/opus
+
+# JSON output
+crev fix --json
+```
+
+This reads the triage enrichment's `promptForAgents` for each issue, dispatches it
+to the configured coding agent, and updates `status: "fixed"` for issues that are
+successfully resolved. Issues are processed sequentially since each fix modifies
+the codebase.
+
+**Configuration:** Add `fix` to your config to enable the fix agent:
+
+```yaml
+fix:
+  runtime: claude
+  model: sonnet
+```
+
+Without this config, the fix command and `[f]` dashboard keybinding are not available.
+Run `crev doctor` to check if fix is configured.
+
+In the dashboard, use `[f]` on the run detail view to fix all actionable issues,
+or `[f]` on an individual issue detail view to fix just that issue. Fixes run in
+the background — you can navigate to other issues while a fix is in progress.
+
 ### Overriding Models at Runtime
 
 Use `--model` to override the runtime/model pair for reviewers without editing the schema file:
@@ -112,7 +202,7 @@ Each issue has:
 - `status`: open | fixed | wont-fix (optional, defaults to open)
 - `triage.verdict`: actionable | deferred | dismissed (when triage enabled)
 - `triage.reasoning`: why triage decided that verdict
-- `triage.enrichment` (when `triage.enrichComments: true`):
+- `triage.enrichment` (when triage is enabled):
   - `title`: issue headline used in PR comment
   - `context`: short evidence paragraph (where + what + risk)
   - `minimalFix.summary`: one-line fix strategy
@@ -148,7 +238,7 @@ issue comments. This attaches each comment to the exact file and
 line in the diff.
 
 When the user asks to post findings to the PR:
-1. Ensure triage enrichment is enabled (`triage.enrichComments: true`) before running review.
+1. Ensure triage is enabled in the schema or config before running review.
 2. Only post issues where `triage.verdict === "actionable"`.
 3. Post as a single PR review with one inline comment per issue.
 4. Use `gh api` to create a review with inline comments:
@@ -239,7 +329,6 @@ triage:
   enabled: true
   runtime: claude
   model: opus
-  enrichComments: true
 ```
 
 Per-reviewer fields:
