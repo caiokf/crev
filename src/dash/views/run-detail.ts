@@ -176,13 +176,24 @@ export function computeIssueWidths(issues: ReadonlyArray<ReviewIssue>): IssueCol
 }
 
 export function formatIssueRow(issue: ReviewIssue, widths: IssueColumnWidths): string {
+  const marker = actionableMarker(issue)
   const sev = severityTag(issue.severity)
   const reviewer = fitCell(issue.reviewer, widths.reviewer)
   const title = fitCell(issue.title, widths.title)
   const where = issue.file
     ? `{gray-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/gray-fg}`
     : ""
-  return `  ${sev} ${reviewer} ${title} ${where}`
+  return `${marker} ${sev} ${reviewer} ${title} ${where}`
+}
+
+/**
+ * Green dot prefix for actionable issues, two blanks otherwise, so the
+ * severity column stays aligned regardless of triage verdict.
+ */
+function actionableMarker(issue: ReviewIssue): string {
+  return issue.triage?.verdict === "actionable"
+    ? `{${DASH_COLORS.ok}-fg}●{/${DASH_COLORS.ok}-fg}`
+    : " "
 }
 
 function fitCell(value: string, width: number): string {

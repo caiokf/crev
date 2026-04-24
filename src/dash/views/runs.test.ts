@@ -165,6 +165,21 @@ describe("run detail · flattenIssues / formatIssueRow", () => {
     expect(fileAt(rowA)).toBe(fileAt(rowB))
     expect(fileAt(rowA)).toBeGreaterThan(0)
   })
+
+  it("prepends a green dot to actionable issues and preserves alignment", () => {
+    const triaged: ReviewIssue = {
+      ...issue,
+      triage: { verdict: "actionable", reasoning: "real bug" },
+    }
+    const widths = computeIssueWidths([issue, triaged])
+    const plain = formatIssueRow(issue, widths)
+    const actionable = formatIssueRow(triaged, widths)
+    expect(actionable).toContain("●")
+    expect(plain).not.toContain("●")
+    // HIGH severity tag should sit at the same visible column in both rows
+    const stripTags = (s: string) => s.replace(/\{[^}]+\}/g, "")
+    expect(stripTags(plain).indexOf("HIGH")).toBe(stripTags(actionable).indexOf("HIGH"))
+  })
 })
 
 describe("issue detail · findIssue / renderIssue", () => {
