@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { prefixId, tryParseIssues, normalizeOutput } from "./normalizer.js"
+import { prefixId, reviewerIdPrefix, tryParseIssues, normalizeOutput } from "./normalizer.js"
 import type { Config } from "./config.js"
 
 const valetMocks = vi.hoisted(() => ({
@@ -29,7 +29,7 @@ describe("tryParseIssues", () => {
     expect(result.parsed).toBe(true)
     if (result.parsed) {
       expect(result.issues).toHaveLength(1)
-      expect(result.issues[0].id).toBe("security--xss-1")
+      expect(result.issues[0].id).toBe(`${reviewerIdPrefix("Security")}--xss-1`)
       expect(result.issues[0].reviewer).toBe("Security")
       expect(result.issues[0].severity).toBe("high")
       expect(result.issues[0].category).toBe("security")
@@ -117,27 +117,47 @@ Done!`
     const result = tryParseIssues(json, "Engineer", "claude", "sonnet")
     expect(result.parsed).toBe(true)
     if (result.parsed) {
-      expect(result.issues[0].id).toBe("engineer--1")
-      expect(result.issues[1].id).toBe("engineer--2")
+      expect(result.issues[0].id).toBe(`${reviewerIdPrefix("Engineer")}--1`)
+      expect(result.issues[1].id).toBe(`${reviewerIdPrefix("Engineer")}--2`)
     }
   })
 })
 
 describe("prefixId", () => {
-  it("prefixes id with reviewer name", () => {
-    expect(prefixId("xss-1", "Security")).toBe("security--xss-1")
+  it("prefixes id with reviewer slug + hash tag", () => {
+    const prefix = reviewerIdPrefix("Security")
+    expect(prefixId("xss-1", "Security")).toBe(`${prefix}--xss-1`)
+    expect(prefix).toMatch(/^security-[0-9a-f]{4}$/)
   })
 
   it("does not double-prefix", () => {
-    expect(prefixId("security--xss-1", "Security")).toBe("security--xss-1")
+    const prefix = reviewerIdPrefix("Security")
+    expect(prefixId(`${prefix}--xss-1`, "Security")).toBe(`${prefix}--xss-1`)
   })
 
-  it("normalizes reviewer name", () => {
-    expect(prefixId("1", "Security Analyst")).toBe("security-analyst--1")
+  it("slugifies reviewer name in the prefix", () => {
+    const prefix = reviewerIdPrefix("Security Analyst")
+    expect(prefix).toMatch(/^security-analyst-[0-9a-f]{4}$/)
+    expect(prefixId("1", "Security Analyst")).toBe(`${prefix}--1`)
   })
 
-  it("does not match partial prefix from different reviewer", () => {
-    expect(prefixId("security-analyst--1", "Security")).toBe("security--security-analyst--1")
+  it("produces distinct prefixes for reviewer names that slugify the same", () => {
+    // "A/B" and "A B" both slugify to "a-b" — the hash tag keeps them apart.
+    const slashPrefix = reviewerIdPrefix("A/B")
+    const spacePrefix = reviewerIdPrefix("A B")
+    expect(slashPrefix).not.toBe(spacePrefix)
+    expect(prefixId("1", "A/B")).not.toBe(prefixId("1", "A B"))
+  })
+})
+
+describe("reviewerIdPrefix", () => {
+  it("is deterministic for the same reviewer name", () => {
+    expect(reviewerIdPrefix("Security")).toBe(reviewerIdPrefix("Security"))
+  })
+
+  it("differs when reviewer names differ, even after slugification", () => {
+    expect(reviewerIdPrefix("A/B")).not.toBe(reviewerIdPrefix("A.B"))
+    expect(reviewerIdPrefix("A/B")).not.toBe(reviewerIdPrefix("A-B"))
   })
 })
 
@@ -178,7 +198,7 @@ describe("normalizeOutput", () => {
     const result = await normalizeOutput("Test", "claude", "opus", raw, 1000, 0, baseConfig)
 
     expect(result.issues).toHaveLength(1)
-    expect(result.issues[0].id).toBe("test--bug-1")
+    expect(result.issues[0].id).toBe(`${reviewerIdPrefix("Test")}--bug-1`)
     expect(result.reviewer).toBe("Test")
   })
 
@@ -198,7 +218,7 @@ describe("normalizeOutput", () => {
     const result = await normalizeOutput("Test", "claude", "opus", "not json at all", 1000, 0, baseConfig)
 
     expect(result.issues).toHaveLength(1)
-    expect(result.issues[0].id).toBe("test--extracted-1")
+    expect(result.issues[0].id).toBe(`${reviewerIdPrefix("Test")}--extracted-1`)
     expect(valetMocks.getRuntime).toHaveBeenCalledWith("claude")
   })
 

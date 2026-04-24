@@ -1,3 +1,4 @@
+import crypto from "node:crypto"
 import type { Config } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
@@ -79,9 +80,25 @@ function normalizeStatus(s: string): NonNullable<ReviewIssue["status"]> {
 }
 
 export function prefixId(id: string, reviewer: string): string {
-  const prefix = slugify(reviewer)
+  const prefix = reviewerIdPrefix(reviewer)
   if (id.startsWith(`${prefix}--`)) return id
   return `${prefix}--${id}`
+}
+
+/**
+ * Build a collision-resistant id prefix from a reviewer name.
+ *
+ * Plain slugify() maps "A/B" and "A B" to the same "a-b", so two
+ * reviewers in the same schema could produce identical issue IDs and
+ * corrupt triage / merge (both of which key by id). Append a short
+ * SHA-256 tag of the exact reviewer name so distinct names always
+ * produce distinct prefixes while the human-readable slug stays
+ * recognisable in filenames and URLs.
+ */
+export function reviewerIdPrefix(reviewer: string): string {
+  const slug = slugify(reviewer)
+  const hash = crypto.createHash("sha256").update(reviewer).digest("hex").slice(0, 4)
+  return `${slug}-${hash}`
 }
 
 async function extractWithNormalizer(

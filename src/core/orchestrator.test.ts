@@ -3,6 +3,7 @@ import os from "node:os"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import path from "node:path"
 import { filterReviewers, buildPromptOnlyResult, orchestrate } from "./orchestrator.js"
+import { reviewerIdPrefix } from "./normalizer.js"
 import { extractChangedFiles, buildAnalyzeReference, buildDiffReference, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
 import { validateReviewFilePath, recomputeSummary } from "./output.js"
 import { UserCancelledError } from "./types.js"
@@ -505,7 +506,7 @@ describe("orchestrate", () => {
       // Triage call
       return Promise.resolve({
         raw: JSON.stringify({
-          triage: [{ id: "engineer--bug-1", verdict: "dismissed", reasoning: "Not a real bug" }],
+          triage: [{ id: `${reviewerIdPrefix("Engineer")}--bug-1`, verdict: "dismissed", reasoning: "Not a real bug" }],
         }),
         durationMs: 50,
         exitCode: 0,
