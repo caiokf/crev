@@ -70,3 +70,23 @@ export class DiffResolutionError extends Data.TaggedError("DiffResolutionError")
   readonly reason: string
   readonly cause: unknown
 }> {}
+
+// ── Git ──
+
+export class GitError extends Data.TaggedError("GitError")<{
+  readonly command: string
+  readonly reason: string
+  readonly cause: unknown
+}> {}
+
+// ── Runtime execution ──
+
+export class RuntimeExecError extends Data.TaggedError("RuntimeExecError")<{
+  readonly runtime: string
+  readonly reason: string
+  readonly cause: unknown
+}> {}
+
+export class RuntimeNotFoundError extends Data.TaggedError("RuntimeNotFoundError")<{
+  readonly runtime: string
+}> {}
