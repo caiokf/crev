@@ -43,7 +43,7 @@ describe("schema detail · renderSchema", () => {
     expect(out).toContain("quick")
     expect(out).toContain("fast check")
     expect(out).toContain("source: schemas/quick.yaml")
-    expect(out).toContain("Reviewers")
+    expect(out).toContain("reviewers")
     expect(out).toContain("Engineer")
     expect(out).toContain("claude/sonnet")
     expect(out).toContain("(inline prompt)")
@@ -58,12 +58,12 @@ describe("schema detail · renderSchema", () => {
       },
       "/repo/.crev",
     )
-    expect(out).toContain("Triage")
+    expect(out).toContain("triage")
     expect(out).toContain("runtime: claude/sonnet")
   })
 
   it("omits triage block when not configured", () => {
     const out = renderSchema(detail, "/repo/.crev")
-    expect(out).not.toContain("Triage")
+    expect(out).not.toContain("triage")
   })
 })

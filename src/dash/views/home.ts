@@ -1,5 +1,5 @@
 import blessed from "blessed"
-import { LIST_STYLE } from "../theme.js"
+import { DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashRoute, DashView } from "../types.js"
 
 /**
@@ -17,9 +17,9 @@ type HomeEntry = {
 }
 
 const ENTRIES: ReadonlyArray<HomeEntry> = [
-  { label: "Schemas", hint: "Browse schemas and reviewers", route: { kind: "schemas" } },
-  { label: "Runs", hint: "Browse past review runs", route: { kind: "runs" } },
-  { label: "Start a review", hint: "Interactive run wizard", route: { kind: "run-wizard" } },
+  { label: "schemas", hint: "browse schemas and reviewers", route: { kind: "schemas" } },
+  { label: "runs", hint: "browse past review runs", route: { kind: "runs" } },
+  { label: "start a review", hint: "interactive run wizard", route: { kind: "run-wizard" } },
 ]
 
 export function createHomeView(): DashView {
@@ -37,8 +37,12 @@ export function createHomeView(): DashView {
         label: " crev dash ",
         border: "line",
         keys: true,
+        vi: true,
         mouse: true,
-        items: ENTRIES.map((e) => `  ${e.label.padEnd(20)} ${e.hint}`),
+        tags: true,
+        items: ENTRIES.map(
+          (e) => `  {${DASH_COLORS.accent}-fg}${e.label.padEnd(20)}{/${DASH_COLORS.accent}-fg} {gray-fg}${e.hint}{/gray-fg}`,
+        ),
         style: LIST_STYLE,
       })
 
@@ -48,7 +52,7 @@ export function createHomeView(): DashView {
       })
 
       list.focus()
-      ctx.setStatus("↑/↓ move · enter open · q quit")
+      ctx.setStatus("↑/↓ or j/k move · enter open · q quit")
       ctx.screen.render()
     },
     unmount() {

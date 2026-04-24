@@ -28,7 +28,7 @@ export function createRunDetailView(filePath: string): DashView {
         left: 0,
         right: 0,
         bottom: 0,
-        label: ` Run · ${path.basename(filePath)} `,
+        label: ` run · ${path.basename(filePath)} `,
         border: "line",
         style: BOX_STYLE,
       })
@@ -52,16 +52,17 @@ export function createRunDetailView(filePath: string): DashView {
         left: "40%",
         right: 0,
         bottom: 0,
-        label: " Issues ",
+        label: " issues ",
         border: "line",
         keys: true,
+        vi: true,
         mouse: true,
         tags: true,
         items: ["  loading…"],
         style: LIST_STYLE,
       })
       issueList.focus()
-      ctx.setStatus("↑/↓ move · enter open · e editor · backspace back · q quit")
+      ctx.setStatus("↑/↓ or j/k move · enter open · e editor · backspace back · q quit")
       ctx.screen.render()
 
       issueList.on("select", (_item, index) => {
@@ -112,24 +113,33 @@ export function renderMeta(r: ReviewResult): string {
   const lines: string[] = []
   lines.push(`{bold}${r.metadata.slug}{/bold}`)
   lines.push(`{gray-fg}${r.metadata.timestamp}{/gray-fg}`)
-  lines.push(`schema: ${r.metadata.schema}`)
+  lines.push(`schema: {${DASH_COLORS.accent}-fg}${r.metadata.schema}{/${DASH_COLORS.accent}-fg}`)
   lines.push(`diff: ${r.metadata.diffType}${r.metadata.diffBase ? ` vs ${r.metadata.diffBase}` : ""}`)
   if (r.metadata.description) lines.push(`desc: ${r.metadata.description}`)
   lines.push("")
 
-  lines.push(`{bold}Summary{/bold}`)
-  lines.push(`total issues: ${r.summary.totalIssues}`)
+  lines.push(`{bold}summary{/bold}`)
+  const totalColor =
+    r.summary.totalIssues === 0
+      ? DASH_COLORS.ok
+      : r.summary.totalIssues >= 10
+        ? DASH_COLORS.danger
+        : DASH_COLORS.warn
+  lines.push(`total issues: {${totalColor}-fg}${r.summary.totalIssues}{/${totalColor}-fg}`)
   if (r.summary.triage) {
     lines.push(
-      `triage: ${r.summary.triage.actionable} actionable · ${r.summary.triage.deferred} deferred · ${r.summary.triage.dismissed} dismissed`,
+      `triage: {${DASH_COLORS.ok}-fg}${r.summary.triage.actionable} actionable{/${DASH_COLORS.ok}-fg} · {${DASH_COLORS.warn}-fg}${r.summary.triage.deferred} deferred{/${DASH_COLORS.warn}-fg} · {gray-fg}${r.summary.triage.dismissed} dismissed{/gray-fg}`,
     )
   }
   lines.push("")
 
-  lines.push(`{bold}Reviewers{/bold}`)
+  lines.push(`{bold}reviewers{/bold}`)
   for (const rv of r.reviews) {
     const count = rv.issues.length
-    lines.push(`  ${rv.reviewer} {gray-fg}${rv.runtime}/${rv.model}{/gray-fg}: ${count}`)
+    const countColor = count === 0 ? DASH_COLORS.ok : count >= 10 ? DASH_COLORS.danger : DASH_COLORS.warn
+    lines.push(
+      `  {${DASH_COLORS.accent}-fg}${rv.reviewer}{/${DASH_COLORS.accent}-fg} {gray-fg}${rv.runtime}/${rv.model}{/gray-fg}: {${countColor}-fg}${count}{/${countColor}-fg}`,
+    )
   }
 
   return lines.join("\n")

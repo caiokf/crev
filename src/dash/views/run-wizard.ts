@@ -21,20 +21,36 @@ type WizardPhase =
   | { kind: "loading" }
   | { kind: "pick-schema"; schemas: SchemaSummary[] }
   | { kind: "pick-diff"; schema: string }
-  | { kind: "running"; schema: string; diff: DiffSource; startedAt: number }
+  | {
+      kind: "running"
+      schema: string
+      diff: DiffSource
+      analyze: boolean
+      startedAt: number
+    }
   | { kind: "error"; message: string }
 
 type DiffChoice = {
   readonly label: string
-  readonly build: (defaultBase: string) => DiffSource
+  readonly build: (defaultBase: string) => { diff: DiffSource; analyze: boolean }
 }
 
 export const DIFF_CHOICES: ReadonlyArray<DiffChoice> = [
-  { label: "Uncommitted changes", build: () => ({ kind: "local", type: "uncommitted" }) },
-  { label: "All local changes (committed + uncommitted)", build: () => ({ kind: "local", type: "all" }) },
+  {
+    label: "Uncommitted changes",
+    build: () => ({ diff: { kind: "local", type: "uncommitted" }, analyze: false }),
+  },
+  {
+    label: "All local changes (committed + uncommitted)",
+    build: () => ({ diff: { kind: "local", type: "all" }, analyze: false }),
+  },
   {
     label: "Branch vs base (from config defaults.base)",
-    build: (base) => ({ kind: "branch", base, type: "all" }),
+    build: (base) => ({ diff: { kind: "branch", base, type: "all" }, analyze: false }),
+  },
+  {
+    label: "Full repo analysis (--analyze, no diff)",
+    build: () => ({ diff: { kind: "local", type: "all" }, analyze: true }),
   },
 ]
 
@@ -58,7 +74,7 @@ export function createRunWizardView(): DashView {
         left: 0,
         right: 0,
         bottom: 0,
-        label: " New review ",
+        label: " new review ",
         border: "line",
         style: BOX_STYLE,
       })
@@ -88,9 +104,10 @@ export function createRunWizardView(): DashView {
               left: 0,
               right: 0,
               bottom: 0,
-              label: " Pick a schema ",
+              label: " pick a schema ",
               border: "line",
               keys: true,
+              vi: true,
               mouse: true,
               tags: true,
               style: LIST_STYLE,
@@ -99,7 +116,7 @@ export function createRunWizardView(): DashView {
                 : ["  (no schemas — run `crev schema init <name>`)"],
             })
             list.focus()
-            ctx.setStatus("↑/↓ move · enter select · backspace cancel · q quit")
+            ctx.setStatus("↑/↓ or j/k move · enter select · backspace cancel · q quit")
             list.on("select", (_item, index) => {
               if (phase.kind !== "pick-schema") return
               const schema = phase.schemas[index]
@@ -117,25 +134,32 @@ export function createRunWizardView(): DashView {
               left: 0,
               right: 0,
               bottom: 0,
-              label: ` Pick a diff source (schema: ${phase.schema}) `,
+              label: ` pick a diff source (schema: ${phase.schema}) `,
               border: "line",
               keys: true,
+              vi: true,
               mouse: true,
               tags: true,
               style: LIST_STYLE,
               items: DIFF_CHOICES.map((c) => `  ${c.label}`),
             })
             list.focus()
-            ctx.setStatus("↑/↓ move · enter start · backspace back · q quit")
+            ctx.setStatus("↑/↓ or j/k move · enter start · backspace back · q quit")
             list.on("select", (_item, index) => {
               if (phase.kind !== "pick-diff") return
               const choice = DIFF_CHOICES[index]
               if (!choice) return
-              const base = ctx.screen.program ? "main" : "main" // dash MVP: rely on config defaults
-              const diff = choice.build(base)
-              phase = { kind: "running", schema: phase.schema, diff, startedAt: Date.now() }
+              const base = "main" // dash MVP: rely on config defaults
+              const { diff, analyze } = choice.build(base)
+              phase = {
+                kind: "running",
+                schema: phase.schema,
+                diff,
+                analyze,
+                startedAt: Date.now(),
+              }
               render()
-              startRun(phase.schema, diff)
+              startRun(phase.schema, diff, analyze)
             })
             break
           }
@@ -190,14 +214,14 @@ export function createRunWizardView(): DashView {
         }
       }
 
-      const startRun = (schemaName: string, diff: DiffSource) => {
+      const startRun = (schemaName: string, diff: DiffSource, analyze: boolean) => {
         const command: RunCommand = {
           schema: schemaName,
           diff,
           output: { kind: "dash" },
           target: { kind: "fresh" },
           plain: false,
-          analyze: false,
+          analyze,
         }
 
         ctx.setQuitGuard(() =>
@@ -247,10 +271,10 @@ export function createRunWizardView(): DashView {
 export function renderRunning(phase: Extract<WizardPhase, { kind: "running" }>): string {
   const elapsed = Math.floor((Date.now() - phase.startedAt) / 1000)
   return [
-    `{bold}Running review{/bold}`,
+    `{bold}running review{/bold}`,
     "",
-    `schema:   ${phase.schema}`,
-    `diff:     ${formatDiff(phase.diff)}`,
+    `schema:   {cyan-fg}${phase.schema}{/cyan-fg}`,
+    `diff:     ${phase.analyze ? "{yellow-fg}full repo analysis{/yellow-fg}" : formatDiff(phase.diff)}`,
     `elapsed:  ${elapsed}s`,
     "",
     "{gray-fg}reviewers are executing — this can take a minute or two.{/gray-fg}",

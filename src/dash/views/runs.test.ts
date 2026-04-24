@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { formatRow as formatRunRow } from "./runs-list.js"
+import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
 import { flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
 import { findIssue, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
@@ -46,15 +46,20 @@ const review: ReviewResult = {
 }
 
 describe("runs list · formatRow", () => {
+  const widths = { slug: 30, schema: 12, issues: 10 }
+
   it("includes timestamp, slug, schema and issue count", () => {
-    const row = formatRunRow({
-      filePath: "/repo/.crev/reviews/x.json",
-      slug: "add-feature",
-      schema: "quick",
-      timestamp: "2026-04-23T12:34:56Z",
-      totalIssues: 2,
-      reviewers: 1,
-    })
+    const row = formatRunRow(
+      {
+        filePath: "/repo/.crev/reviews/x.json",
+        slug: "add-feature",
+        schema: "quick",
+        timestamp: "2026-04-23T12:34:56Z",
+        totalIssues: 2,
+        reviewers: 1,
+      },
+      widths,
+    )
     expect(row).toContain("2026-04-23 12:34")
     expect(row).toContain("add-feature")
     expect(row).toContain("quick")
@@ -63,15 +68,58 @@ describe("runs list · formatRow", () => {
   })
 
   it("singularises a single issue", () => {
-    const row = formatRunRow({
-      filePath: "x.json",
-      slug: "s",
-      schema: "q",
-      timestamp: "2026-04-23T12:34:56Z",
-      totalIssues: 1,
-      reviewers: 1,
-    })
+    const row = formatRunRow(
+      {
+        filePath: "x.json",
+        slug: "s",
+        schema: "q",
+        timestamp: "2026-04-23T12:34:56Z",
+        totalIssues: 1,
+        reviewers: 1,
+      },
+      widths,
+    )
     expect(row).toContain("1 issue ")
+  })
+
+  it("truncates overly long schema names with an ellipsis", () => {
+    const row = formatRunRow(
+      {
+        filePath: "x.json",
+        slug: "s",
+        schema: "bugs-and-security",
+        timestamp: "2026-04-23T12:34:56Z",
+        totalIssues: 1,
+        reviewers: 1,
+      },
+      { slug: 4, schema: 10, issues: 10 },
+    )
+    expect(row).toContain("bugs-and-…")
+  })
+})
+
+describe("runs list · computeColumnWidths", () => {
+  it("clamps slug + schema widths to the widest row with a max ceiling", () => {
+    const widths = computeColumnWidths([
+      {
+        filePath: "a.json",
+        slug: "short",
+        schema: "cli",
+        timestamp: "t",
+        totalIssues: 0,
+        reviewers: 1,
+      },
+      {
+        filePath: "b.json",
+        slug: "a-very-long-slug-name-here",
+        schema: "product-readiness",
+        timestamp: "t",
+        totalIssues: 0,
+        reviewers: 1,
+      },
+    ])
+    expect(widths.slug).toBe(26)
+    expect(widths.schema).toBe(17)
   })
 })
 
@@ -79,9 +127,9 @@ describe("run detail · renderMeta", () => {
   it("shows metadata, summary, and reviewer list", () => {
     const out = renderMeta(review)
     expect(out).toContain("add-feature")
-    expect(out).toContain("schema: quick")
+    expect(out).toContain("quick")
     expect(out).toContain("diff: all vs main")
-    expect(out).toContain("total issues: 1")
+    expect(out).toContain("total issues: ")
     expect(out).toContain("1 actionable")
     expect(out).toContain("Engineer")
   })
@@ -131,7 +179,7 @@ describe("issue detail · findIssue / renderIssue", () => {
       },
     }
     const out = renderIssue(triaged)
-    expect(out).toContain("Triage")
+    expect(out).toContain("triage")
     expect(out).toContain("verdict: actionable")
     expect(out).toContain("guard the call")
     expect(out).toContain("if (x) x.trim()")

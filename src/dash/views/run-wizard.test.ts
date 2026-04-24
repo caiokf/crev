@@ -4,12 +4,18 @@ import { DIFF_CHOICES, formatDiff, renderRunning } from "./run-wizard.js"
 describe("wizard · DIFF_CHOICES", () => {
   it("builds uncommitted local diff", () => {
     const d = DIFF_CHOICES[0]!.build("main")
-    expect(d).toEqual({ kind: "local", type: "uncommitted" })
+    expect(d).toEqual({ diff: { kind: "local", type: "uncommitted" }, analyze: false })
   })
 
   it("builds branch diff using the supplied base", () => {
     const d = DIFF_CHOICES[2]!.build("release")
-    expect(d).toEqual({ kind: "branch", base: "release", type: "all" })
+    expect(d).toEqual({ diff: { kind: "branch", base: "release", type: "all" }, analyze: false })
+  })
+
+  it("exposes a full-repo analysis choice", () => {
+    const choice = DIFF_CHOICES.find((c) => c.label.includes("analyze"))
+    expect(choice).toBeDefined()
+    expect(choice!.build("main").analyze).toBe(true)
   })
 })
 
@@ -32,11 +38,23 @@ describe("wizard · renderRunning", () => {
       kind: "running" as const,
       schema: "quick",
       diff: { kind: "local" as const, type: "all" as const },
+      analyze: false,
       startedAt: Date.now() - 2500,
     }
     const out = renderRunning(phase)
-    expect(out).toContain("schema:   quick")
-    expect(out).toContain("diff:     local all")
+    expect(out).toContain("quick")
+    expect(out).toContain("local all")
     expect(out).toMatch(/elapsed:\s+\ds/)
+  })
+
+  it("labels the diff line as full-repo analysis when analyze is true", () => {
+    const phase = {
+      kind: "running" as const,
+      schema: "quick",
+      diff: { kind: "local" as const, type: "all" as const },
+      analyze: true,
+      startedAt: Date.now(),
+    }
+    expect(renderRunning(phase)).toContain("full repo analysis")
   })
 })

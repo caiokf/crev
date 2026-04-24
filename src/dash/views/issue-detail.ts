@@ -25,10 +25,11 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         left: 0,
         right: 0,
         bottom: 0,
-        label: " Issue ",
+        label: " issue ",
         border: "line",
         tags: true,
         keys: true,
+        vi: true,
         mouse: true,
         scrollable: true,
         alwaysScroll: true,
@@ -37,7 +38,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("↑/↓ scroll · backspace back · q quit")
+      ctx.setStatus("↑/↓ or j/k scroll · backspace back · q quit")
       ctx.screen.render()
 
       void runDashEffect(showAction({ filePath })).then((result) => {
@@ -88,13 +89,13 @@ export function renderIssue(issue: ReviewIssue): string {
 
   if (issue.triage) {
     lines.push("")
-    lines.push(`{bold}Triage{/bold}`)
+    lines.push(`{bold}triage{/bold}`)
     lines.push(`verdict: ${issue.triage.verdict}`)
     lines.push(`reasoning: ${issue.triage.reasoning}`)
     const enrich = issue.triage.enrichment
     if (enrich) {
       lines.push("")
-      lines.push(`{bold}Suggested fix{/bold}`)
+      lines.push(`{bold}suggested fix{/bold}`)
       lines.push(enrich.minimalFix.summary)
       if (enrich.minimalFix.patch) {
         lines.push("")

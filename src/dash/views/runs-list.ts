@@ -2,7 +2,7 @@ import blessed from "blessed"
 import path from "node:path"
 import { listReviewsAction, type ReviewSummary } from "../../actions/show.js"
 import { runDashEffect } from "../runtime.js"
-import { LIST_STYLE } from "../theme.js"
+import { DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
@@ -31,16 +31,17 @@ export function createRunsListView(): DashView {
         left: 0,
         right: 0,
         bottom: 0,
-        label: " Runs ",
+        label: " runs ",
         border: "line",
         keys: true,
+        vi: true,
         mouse: true,
         tags: true,
         items: ["  loading…"],
         style: LIST_STYLE,
       })
       list.focus()
-      ctx.setStatus("↑/↓ move · enter open · / filter · backspace back · q quit")
+      ctx.setStatus("↑/↓ or j/k move · enter open · / filter · backspace back · q quit")
       ctx.screen.render()
 
       const renderRows = () => {
@@ -55,9 +56,10 @@ export function createRunsListView(): DashView {
               : "  {gray-fg}(no reviews yet — run `crev run --schema quick`){/gray-fg}",
           ])
         } else {
-          list.setItems(visibleRows.map(formatRow))
+          const widths = computeColumnWidths(visibleRows)
+          list.setItems(visibleRows.map((r) => formatRow(r, widths)))
         }
-        list.setLabel(filter ? ` Runs · filter: ${filter} ` : " Runs ")
+        list.setLabel(filter ? ` runs · filter: ${filter} ` : " runs ")
         ctx.screen.render()
       }
 
@@ -91,7 +93,7 @@ export function createRunsListView(): DashView {
           filterInput.destroy()
           filterInput = null
           list?.focus()
-          ctx.setStatus("↑/↓ move · enter open · / filter · backspace back · q quit")
+          ctx.setStatus("↑/↓ or j/k move · enter open · / filter · backspace back · q quit")
           renderRows()
         }
 
@@ -131,11 +133,53 @@ export function matchesFilter(r: ReviewSummary, filter: string): boolean {
   )
 }
 
-export function formatRow(r: ReviewSummary): string {
+export type ColumnWidths = {
+  readonly slug: number
+  readonly schema: number
+  readonly issues: number
+}
+
+const MAX_SLUG_WIDTH = 30
+const MAX_SCHEMA_WIDTH = 24
+const ISSUES_WIDTH = 10
+
+export function computeColumnWidths(rows: ReadonlyArray<ReviewSummary>): ColumnWidths {
+  const slug = Math.min(
+    MAX_SLUG_WIDTH,
+    Math.max(4, ...rows.map((r) => r.slug.length)),
+  )
+  const schema = Math.min(
+    MAX_SCHEMA_WIDTH,
+    Math.max(6, ...rows.map((r) => r.schema.length)),
+  )
+  return { slug, schema, issues: ISSUES_WIDTH }
+}
+
+export function formatRow(r: ReviewSummary, widths: ColumnWidths): string {
   const when = r.timestamp.slice(0, 16).replace("T", " ")
-  const slug = r.slug.slice(0, 30).padEnd(30)
-  const schema = r.schema.padEnd(12)
-  const issues = `${r.totalIssues} issue${r.totalIssues === 1 ? "" : "s"}`.padEnd(12)
-  const file = `{gray-fg}${path.basename(r.filePath)}{/gray-fg}`
-  return `  ${when}  ${slug}${schema}${issues}${file}`
+  const slug = fitCell(r.slug, widths.slug)
+  const schema = fitCell(r.schema, widths.schema)
+  const issuesText = `${r.totalIssues} issue${r.totalIssues === 1 ? "" : "s"}`
+  const issues = issuesText.padEnd(widths.issues)
+  const file = path.basename(r.filePath)
+
+  const issueColor =
+    r.totalIssues === 0
+      ? DASH_COLORS.ok
+      : r.totalIssues >= 10
+        ? DASH_COLORS.danger
+        : DASH_COLORS.warn
+
+  return (
+    `  {gray-fg}${when}{/gray-fg}  ` +
+    `${slug}  ` +
+    `{${DASH_COLORS.accent}-fg}${schema}{/${DASH_COLORS.accent}-fg}  ` +
+    `{${issueColor}-fg}${issues}{/${issueColor}-fg}  ` +
+    `{gray-fg}${file}{/gray-fg}`
+  )
+}
+
+function fitCell(value: string, width: number): string {
+  if (value.length > width) return value.slice(0, Math.max(0, width - 1)) + "…"
+  return value.padEnd(width)
 }

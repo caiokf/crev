@@ -23,10 +23,11 @@ export function createSchemaDetailView(name: string): DashView {
         left: 0,
         right: 0,
         bottom: 0,
-        label: ` Schema · ${name} `,
+        label: ` schema · ${name} `,
         border: "line",
         tags: true,
         keys: true,
+        vi: true,
         scrollable: true,
         alwaysScroll: true,
         mouse: true,
@@ -35,7 +36,7 @@ export function createSchemaDetailView(name: string): DashView {
         style: BOX_STYLE,
       })
       box.focus()
-      ctx.setStatus("↑/↓ scroll · backspace back · q quit")
+      ctx.setStatus("↑/↓ or j/k scroll · backspace back · q quit")
       ctx.screen.render()
 
       void runDashEffect(showSchemaAction(name)).then((result) => {
@@ -66,7 +67,7 @@ export function renderSchema(detail: SchemaDetail, crevDir: string): string {
   lines.push(`{gray-fg}source: ${relPath}{/gray-fg}`)
   lines.push("")
 
-  lines.push(`{bold}Reviewers{/bold} (${detail.reviewers.length})`)
+  lines.push(`{bold}reviewers{/bold} (${detail.reviewers.length})`)
   for (const r of detail.reviewers) {
     const source = r.agent
       ? ` {gray-fg}→ ${r.agent}{/gray-fg}`
@@ -78,7 +79,7 @@ export function renderSchema(detail: SchemaDetail, crevDir: string): string {
 
   if (detail.triage) {
     lines.push("")
-    lines.push(`{bold}Triage{/bold}`)
+    lines.push(`{bold}triage{/bold}`)
     lines.push(`  enabled: ${detail.triage.enabled ? "{green-fg}yes{/green-fg}" : "{gray-fg}no{/gray-fg}"}`)
     if (detail.triage.enabled) {
       lines.push(`  runtime: ${detail.triage.runtime}/${detail.triage.model}`)

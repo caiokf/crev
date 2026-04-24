@@ -1,7 +1,7 @@
 import blessed from "blessed"
 import { listSchemasAction, type SchemaSummary } from "../../actions/list.js"
 import { runDashEffect } from "../runtime.js"
-import { LIST_STYLE } from "../theme.js"
+import { DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
@@ -26,16 +26,17 @@ export function createSchemasListView(): DashView {
         left: 0,
         right: 0,
         bottom: 0,
-        label: " Schemas ",
+        label: " schemas ",
         border: "line",
         keys: true,
+        vi: true,
         mouse: true,
         tags: true,
         items: ["  loading…"],
         style: LIST_STYLE,
       })
       list.focus()
-      ctx.setStatus("↑/↓ move · enter open · backspace back · q quit")
+      ctx.setStatus("↑/↓ or j/k move · enter open · backspace back · q quit")
       ctx.screen.render()
 
       list.on("select", (_item, index) => {
@@ -72,5 +73,5 @@ export function formatRow(s: SchemaSummary): string {
   const name = s.name.padEnd(24)
   const reviewers = `${s.reviewers} reviewer${s.reviewers === 1 ? "" : "s"}`.padEnd(14)
   const desc = s.error ? `{red-fg}${s.error}{/red-fg}` : s.description || "{gray-fg}(no description){/gray-fg}"
-  return `  ${name}${reviewers}${desc}`
+  return `  {${DASH_COLORS.accent}-fg}${name}{/${DASH_COLORS.accent}-fg}{gray-fg}${reviewers}{/gray-fg}${desc}`
 }
