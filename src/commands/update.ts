@@ -2,8 +2,7 @@ import path from "node:path"
 import fs from "node:fs"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { detectAITools } from "../util/detect-tools.js"
-import { writeSkill } from "../util/skills.js"
+import { getInstalledSkills, writeSkill } from "../util/skills.js"
 import { exitWithError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
@@ -19,22 +18,21 @@ export function registerUpdateCommand(program: Command): void {
         exitWithError(chalk.red("No .crev directory found. Run `crev init` first."))
       }
 
-      const tools = detectAITools(projectRoot)
-      const detected = tools.filter((t) => t.detected)
+      const installed = getInstalledSkills(projectRoot)
 
-      if (detected.length === 0) {
-        console.log(chalk.yellow("No AI tools detected in this project."))
+      if (installed.length === 0) {
+        console.log(chalk.yellow("No installed crev skills found. Run `crev init` first."))
         return
       }
 
-      console.log(chalk.dim("Updating skills for detected AI tools..."))
+      console.log(chalk.dim("Updating skills for installed tools..."))
       console.log()
 
-      for (const tool of detected) {
+      for (const tool of installed) {
         writeSkill(projectRoot, tool, true)
       }
 
       console.log()
-      console.log(chalk.green("Done.") + " Skills regenerated for: " + detected.map((t) => t.name).join(", "))
+      console.log(chalk.green("Done.") + " Skills regenerated for: " + installed.map((t) => t.name).join(", "))
     })
 }

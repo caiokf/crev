@@ -4,20 +4,14 @@ import path from "node:path"
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const toolMocks = vi.hoisted(() => ({
-  detectAITools: vi.fn(),
-}))
-
 const skillMocks = vi.hoisted(() => ({
   writeSkill: vi.fn(),
-}))
-
-vi.mock("../util/detect-tools.js", () => ({
-  detectAITools: toolMocks.detectAITools,
+  getInstalledSkills: vi.fn(),
 }))
 
 vi.mock("../util/skills.js", () => ({
   writeSkill: skillMocks.writeSkill,
+  getInstalledSkills: skillMocks.getInstalledSkills,
 }))
 
 import { registerUpdateCommand } from "./update.js"
@@ -39,8 +33,8 @@ describe("registerUpdateCommand", () => {
   let errorSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    toolMocks.detectAITools.mockReset()
     skillMocks.writeSkill.mockReset()
+    skillMocks.getInstalledSkills.mockReset()
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
   })
@@ -60,32 +54,27 @@ describe("registerUpdateCommand", () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
-  it("prints a warning when no tools are detected", async () => {
+  it("prints a warning when no installed skills found", async () => {
     const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-update-none-"))
     fs.mkdirSync(path.join(tmp, ".crev"), { recursive: true })
-    toolMocks.detectAITools.mockReturnValue([
-      { name: "Claude", id: "claude", detected: false, detectionPath: ".claude", skillPath: ".claude/skills/crev" },
-    ])
+    skillMocks.getInstalledSkills.mockReturnValue([])
 
     await runUpdate([tmp])
 
-    expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("No AI tools detected"))).toBe(true)
+    expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("No installed crev skills found"))).toBe(true)
     expect(skillMocks.writeSkill).not.toHaveBeenCalled()
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
-  it("regenerates skills for detected tools", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-update-detected-"))
+  it("regenerates skills only for tools with installed skills", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-update-installed-"))
     fs.mkdirSync(path.join(tmp, ".crev"), { recursive: true })
 
-    const claude = { name: "Claude", id: "claude", detected: true, detectionPath: ".claude", skillPath: ".claude/skills/crev" }
+    const claude = { name: "Claude Code", id: "claude", detected: true, detectionPath: ".claude", skillPath: ".claude/skills/crev" }
     const cursor = { name: "Cursor", id: "cursor", detected: true, detectionPath: ".cursor", skillPath: ".cursor/skills/crev" }
-    toolMocks.detectAITools.mockReturnValue([
-      claude,
-      cursor,
-      { name: "Gemini", id: "gemini", detected: false, detectionPath: ".gemini", skillPath: ".gemini/commands" },
-    ])
+    // getInstalledSkills returns only tools that have skill files — Gemini is excluded
+    skillMocks.getInstalledSkills.mockReturnValue([claude, cursor])
 
     await runUpdate([tmp])
 
@@ -93,6 +82,25 @@ describe("registerUpdateCommand", () => {
     expect(skillMocks.writeSkill).toHaveBeenCalledWith(tmp, claude, true)
     expect(skillMocks.writeSkill).toHaveBeenCalledWith(tmp, cursor, true)
     expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("Done."))).toBe(true)
+
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it("does not create skill files for tools that were not initialized", async () => {
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-update-nocreate-"))
+    fs.mkdirSync(path.join(tmp, ".crev"), { recursive: true })
+    // Simulate: .claude and .cursor dirs exist, but only claude has an installed skill
+    fs.mkdirSync(path.join(tmp, ".claude"), { recursive: true })
+    fs.mkdirSync(path.join(tmp, ".cursor"), { recursive: true })
+
+    const claude = { name: "Claude Code", id: "claude", detected: true, detectionPath: ".claude", skillPath: ".claude/skills/crev" }
+    skillMocks.getInstalledSkills.mockReturnValue([claude])
+
+    await runUpdate([tmp])
+
+    // Only claude skill should be updated, not cursor
+    expect(skillMocks.writeSkill).toHaveBeenCalledTimes(1)
+    expect(skillMocks.writeSkill).toHaveBeenCalledWith(tmp, claude, true)
 
     fs.rmSync(tmp, { recursive: true, force: true })
   })
