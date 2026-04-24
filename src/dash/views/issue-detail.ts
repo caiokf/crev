@@ -171,7 +171,7 @@ export function renderIssue(issue: ReviewIssue): string {
         lines.push("")
         const lang = enrich.minimalFix.language ?? ""
         lines.push(`{gray-fg}\`\`\`${escapeTags(lang)}{/gray-fg}`)
-        lines.push(`{${DASH_COLORS.accent}-fg}${escapeTags(enrich.minimalFix.patch)}{/${DASH_COLORS.accent}-fg}`)
+        lines.push(formatCodeBlock(enrich.minimalFix.patch, lang))
         lines.push(`{gray-fg}\`\`\`{/gray-fg}`)
       }
 
@@ -190,6 +190,48 @@ export function renderIssue(issue: ReviewIssue): string {
 
 function sectionHeader(label: string): string {
   return `{${DASH_COLORS.accent}-fg}{bold}❯ ${label}{/bold}{/${DASH_COLORS.accent}-fg}`
+}
+
+/**
+ * Render a fenced code block. For `diff` patches, colour each line
+ * based on its unified-diff prefix so additions/removals/hunk headers
+ * pop like in a real diff viewer. Non-diff blocks stay in the accent
+ * colour so they still read as code.
+ */
+export function formatCodeBlock(patch: string, language: string): string {
+  if (language.toLowerCase() === "diff") return formatDiff(patch)
+  return `{${DASH_COLORS.accent}-fg}${escapeTags(patch)}{/${DASH_COLORS.accent}-fg}`
+}
+
+export function formatDiff(patch: string): string {
+  // Dark-tinted backgrounds keep the bg suggestion from overpowering
+  // the surrounding panel while still giving a clear "added vs removed"
+  // silhouette. Hex colours work on any 256-colour terminal (blessed
+  // falls back gracefully on 16-colour terminals).
+  const ADD_BG = "#143a14"
+  const DEL_BG = "#4a1c1c"
+  const HUNK_BG = "#1c2a4a"
+
+  return patch
+    .split("\n")
+    .map((raw) => {
+      const escaped = escapeTags(raw)
+      if (raw.startsWith("+++") || raw.startsWith("---")) {
+        // File header lines: dimmed, no bg
+        return `{gray-fg}{bold}${escaped}{/bold}{/gray-fg}`
+      }
+      if (raw.startsWith("@@")) {
+        return `{${HUNK_BG}-bg}{cyan-fg}${escaped}{/cyan-fg}{/${HUNK_BG}-bg}`
+      }
+      if (raw.startsWith("+")) {
+        return `{${ADD_BG}-bg}{green-fg}${escaped}{/green-fg}{/${ADD_BG}-bg}`
+      }
+      if (raw.startsWith("-")) {
+        return `{${DEL_BG}-bg}{red-fg}${escaped}{/red-fg}{/${DEL_BG}-bg}`
+      }
+      return `{gray-fg}${escaped}{/gray-fg}`
+    })
+    .join("\n")
 }
 
 function severityColor(severity: ReviewIssue["severity"]): string {

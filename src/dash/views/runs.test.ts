@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest"
 import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
 import { computeIssueWidths, flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
-import { buildCopyPrompt, findIssue, renderIssue } from "./issue-detail.js"
+import { buildCopyPrompt, findIssue, formatDiff, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 
 const issue: ReviewIssue = {
@@ -267,5 +267,33 @@ describe("issue detail · buildCopyPrompt", () => {
 
   it("returns an empty string when enrichment is missing", () => {
     expect(buildCopyPrompt(issue)).toBe("")
+  })
+})
+
+describe("issue detail · formatDiff", () => {
+  it("paints + lines green and - lines red with contrasting backgrounds", () => {
+    const patch = ["- const old = 1", "+ const next = 2"].join("\n")
+    const out = formatDiff(patch)
+    expect(out).toContain("{green-fg}")
+    expect(out).toContain("{red-fg}")
+    // background tints present
+    expect(out).toMatch(/#[0-9a-f]{6}-bg/i)
+  })
+
+  it("dims file-header and context lines and tints hunk markers", () => {
+    const patch = [
+      "--- a/foo.ts",
+      "+++ b/foo.ts",
+      "@@ -1,2 +1,2 @@",
+      " unchanged line",
+      "- removed",
+      "+ added",
+    ].join("\n")
+    const out = formatDiff(patch)
+    expect(out).toContain("@@ -1,2 +1,2 @@")
+    // file headers are bold gray
+    expect(out).toMatch(/\{gray-fg\}\{bold\}--- a\/foo\.ts/)
+    // hunk header uses cyan foreground
+    expect(out).toContain("{cyan-fg}@@ -1,2 +1,2 @@")
   })
 })
