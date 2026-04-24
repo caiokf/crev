@@ -117,6 +117,9 @@ export function registerSchemaCommand(program: Command): void {
       if (!opts.all && !file) {
         exitWithError(chalk.red("Specify a schema file or use --all"))
       }
+      if (opts.all && file) {
+        exitWithError(chalk.red("Cannot specify both a schema file and --all"))
+      }
 
       const input = opts.all ? ({ all: true } as const) : ({ file: file as string } as const)
 
