@@ -1,25 +1,25 @@
 class Crev < Formula
   desc "Multi-AI code review CLI"
   homepage "https://github.com/caiokf/crev"
-  version "0.7.0"
+  version "0.7.1"
 
   on_macos do
     if Hardware::CPU.arm?
-      url "https://github.com/caiokf/crev/releases/download/v0.7.0/crev-darwin-arm64"
-      sha256 "1c70a849042f4ca415dc8d9498efc16d19c01df00da149344d13727784058586"
+      url "https://github.com/caiokf/crev/releases/download/v0.7.1/crev-darwin-arm64"
+      sha256 "1d288408ac15f68ce62b8eb87df4003f3efd53b834057c2ec029792ce3cf2968"
     else
-      url "https://github.com/caiokf/crev/releases/download/v0.7.0/crev-darwin-x64"
-      sha256 "c55b2616ac3754df27f193df0af33acd47c7026c622cfe11468d1dfbaaf30f66"
+      url "https://github.com/caiokf/crev/releases/download/v0.7.1/crev-darwin-x64"
+      sha256 "cb9176ce2d8b4c21479ff2b4d353eacd83574b74a3cc0adeb70957a7f8e76a17"
     end
   end
 
   on_linux do
     if Hardware::CPU.arm?
-      url "https://github.com/caiokf/crev/releases/download/v0.7.0/crev-linux-arm64"
-      sha256 "d73e8dd87696bfb35d166983f32a0191ee4e152259244a566093aa0f7df51b69"
+      url "https://github.com/caiokf/crev/releases/download/v0.7.1/crev-linux-arm64"
+      sha256 "546c5225d2b5a812ad2120442eff4cb1629a0cad40811919a91539fe5b354ba8"
     else
-      url "https://github.com/caiokf/crev/releases/download/v0.7.0/crev-linux-x64"
-      sha256 "8356854720d37e73f78c0cbfabe9fd63d5e328affcdeeb125b17f11df64d014c"
+      url "https://github.com/caiokf/crev/releases/download/v0.7.1/crev-linux-x64"
+      sha256 "6d1349c80f53869e55cd3e05a96f4493fef59d9662c876fd024bccdf227b74f8"
     end
   end
 
