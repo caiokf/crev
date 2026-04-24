@@ -16,7 +16,8 @@ export type DashRoute =
   | { readonly kind: "schemas" }
   | { readonly kind: "schema-detail"; readonly name: string }
   | { readonly kind: "runs" }
-  | { readonly kind: "run-detail"; readonly slug: string }
+  | { readonly kind: "run-detail"; readonly filePath: string }
+  | { readonly kind: "issue-detail"; readonly filePath: string; readonly issueId: string }
   | { readonly kind: "run-wizard" }
 
 export interface DashRouter {

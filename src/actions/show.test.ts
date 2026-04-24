@@ -2,7 +2,7 @@ import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Exit, Layer } from "effect"
 import path from "node:path"
-import { showAction } from "./show.js"
+import { listReviewsAction, showAction } from "./show.js"
 import { makeTestCrevConfig } from "../services/CrevConfig.js"
 import { makeTestReviewStore } from "../services/ReviewStore.js"
 import type { ReviewResult } from "../core/types.js"
@@ -61,6 +61,25 @@ describe("showAction", () => {
         const err = exit.cause._tag === "Fail" ? exit.cause.error : null
         expect(err?._tag).toBe("ReviewNotFoundError")
       }
+    }).pipe(Effect.provide(Layer.mergeAll(cfg, store)))
+  })
+
+  it.effect("lists every review newest-first via listReviewsAction", () => {
+    const crevDir = "/proj/.crev"
+    const cfg = makeTestCrevConfig({
+      crevDir,
+      config: { output: { dir: "/proj/.crev/reviews" } },
+    }).layer
+    const { layer: store } = makeTestReviewStore({
+      "/proj/.crev/reviews/a.json": fixture("early", "2024-01-01T00:00:00Z"),
+      "/proj/.crev/reviews/b.json": fixture("newest", "2024-06-01T00:00:00Z"),
+    })
+
+    return Effect.gen(function* () {
+      const out = yield* listReviewsAction
+      expect(out.map((r) => r.slug)).toEqual(["newest", "early"])
+      expect(out[0]!.totalIssues).toBe(0)
+      expect(out[0]!.reviewers).toBe(0)
     }).pipe(Effect.provide(Layer.mergeAll(cfg, store)))
   })
 

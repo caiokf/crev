@@ -12,6 +12,47 @@ import type {
   ReviewParseError,
 } from "../errors.js"
 
+export type ReviewSummary = {
+  readonly filePath: string
+  readonly slug: string
+  readonly schema: string
+  readonly timestamp: string
+  readonly totalIssues: number
+  readonly reviewers: number
+  readonly description?: string
+}
+
+/**
+ * Summarise every review under the configured output directory,
+ * newest first. Used by the dash runs list and any other caller that
+ * needs a lightweight index without loading full issue bodies.
+ */
+export const listReviewsAction: Effect.Effect<
+  ReviewSummary[],
+  ConfigParseError,
+  CrevConfig | ReviewStore
+> = Effect.gen(function* () {
+  const cfg = yield* CrevConfig
+  const store = yield* ReviewStore
+  const { crevDir, config } = yield* cfg.load()
+  const outputDir = getOutputDir(config, crevDir)
+  const { reviews } = yield* store.list(outputDir)
+
+  return reviews
+    .map(
+      ({ filePath, result }): ReviewSummary => ({
+        filePath,
+        slug: result.metadata.slug,
+        schema: result.metadata.schema,
+        timestamp: result.metadata.timestamp,
+        totalIssues: result.summary.totalIssues,
+        reviewers: result.reviews.length,
+        description: result.metadata.description,
+      }),
+    )
+    .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
+})
+
 export type ShowInput = {
   /**
    * Optional explicit review file. Relative paths resolve against the
