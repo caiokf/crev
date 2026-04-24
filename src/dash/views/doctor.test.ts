@@ -247,6 +247,21 @@ describe("doctor · buildDoctorRows", () => {
     expect(skillRow!.fix).toBeUndefined()
   })
 
+  it("attaches fix action to unconfigured fix agent", () => {
+    const rows = buildDoctorRows(
+      snapshot({
+        projectChecks: [
+          { name: ".crev/config.yaml", ok: true, detail: "valid" },
+          { name: "fix agent", ok: false, detail: "not configured" },
+        ],
+      }),
+    )
+    const fixRow = rows.find((r) => r.text.includes("fix agent"))
+    expect(fixRow).toBeDefined()
+    expect(fixRow!.fix).toBeDefined()
+    expect(fixRow!.fix!.label).toBe("enable fix agent")
+  })
+
   it("includes spacer rows between sections", () => {
     const rows = buildDoctorRows(
       snapshot({

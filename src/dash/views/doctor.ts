@@ -295,6 +295,32 @@ function getProjectFix(check: ProjectCheck, crevDir: string): DoctorFixAction | 
     }
   }
 
+  if (check.name === "fix agent" && !check.ok) {
+    return {
+      label: "enable fix agent",
+      apply: () => {
+        const configPath = path.join(crevDir, "config.yaml")
+        if (!fs.existsSync(configPath)) {
+          return "create config.yaml first"
+        }
+        const content = fs.readFileSync(configPath, "utf-8")
+        // If fix section is commented out, uncomment it
+        if (content.includes("# fix:")) {
+          const updated = content
+            .replace(/# fix:\n/, "fix:\n")
+            .replace(/#   runtime: claude\n/, "  runtime: claude\n")
+            .replace(/#   model: sonnet\n/, "  model: sonnet\n")
+          fs.writeFileSync(configPath, updated, "utf-8")
+          return "enabled fix agent in config.yaml"
+        }
+        // Otherwise append fix section
+        const fixBlock = "\nfix:\n  runtime: claude\n  model: sonnet\n"
+        fs.appendFileSync(configPath, fixBlock, "utf-8")
+        return "added fix agent to config.yaml"
+      },
+    }
+  }
+
   return undefined
 }
 
