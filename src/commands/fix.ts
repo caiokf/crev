@@ -11,6 +11,7 @@ type FixOptions = {
   issue?: string
   includeDeferred?: boolean
   model?: string
+  maxTurns?: string
   json?: boolean
 }
 
@@ -21,6 +22,7 @@ export function registerFixCommand(program: Command): void {
     .option("--issue <id>", "Fix a single issue by ID")
     .option("--include-deferred", "Include deferred issues (default: actionable only)")
     .option("--model <spec>", "Override runtime/model (format: runtime/model)")
+    .option("--max-turns <n>", "Max agent turns per issue (default: 10)")
     .option("--json", "Machine-readable JSON output")
     .action(async (file: string | undefined, opts: FixOptions) => {
       let runtime: string | undefined
@@ -47,6 +49,7 @@ export function registerFixCommand(program: Command): void {
           includeDeferred: opts.includeDeferred,
           runtime,
           model,
+          maxTurns: opts.maxTurns ? parseInt(opts.maxTurns, 10) : undefined,
           onProgress: opts.json
             ? undefined
             : (completed, total, status) => {
