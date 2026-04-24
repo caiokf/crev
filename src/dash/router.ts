@@ -1,3 +1,4 @@
+import { createDoctorView } from "./views/doctor.js"
 import { createHomeView } from "./views/home.js"
 import { createIssueDetailView } from "./views/issue-detail.js"
 import { createRunDetailView } from "./views/run-detail.js"
@@ -72,5 +73,7 @@ export const defaultResolver: ViewResolver = (route) => {
       return createIssueDetailView(route.filePath, route.issueId)
     case "run-wizard":
       return createRunWizardView()
+    case "doctor":
+      return createDoctorView()
   }
 }

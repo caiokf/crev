@@ -19,6 +19,7 @@ export type DashRoute =
   | { readonly kind: "run-detail"; readonly filePath: string }
   | { readonly kind: "issue-detail"; readonly filePath: string; readonly issueId: string }
   | { readonly kind: "run-wizard" }
+  | { readonly kind: "doctor" }
 
 export interface DashRouter {
   readonly navigate: (route: DashRoute) => void

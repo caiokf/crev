@@ -32,6 +32,7 @@ export const ENTRIES: ReadonlyArray<HomeEntry> = [
   { key: "s", label: "schemas", hint: "browse schemas and reviewers", route: { kind: "schemas" } },
   { key: "r", label: "runs", hint: "browse past review runs", route: { kind: "runs" } },
   { key: "n", label: "start a review", hint: "interactive run wizard", route: { kind: "run-wizard" } },
+  { key: "d", label: "doctor", hint: "check runtimes, schemas, and project setup", route: { kind: "doctor" } },
 ]
 
 export function createHomeView(): DashView {
