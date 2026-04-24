@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
-import { flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
+import { computeIssueWidths, flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
 import { findIssue, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 
@@ -141,11 +141,29 @@ describe("run detail · flattenIssues / formatIssueRow", () => {
   })
 
   it("includes severity tag and file:line", () => {
-    const row = formatIssueRow(issue)
+    const row = formatIssueRow(issue, computeIssueWidths([issue]))
     expect(row).toContain("HIGH")
     expect(row).toContain("Engineer")
     expect(row).toContain("Null deref")
     expect(row).toContain("src/foo.ts:42")
+  })
+
+  it("pads title + reviewer so file column aligns across rows", () => {
+    const a: ReviewIssue = { ...issue, reviewer: "CLI Conventions", title: "short" }
+    const b: ReviewIssue = {
+      ...issue,
+      id: "i-2",
+      reviewer: "Bug Hunter",
+      title: "a much longer issue title that explains the problem in detail",
+    }
+    const widths = computeIssueWidths([a, b])
+    const rowA = formatIssueRow(a, widths)
+    const rowB = formatIssueRow(b, widths)
+    // strip blessed tags to compare visible positions
+    const stripTags = (s: string) => s.replace(/\{[^}]+\}/g, "")
+    const fileAt = (s: string) => stripTags(s).indexOf("src/foo.ts")
+    expect(fileAt(rowA)).toBe(fileAt(rowB))
+    expect(fileAt(rowA)).toBeGreaterThan(0)
   })
 })
 

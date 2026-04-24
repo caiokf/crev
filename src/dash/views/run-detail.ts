@@ -92,7 +92,8 @@ export function createRunDetailView(filePath: string): DashView {
         if (issues.length === 0) {
           issueList.setItems(["  {gray-fg}(no issues){/gray-fg}"])
         } else {
-          issueList.setItems(issues.map(formatIssueRow))
+          const widths = computeIssueWidths(issues)
+          issueList.setItems(issues.map((issue) => formatIssueRow(issue, widths)))
         }
         ctx.screen.render()
       })
@@ -153,11 +154,39 @@ export function flattenIssues(r: ReviewResult): ReviewIssue[] {
   return out
 }
 
-export function formatIssueRow(issue: ReviewIssue): string {
+export type IssueColumnWidths = {
+  readonly reviewer: number
+  readonly title: number
+}
+
+const MAX_REVIEWER_WIDTH = 20
+const MAX_TITLE_WIDTH = 60
+
+export function computeIssueWidths(issues: ReadonlyArray<ReviewIssue>): IssueColumnWidths {
+  const reviewer = Math.min(
+    MAX_REVIEWER_WIDTH,
+    Math.max(8, ...issues.map((i) => i.reviewer.length)),
+  )
+  const title = Math.min(
+    MAX_TITLE_WIDTH,
+    Math.max(20, ...issues.map((i) => i.title.length)),
+  )
+  return { reviewer, title }
+}
+
+export function formatIssueRow(issue: ReviewIssue, widths: IssueColumnWidths): string {
   const sev = severityTag(issue.severity)
-  const reviewer = issue.reviewer.padEnd(12)
-  const where = issue.file ? `{gray-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/gray-fg}` : ""
-  return `  ${sev} ${reviewer} ${issue.title} ${where}`
+  const reviewer = fitCell(issue.reviewer, widths.reviewer)
+  const title = fitCell(issue.title, widths.title)
+  const where = issue.file
+    ? `{gray-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/gray-fg}`
+    : ""
+  return `  ${sev} ${reviewer} ${title} ${where}`
+}
+
+function fitCell(value: string, width: number): string {
+  if (value.length > width) return value.slice(0, Math.max(0, width - 1)) + "…"
+  return value.padEnd(width)
 }
 
 function severityTag(severity: ReviewIssue["severity"]): string {
