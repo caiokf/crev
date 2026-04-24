@@ -24,8 +24,13 @@ export type OutputPaths = {
   readonly markdownPath?: string
 }
 
+export type LoadedReview = {
+  readonly filePath: string
+  readonly result: ReviewResult
+}
+
 export type ReviewList = {
-  readonly reviews: ReviewResult[]
+  readonly reviews: LoadedReview[]
   readonly skipped: string[]
 }
 
@@ -38,7 +43,7 @@ export interface ReviewStoreService {
 
   readonly latest: (
     outputDir: string,
-  ) => Effect.Effect<ReviewResult, ReviewNotFoundError | ReviewParseError | FileReadError>
+  ) => Effect.Effect<LoadedReview, ReviewNotFoundError | ReviewParseError | FileReadError>
 
   readonly write: (input: WriteInput) => Effect.Effect<OutputPaths, FileWriteError>
 }
@@ -61,7 +66,7 @@ export const ReviewStoreLive = Layer.effect(
         )
         const jsonFiles = entries.filter((f) => f.endsWith(".json")).sort()
 
-        const reviews: ReviewResult[] = []
+        const reviews: LoadedReview[] = []
         const skipped: string[] = []
 
         for (const entry of jsonFiles) {
@@ -69,7 +74,7 @@ export const ReviewStoreLive = Layer.effect(
           const parsed = yield* parseReviewFile(fs, filePath).pipe(
             Effect.catchAll(() => Effect.succeed(null)),
           )
-          if (parsed) reviews.push(parsed)
+          if (parsed) reviews.push({ filePath, result: parsed })
           else skipped.push(filePath)
         }
 
@@ -85,9 +90,11 @@ export const ReviewStoreLive = Layer.effect(
         if (reviews.length === 0) {
           return yield* Effect.fail(new ReviewNotFoundError({ outputDir }))
         }
-        return reviews.slice().sort((a, b) =>
-          a.metadata.timestamp.localeCompare(b.metadata.timestamp),
-        )[reviews.length - 1]
+        return reviews
+          .slice()
+          .sort((a, b) =>
+            a.result.metadata.timestamp.localeCompare(b.result.metadata.timestamp),
+          )[reviews.length - 1]
       })
 
     const write: ReviewStoreService["write"] = (input) =>
@@ -130,10 +137,12 @@ export const makeTestReviewStore = (
       list: (outputDir) =>
         Effect.sync(() => {
           const prefix = outputDir.endsWith("/") ? outputDir : `${outputDir}/`
-          const matched = [...files.entries()]
+          const matched: LoadedReview[] = [...files.entries()]
             .filter(([p]) => p.startsWith(prefix) && p.endsWith(".json"))
-            .map(([, v]) => v)
-            .sort((a, b) => a.metadata.timestamp.localeCompare(b.metadata.timestamp))
+            .map(([filePath, result]) => ({ filePath, result }))
+            .sort((a, b) =>
+              a.result.metadata.timestamp.localeCompare(b.result.metadata.timestamp),
+            )
           return { reviews: matched, skipped: [] }
         }),
 
@@ -150,10 +159,12 @@ export const makeTestReviewStore = (
       latest: (outputDir) =>
         Effect.sync(() => {
           const prefix = outputDir.endsWith("/") ? outputDir : `${outputDir}/`
-          const matched = [...files.entries()]
+          const matched: LoadedReview[] = [...files.entries()]
             .filter(([p]) => p.startsWith(prefix) && p.endsWith(".json"))
-            .map(([, v]) => v)
-            .sort((a, b) => a.metadata.timestamp.localeCompare(b.metadata.timestamp))
+            .map(([filePath, result]) => ({ filePath, result }))
+            .sort((a, b) =>
+              a.result.metadata.timestamp.localeCompare(b.result.metadata.timestamp),
+            )
           return matched
         }).pipe(
           Effect.flatMap((matched) =>

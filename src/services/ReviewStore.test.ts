@@ -49,7 +49,8 @@ describe("ReviewStore service — test layer", () => {
     return Effect.gen(function* () {
       const store = yield* ReviewStore
       const { reviews, skipped } = yield* store.list("/out")
-      expect(reviews.map((r) => r.metadata.slug)).toEqual(["a", "b"])
+      expect(reviews.map((r) => r.result.metadata.slug)).toEqual(["a", "b"])
+      expect(reviews.map((r) => r.filePath)).toEqual(["/out/a.json", "/out/b.json"])
       expect(skipped).toEqual([])
     }).pipe(Effect.provide(layer))
   })
@@ -63,8 +64,9 @@ describe("ReviewStore service — test layer", () => {
     })
     return Effect.gen(function* () {
       const store = yield* ReviewStore
-      const result = yield* store.latest("/out")
-      expect(result.metadata.slug).toBe("b")
+      const loaded = yield* store.latest("/out")
+      expect(loaded.result.metadata.slug).toBe("b")
+      expect(loaded.filePath).toBe("/out/b.json")
     }).pipe(Effect.provide(layer))
   })
 
@@ -140,7 +142,8 @@ describe("ReviewStore service — Live layer", () => {
         const store = yield* ReviewStore
         const { reviews, skipped } = yield* store.list(outDir)
         expect(reviews).toHaveLength(1)
-        expect(reviews[0].metadata.slug).toBe("good")
+        expect(reviews[0].result.metadata.slug).toBe("good")
+        expect(reviews[0].filePath).toBe(path.join(outDir, "good.json"))
         expect(skipped).toHaveLength(1)
         expect(skipped[0]).toContain("broken.json")
       }).pipe(Effect.provide(layer)),

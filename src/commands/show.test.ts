@@ -1,21 +1,33 @@
-import fs from "node:fs"
-import os from "node:os"
-import path from "node:path"
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const configMocks = vi.hoisted(() => ({
-  findCrevDir: vi.fn(),
-  loadLayeredConfig: vi.fn(),
-  getOutputDir: vi.fn(),
+// Shim-level tests. The show command is now a thin wrapper around
+// `showAction` from src/actions/show.ts; that action is exercised in
+// `src/actions/show.test.ts` against test layers.
+//
+// Here we only verify that the shim maps action results/errors to stdout
+// and the exit-on-error behavior users depend on.
+
+const actionMocks = vi.hoisted(() => ({
+  showAction: vi.fn(),
 }))
 
-vi.mock("../core/config.js", () => ({
-  findCrevDir: configMocks.findCrevDir,
-  loadLayeredConfig: configMocks.loadLayeredConfig,
-  getOutputDir: configMocks.getOutputDir,
-}))
+vi.mock("../actions/show.js", async () => {
+  const { Effect } = await import("effect")
+  return {
+    showAction: (input: unknown) =>
+      Effect.suspend(() => {
+        const result = actionMocks.showAction(input)
+        if (result && typeof result === "object" && "_op" in result) {
+          return result as ReturnType<typeof Effect.succeed>
+        }
+        return Effect.succeed(result)
+      }),
+  }
+})
 
+import { showAction as _ } from "../actions/show.js"
+void _
 import { registerShowCommand } from "./show.js"
 
 async function runShow(args: string[]) {
@@ -30,14 +42,23 @@ function mockExit() {
   }) as never)
 }
 
-describe("registerShowCommand", () => {
+const fixtureResult = {
+  metadata: {
+    slug: "run-1",
+    schema: "quick",
+    timestamp: "2026-04-22T00:00:00.000Z",
+    diffType: "local" as const,
+  },
+  reviews: [],
+  summary: { totalIssues: 0, bySeverity: {}, byCategory: {}, byReviewer: {} },
+}
+
+describe("registerShowCommand (shim)", () => {
   let logSpy: ReturnType<typeof vi.spyOn>
   let errorSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    configMocks.findCrevDir.mockReset()
-    configMocks.loadLayeredConfig.mockReset()
-    configMocks.getOutputDir.mockReset()
+    actionMocks.showAction.mockReset()
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
     errorSpy = vi.spyOn(console, "error").mockImplementation(() => {})
   })
@@ -46,24 +67,28 @@ describe("registerShowCommand", () => {
     vi.restoreAllMocks()
   })
 
-  it("fails when no review file exists", async () => {
+  it("exits with error when no reviews found", async () => {
     const exitSpy = mockExit()
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-show-empty-"))
+    const { Effect } = await import("effect")
+    const { ReviewNotFoundError } = await import("../errors.js")
 
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    configMocks.loadLayeredConfig.mockReturnValue({ output: { format: "json" } })
-    configMocks.getOutputDir.mockReturnValue(tmp)
+    actionMocks.showAction.mockReturnValue(
+      Effect.fail(new ReviewNotFoundError({ outputDir: "/repo/.crev/reviews" })),
+    )
 
     await expect(runShow([])).rejects.toThrow("process.exit:1")
     expect(errorSpy.mock.calls[0][0]).toContain("No review files found")
     expect(exitSpy).toHaveBeenCalledWith(1)
-
-    fs.rmSync(tmp, { recursive: true, force: true })
   })
 
-  it("fails when an explicit file does not exist", async () => {
+  it("exits with error when an explicit file does not exist", async () => {
     const exitSpy = mockExit()
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
+    const { Effect } = await import("effect")
+    const { FileNotFoundError } = await import("../errors.js")
+
+    actionMocks.showAction.mockReturnValue(
+      Effect.fail(new FileNotFoundError({ path: "/tmp/does-not-exist-review.json" })),
+    )
 
     await expect(runShow(["/tmp/does-not-exist-review.json"])).rejects.toThrow("process.exit:1")
     expect(errorSpy.mock.calls[0][0]).toContain("not found")
@@ -71,45 +96,39 @@ describe("registerShowCommand", () => {
   })
 
   it("prints raw review JSON with --json", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-show-json-"))
-    const file = path.join(tmp, "review.json")
-    const content = JSON.stringify({
-      metadata: { slug: "run-1", schema: "quick", timestamp: "2026-04-22T00:00:00.000Z", diffType: "local" },
-      reviews: [],
-      summary: { totalIssues: 0 },
+    actionMocks.showAction.mockReturnValue({
+      filePath: "/out/review.json",
+      result: fixtureResult,
+      isLatest: false,
     })
-    fs.writeFileSync(file, content, "utf-8")
 
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    await runShow([file, "--json"])
+    await runShow(["/out/review.json", "--json"])
 
-    expect(logSpy).toHaveBeenCalledWith(content)
-    fs.rmSync(tmp, { recursive: true, force: true })
+    const payload = JSON.parse(logSpy.mock.calls[0][0] as string)
+    expect(payload.metadata.slug).toBe("run-1")
   })
 
-  it("uses the latest review file by default", async () => {
-    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "crev-show-latest-"))
-    const oldFile = path.join(tmp, "2026-04-21-old.json")
-    const newFile = path.join(tmp, "2026-04-22-new.json")
-    fs.writeFileSync(
-      oldFile,
-      JSON.stringify({ metadata: { slug: "old", schema: "quick", timestamp: "", diffType: "local" }, reviews: [], summary: { totalIssues: 0 } }),
-      "utf-8",
-    )
-    const newContent = JSON.stringify({
-      metadata: { slug: "new", schema: "quick", timestamp: "", diffType: "local" },
-      reviews: [],
-      summary: { totalIssues: 0 },
+  it("passes the explicit file to showAction", async () => {
+    actionMocks.showAction.mockReturnValue({
+      filePath: "/out/review.json",
+      result: fixtureResult,
+      isLatest: false,
     })
-    fs.writeFileSync(newFile, newContent, "utf-8")
 
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    configMocks.loadLayeredConfig.mockReturnValue({ output: { format: "json" } })
-    configMocks.getOutputDir.mockReturnValue(tmp)
+    await runShow(["/out/review.json", "--json"])
+
+    expect(actionMocks.showAction).toHaveBeenCalledWith({ filePath: "/out/review.json" })
+  })
+
+  it("calls showAction with no filePath when none is provided", async () => {
+    actionMocks.showAction.mockReturnValue({
+      filePath: "/out/latest.json",
+      result: fixtureResult,
+      isLatest: true,
+    })
 
     await runShow(["--json"])
 
-    expect(logSpy).toHaveBeenCalledWith(newContent)
-    fs.rmSync(tmp, { recursive: true, force: true })
+    expect(actionMocks.showAction).toHaveBeenCalledWith({ filePath: undefined })
   })
 })
