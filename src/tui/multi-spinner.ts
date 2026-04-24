@@ -75,7 +75,12 @@ export function createMultiSpinner(
     return createPlainSpinner(state)
   }
 
-  const canRawMode = typeof process.stdin.setRawMode === "function"
+  // setRawMode exists as a function even when stdin is piped, but
+  // calling it on a non-TTY throws EINVAL at runtime. Guard on
+  // isTTY so `echo '' | crev run quick` (stdout TTY, stdin piped)
+  // doesn't crash when stepping into the spinner setup.
+  const canRawMode =
+    process.stdin.isTTY === true && typeof process.stdin.setRawMode === "function"
 
   function setupKeyboard(): void {
     if (!canRawMode) return
