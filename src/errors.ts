@@ -63,3 +63,10 @@ export class ReviewParseError extends Data.TaggedError("ReviewParseError")<{
 export class ReviewNotFoundError extends Data.TaggedError("ReviewNotFoundError")<{
   readonly outputDir: string
 }> {}
+
+// ── Diff ──
+
+export class DiffResolutionError extends Data.TaggedError("DiffResolutionError")<{
+  readonly reason: string
+  readonly cause: unknown
+}> {}

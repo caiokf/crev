@@ -1,10 +1,18 @@
 import type { Command } from "commander"
 import chalk from "chalk"
-import { findCrevDir, loadLayeredConfig } from "../core/config.js"
-import { resolveDiff, cleanupDiffFile } from "../core/diff.js"
+import { Effect, Exit } from "effect"
+import { diffAction } from "../actions/diff.js"
 import { RawDiffFlags } from "../core/types.js"
-import { errorMessage, exitWithError } from "../util/cli-errors.js"
+import { CliLive } from "../layers.js"
+import { exitWithError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
+
+type DiffOptions = {
+  base?: string
+  baseCommit?: string
+  type?: string
+  pr?: string
+}
 
 export function registerDiffCommand(program: Command): void {
   program
@@ -14,7 +22,7 @@ export function registerDiffCommand(program: Command): void {
     .option("--base-commit <sha>", "Specific commit hash")
     .option("--type <type>", "Diff type: all, committed, uncommitted", "all")
     .option("--pr <number>", "GitHub PR number")
-    .action(async (opts) => {
+    .action(async (opts: DiffOptions) => {
       const parsed = RawDiffFlags.safeParse({
         base: opts.base,
         baseCommit: opts.baseCommit,
@@ -25,28 +33,24 @@ export function registerDiffCommand(program: Command): void {
         exitWithError(chalk.red(`Error: ${parsed.error.issues.map((i) => i.message).join(", ")}`))
       }
 
-      const crevDir = findCrevDir()
-      const config = loadLayeredConfig(crevDir)
-      const source = parsed.data
+      const exit = await Effect.runPromiseExit(
+        diffAction({ source: parsed.data }).pipe(Effect.provide(CliLive)),
+      )
 
-      let diff
-      try {
-        diff = await resolveDiff({
-          slug: "preview",
-          source,
-          exclude: config.diff.exclude,
-          crevDir,
-        })
-      } catch (err) {
-        const reason = errorMessage(err)
-        exitWithError(chalk.red(`Error: failed to generate diff: ${reason}`))
+      if (Exit.isFailure(exit)) {
+        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        if (err?._tag === "DiffResolutionError") {
+          exitWithError(chalk.red(`Error: failed to generate diff: ${err.reason}`))
+        }
+        exitWithError(chalk.red(`Error: ${err?._tag ?? "unknown"}`))
       }
 
+      const { diff, cleanup } = exit.value
       const lines = diff.diffContent.split("\n").length
       console.log(chalk.bold(`Diff: ${lines} lines`))
       console.log()
       console.log(diff.diffContent)
 
-      cleanupDiffFile(diff)
+      cleanup()
     })
 }
