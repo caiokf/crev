@@ -4,7 +4,7 @@ import { showAction } from "../../actions/show.js"
 import type { ReviewIssue } from "../../core/types.js"
 import { copyToClipboard } from "../clipboard.js"
 import { runDashEffect } from "../runtime.js"
-import { BOX_STYLE, DASH_COLORS } from "../theme.js"
+import { BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
@@ -116,23 +116,28 @@ export function renderIssue(issue: ReviewIssue): string {
   const catColor = categoryColor(issue.category)
 
   // ── Title + severity/category pill row ──
-  lines.push(`{bold}${issue.title}{/bold}`)
+  //   User-controlled strings (title, reviewer, description, …) are
+  //   run through `escapeTags` because blessed otherwise interprets
+  //   `{...}` inside them as color directives — which is how a
+  //   description literally discussing `{cyan-fg}` tags ended up
+  //   rendered entirely in blue.
+  lines.push(`{bold}${escapeTags(issue.title)}{/bold}`)
   lines.push(
     `{${sevColor}-fg}{bold}${issue.severity.toUpperCase()}{/bold}{/${sevColor}-fg}` +
-      `  {${catColor}-fg}${issue.category}{/${catColor}-fg}` +
-      `  {${DASH_COLORS.accent}-fg}${issue.reviewer}{/${DASH_COLORS.accent}-fg}` +
-      `  {gray-fg}${issue.runtime}/${issue.model}{/gray-fg}`,
+      `  {${catColor}-fg}${escapeTags(issue.category)}{/${catColor}-fg}` +
+      `  {${DASH_COLORS.accent}-fg}${escapeTags(issue.reviewer)}{/${DASH_COLORS.accent}-fg}` +
+      `  {gray-fg}${escapeTags(issue.runtime)}/${escapeTags(issue.model)}{/gray-fg}`,
   )
   if (issue.file) {
     lines.push(
-      `{gray-fg}↳{/gray-fg} {${DASH_COLORS.accent}-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/${DASH_COLORS.accent}-fg}`,
+      `{gray-fg}↳{/gray-fg} {${DASH_COLORS.accent}-fg}${escapeTags(issue.file)}${issue.line ? `:${issue.line}` : ""}{/${DASH_COLORS.accent}-fg}`,
     )
   }
 
   // ── Description ──
   lines.push("")
   lines.push(sectionHeader("description"))
-  lines.push(issue.description)
+  lines.push(escapeTags(issue.description))
 
   // ── Triage (if present) ──
   if (issue.triage) {
@@ -149,24 +154,24 @@ export function renderIssue(issue: ReviewIssue): string {
     lines.push(
       `{gray-fg}verdict:{/gray-fg} {${verdictColor}-fg}{bold}${verdict}{/bold}{/${verdictColor}-fg}`,
     )
-    lines.push(`{gray-fg}reasoning:{/gray-fg} ${issue.triage.reasoning}`)
+    lines.push(`{gray-fg}reasoning:{/gray-fg} ${escapeTags(issue.triage.reasoning)}`)
 
     const enrich = issue.triage.enrichment
     if (enrich) {
       if (enrich.context) {
         lines.push("")
         lines.push(sectionHeader("context"))
-        lines.push(enrich.context)
+        lines.push(escapeTags(enrich.context))
       }
 
       lines.push("")
       lines.push(sectionHeader("suggested fix"))
-      lines.push(enrich.minimalFix.summary)
+      lines.push(escapeTags(enrich.minimalFix.summary))
       if (enrich.minimalFix.patch) {
         lines.push("")
         const lang = enrich.minimalFix.language ?? ""
-        lines.push(`{gray-fg}\`\`\`${lang}{/gray-fg}`)
-        lines.push(`{${DASH_COLORS.accent}-fg}${enrich.minimalFix.patch}{/${DASH_COLORS.accent}-fg}`)
+        lines.push(`{gray-fg}\`\`\`${escapeTags(lang)}{/gray-fg}`)
+        lines.push(`{${DASH_COLORS.accent}-fg}${escapeTags(enrich.minimalFix.patch)}{/${DASH_COLORS.accent}-fg}`)
         lines.push(`{gray-fg}\`\`\`{/gray-fg}`)
       }
 
@@ -175,7 +180,7 @@ export function renderIssue(issue: ReviewIssue): string {
         lines.push(sectionHeader("prompt for ai agents"))
         lines.push(`{gray-fg}(press [c] to copy){/gray-fg}`)
         lines.push("")
-        lines.push(enrich.promptForAgents)
+        lines.push(escapeTags(enrich.promptForAgents))
       }
     }
   }

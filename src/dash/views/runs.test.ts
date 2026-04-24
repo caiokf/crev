@@ -203,6 +203,22 @@ describe("issue detail · findIssue / renderIssue", () => {
     expect(out).not.toContain("prompt for ai agents")
   })
 
+  it("escapes `{...}` in user-controlled text so blessed doesn't parse it as tags", () => {
+    const tricky: ReviewIssue = {
+      ...issue,
+      title: "Unsanitised {green-fg}tags{/green-fg} in output",
+      description: "Literal braces like {accent-fg} must survive as-is, not colour the panel.",
+    }
+    const out = renderIssue(tricky)
+    // user braces are escaped to {open}/{close} so blessed treats them
+    // as literal text, not color directives
+    expect(out).toContain("{open}green-fg{close}")
+    expect(out).toContain("{open}accent-fg{close}")
+    // the unescaped `{green-fg}` from the user string should never land
+    // in the output; the legit section-header `{cyan-fg}` is fine
+    expect(out).not.toContain("{green-fg}")
+  })
+
   it("renders triage verdict + enrichment when present", () => {
     const triaged: ReviewIssue = {
       ...issue,

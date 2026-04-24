@@ -5,7 +5,7 @@ import { showAction } from "../../actions/show.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 import { openInEditor } from "../editor.js"
 import { runDashEffect } from "../runtime.js"
-import { LIST_STYLE, BOX_STYLE, DASH_COLORS } from "../theme.js"
+import { LIST_STYLE, BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
 
 /**
@@ -113,11 +113,11 @@ export function createRunDetailView(filePath: string): DashView {
 
 export function renderMeta(r: ReviewResult): string {
   const lines: string[] = []
-  lines.push(`{bold}${r.metadata.slug}{/bold}`)
+  lines.push(`{bold}${escapeTags(r.metadata.slug)}{/bold}`)
   lines.push(`{gray-fg}${r.metadata.timestamp}{/gray-fg}`)
-  lines.push(`schema: {${DASH_COLORS.accent}-fg}${r.metadata.schema}{/${DASH_COLORS.accent}-fg}`)
-  lines.push(`diff: ${r.metadata.diffType}${r.metadata.diffBase ? ` vs ${r.metadata.diffBase}` : ""}`)
-  if (r.metadata.description) lines.push(`desc: ${r.metadata.description}`)
+  lines.push(`schema: {${DASH_COLORS.accent}-fg}${escapeTags(r.metadata.schema)}{/${DASH_COLORS.accent}-fg}`)
+  lines.push(`diff: ${r.metadata.diffType}${r.metadata.diffBase ? ` vs ${escapeTags(r.metadata.diffBase)}` : ""}`)
+  if (r.metadata.description) lines.push(`desc: ${escapeTags(r.metadata.description)}`)
   lines.push("")
 
   lines.push(`{bold}summary{/bold}`)
@@ -140,7 +140,7 @@ export function renderMeta(r: ReviewResult): string {
     const count = rv.issues.length
     const countColor = count === 0 ? DASH_COLORS.ok : count >= 10 ? DASH_COLORS.danger : DASH_COLORS.warn
     lines.push(
-      `  {${DASH_COLORS.accent}-fg}${rv.reviewer}{/${DASH_COLORS.accent}-fg} {gray-fg}${rv.runtime}/${rv.model}{/gray-fg}: {${countColor}-fg}${count}{/${countColor}-fg}`,
+      `  {${DASH_COLORS.accent}-fg}${escapeTags(rv.reviewer)}{/${DASH_COLORS.accent}-fg} {gray-fg}${escapeTags(rv.runtime)}/${escapeTags(rv.model)}{/gray-fg}: {${countColor}-fg}${count}{/${countColor}-fg}`,
     )
   }
 
@@ -178,10 +178,13 @@ export function computeIssueWidths(issues: ReadonlyArray<ReviewIssue>): IssueCol
 export function formatIssueRow(issue: ReviewIssue, widths: IssueColumnWidths): string {
   const marker = actionableMarker(issue)
   const sev = severityTag(issue.severity)
-  const reviewer = fitCell(issue.reviewer, widths.reviewer)
-  const title = fitCell(issue.title, widths.title)
+  // `fitCell` pads/truncates to keep columns aligned, so do that first
+  // then escape blessed tag chars so LLM-authored titles/reviewer names
+  // can't hijack the formatting with a stray `{...}`.
+  const reviewer = escapeTags(fitCell(issue.reviewer, widths.reviewer))
+  const title = escapeTags(fitCell(issue.title, widths.title))
   const where = issue.file
-    ? `{gray-fg}${issue.file}${issue.line ? `:${issue.line}` : ""}{/gray-fg}`
+    ? `{gray-fg}${escapeTags(issue.file)}${issue.line ? `:${issue.line}` : ""}{/gray-fg}`
     : ""
   return `${marker} ${sev} ${reviewer} ${title} ${where}`
 }

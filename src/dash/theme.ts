@@ -42,3 +42,13 @@ export const HEADER_STYLE = {
   fg: DASH_COLORS.accent,
   bold: true,
 } as const
+
+/**
+ * Escape `{` / `}` in user-controlled strings so blessed (with
+ * `tags: true`) doesn't interpret them as color/style directives.
+ * Mirrors `blessed.helpers.escape` — reproduced here so we don't
+ * couple every call site to the shim's runtime shape.
+ */
+export function escapeTags(text: string): string {
+  return text.replace(/[{}]/g, (ch) => (ch === "{" ? "{open}" : "{close}"))
+}
