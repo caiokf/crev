@@ -47,6 +47,12 @@ export function makeRouter(
     current() {
       return stack[stack.length - 1] ?? { kind: "home" }
     },
+    reset(routes) {
+      if (routes.length === 0) throw new Error("router.reset requires at least one route")
+      stack.length = 0
+      for (const r of routes) stack.push(r)
+      mount(stack[stack.length - 1]!)
+    },
   }
 }
 

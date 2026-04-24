@@ -24,6 +24,13 @@ export interface DashRouter {
   readonly navigate: (route: DashRoute) => void
   readonly back: () => void
   readonly current: () => DashRoute
+  /**
+   * Replace the navigation stack with `routes` and mount the last
+   * entry. Used to seed a deep-linked launch (`crev dash <file>`) with
+   * the intermediate views below it so `[bksp]` walks back through
+   * them as if the user had navigated in manually.
+   */
+  readonly reset: (routes: readonly DashRoute[]) => void
 }
 
 export interface AppContext {

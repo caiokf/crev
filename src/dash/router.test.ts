@@ -72,4 +72,46 @@ describe("makeRouter", () => {
     router.back()
     expect(router.current()).toEqual({ kind: "home" })
   })
+
+  it("reset() seeds the stack and mounts only the top, letting back() walk down", () => {
+    const mounted: DashRoute[] = []
+    const unmountCounts = new Map<string, number>()
+    const router = makeRouter(
+      () => makeStubCtx(),
+      (route) => ({
+        route,
+        mount: vi.fn(() => {
+          mounted.push(route)
+        }),
+        unmount: vi.fn(() => {
+          unmountCounts.set(route.kind, (unmountCounts.get(route.kind) ?? 0) + 1)
+        }),
+      }),
+    )
+
+    router.reset([
+      { kind: "home" },
+      { kind: "runs" },
+      { kind: "run-detail", filePath: "/tmp/x.json" },
+    ])
+
+    // Only the top route is mounted — the intermediate ones exist in
+    // the stack but were never materialised, so blessed isn't doing
+    // throwaway work.
+    expect(mounted).toEqual([{ kind: "run-detail", filePath: "/tmp/x.json" }])
+    expect(router.current()).toEqual({ kind: "run-detail", filePath: "/tmp/x.json" })
+
+    router.back()
+    expect(router.current()).toEqual({ kind: "runs" })
+    router.back()
+    expect(router.current()).toEqual({ kind: "home" })
+    router.back()
+    // bottomed-out: stays at home
+    expect(router.current()).toEqual({ kind: "home" })
+  })
+
+  it("reset() throws on an empty stack rather than leaving the app without a view", () => {
+    const router = makeRouter(() => makeStubCtx(), (route) => makeStubView(route))
+    expect(() => router.reset([])).toThrow()
+  })
 })

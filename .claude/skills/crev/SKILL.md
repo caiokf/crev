@@ -32,6 +32,9 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Show config layers          | `crev config --layers`                                   |
 | Review stats (latest)       | `crev stats --schema <name>`                             |
 | Review stats (all versions) | `crev stats --schema <name> --history`                   |
+| Open dashboard              | `crev dash`                                              |
+| Open a review in dashboard  | `crev dash <review-file>`                                |
+| Open an issue in dashboard  | `crev dash <review-file> --issue <issue-id>`             |
 | Detailed help               | `crev help run` / `crev help schema`                     |
 
 ## Configuration
@@ -295,3 +298,9 @@ When running a review, tell the user:
 - Reviewers run in parallel (30-90s typical)
 - When done: summarize issue counts by severity
 - Ask which issues to fix vs dismiss
+- Offer a dashboard deep-link so the user can jump straight into
+  the new findings: `crev dash .crev/reviews/<slug>.json`. For a
+  specific issue, append `--issue <issue-id>` (the `id` field on
+  each issue in the JSON). Backspace/escape walks back through
+  run-detail → runs list → home as if the user had navigated in
+  manually.

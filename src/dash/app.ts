@@ -18,7 +18,13 @@ import type { AppContext, DashRoute, QuitGuard } from "./types.js"
  */
 
 export type RunDashOptions = {
-  readonly initialRoute?: DashRoute
+  /**
+   * Initial route to mount. Pass a single route for the simple case,
+   * or an ordered stack (e.g. `[home, runs, run-detail]`) to deep-link
+   * into a nested view while still letting `[bksp]` walk back through
+   * the intermediate views.
+   */
+  readonly initialRoute?: DashRoute | readonly DashRoute[]
   /** Allows the CLI shim to override where config/schemas are read from (used by tests). */
   readonly crevDir?: string
 }
@@ -81,7 +87,12 @@ export function runDash(opts: RunDashOptions = {}): Promise<void> {
   })
 
   ctxRef = { screen, body, router, setStatus, crevDir, setQuitGuard }
-  router.navigate(opts.initialRoute ?? { kind: "home" })
+  const initial = opts.initialRoute ?? { kind: "home" }
+  if (Array.isArray(initial)) {
+    router.reset(initial as readonly DashRoute[])
+  } else {
+    router.navigate(initial as DashRoute)
+  }
 
   return new Promise<void>((resolve) => {
     const quit = (): void => {
