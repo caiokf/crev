@@ -15,6 +15,16 @@ export function padVisible(s: string, width: number): string {
 // Matches any ANSI escape sequence (SGR, cursor, erase, etc.)
 const ANSI_ESCAPE_RE = /\x1B(?:\[[0-9;]*[a-zA-Z]|\][^\x07]*\x07)/
 
+/**
+ * Truncate + right-pad a plain string to `width` columns for use
+ * inside blessed table cells. Assumes no ANSI escapes in `value`
+ * (blessed tag escaping happens separately at the call site).
+ */
+export function fitCell(value: string, width: number): string {
+  if (value.length > width) return value.slice(0, Math.max(0, width - 1)) + "…"
+  return value.padEnd(width)
+}
+
 export function truncateVisible(s: string, maxLen: number): string {
   // Guard against callers computing width via subtraction that could
   // go to 0 or negative. Without this the while-loop condition

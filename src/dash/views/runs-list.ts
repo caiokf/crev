@@ -2,6 +2,7 @@ import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import path from "node:path"
 import { listReviewsAction, type ReviewSummary } from "../../actions/show.js"
+import { fitCell } from "../../tui/ansi.js"
 import { runDashEffect } from "../runtime.js"
 import { DASH_COLORS, LIST_STYLE } from "../theme.js"
 import type { AppContext, DashView } from "../types.js"
@@ -180,7 +181,3 @@ export function formatRow(r: ReviewSummary, widths: ColumnWidths): string {
   )
 }
 
-function fitCell(value: string, width: number): string {
-  if (value.length > width) return value.slice(0, Math.max(0, width - 1)) + "…"
-  return value.padEnd(width)
-}

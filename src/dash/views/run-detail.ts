@@ -4,6 +4,7 @@ import path from "node:path"
 import { showAction } from "../../actions/show.js"
 import { setVerdictAction } from "../../actions/verdict.js"
 import type { ReviewIssue, ReviewResult, TriageVerdict } from "../../core/types.js"
+import { fitCell } from "../../tui/ansi.js"
 import { openInEditor } from "../editor.js"
 import { runDashEffect } from "../runtime.js"
 import { LIST_STYLE, BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
@@ -274,10 +275,6 @@ function actionableMarker(issue: ReviewIssue): string {
   }
 }
 
-function fitCell(value: string, width: number): string {
-  if (value.length > width) return value.slice(0, Math.max(0, width - 1)) + "…"
-  return value.padEnd(width)
-}
 
 function severityTag(severity: ReviewIssue["severity"]): string {
   switch (severity) {
