@@ -1,6 +1,5 @@
 import type { Command } from "commander"
 import chalk from "chalk"
-import { runDash } from "../dash/index.js"
 import { exitWithError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
@@ -17,6 +16,10 @@ export function registerDashCommand(program: Command): void {
         )
       }
       try {
+        // Lazy-load the dash entrypoint so non-dash commands (and
+        // `crev --version`) don't have to pay the blessed init cost
+        // or risk its dynamic-require hazards in standalone binaries.
+        const { runDash } = await import("../dash/index.js")
         await runDash()
       } catch (err) {
         exitWithError(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`))

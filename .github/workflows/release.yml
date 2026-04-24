@@ -57,7 +57,12 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm typecheck
       - run: pnpm build
-      - run: bun build --compile --target=${{ matrix.target }} ./dist/bin.js --outfile ${{ matrix.artifact }}
+      # term.js + pty.js are referenced only inside blessed's
+      # Terminal widget, which we never instantiate. Marking them
+      # external keeps Bun from failing the compile on deps we don't
+      # ship (the requires only fire if a Terminal element is
+      # constructed, which never happens in our dash).
+      - run: bun build --compile --target=${{ matrix.target }} --external=term.js --external=pty.js ./dist/bin.js --outfile ${{ matrix.artifact }}
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}

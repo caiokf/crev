@@ -1,3 +1,6 @@
+// Must precede `import blessed` so the shim's static requires land in
+// the bundle before blessed's own widget loader runs.
+import "./blessed-widgets-shim.js"
 import blessed from "blessed"
 import { findCrevDir } from "../core/config.js"
 import { makeRouter } from "./router.js"
