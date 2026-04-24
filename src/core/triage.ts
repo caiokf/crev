@@ -156,13 +156,17 @@ export function buildTriagePrompt(
     : ""
 
   const enrichmentSection = flags?.enrichComments
-    ? `\n\n## Comment Enrichment\nFor each issue, include "enrichment" so downstream agents can post a CodeRabbit-style PR comment.
-- title: short imperative title (for example "Add IAM permission for the new secret")
-- context: 1 short paragraph referencing evidence, file path(s), and line number(s)
-- minimalFix.summary: one-line fix strategy
+    ? `\n\n## Comment Enrichment
+For each issue, include "enrichment" so downstream agents can post a CodeRabbit-style PR comment.
+
+**Critical rule:** enrichment MUST be written as if the issue were actionable, regardless of the verdict you assign. The verdict alone controls whether an agent will actually run the fix — the enrichment is a reusable fix recipe that must still make sense if a human later flips the verdict to "actionable". Never write passive language like "no action required", "do nothing", "skip this", or "since this is dismissed…". Write every field as concrete fix guidance.
+
+- title: short imperative title describing the fix (for example "Add IAM permission for the new secret")
+- context: 1 short paragraph explaining what is wrong, where (file path(s) + line number(s)), and why it matters — phrased as a problem statement, not a verdict justification
+- minimalFix.summary: one-line fix strategy (imperative voice)
 - minimalFix.language: code fence language like "diff", "ts", "js", "yaml", "bash", or "text"
-- minimalFix.patch: small concrete patch/snippet (minimal viable fix, no placeholders)
-- promptForAgents: direct instructions another agent can run to verify/fix this issue`
+- minimalFix.patch: small concrete patch/snippet that implements the minimal viable fix (no placeholders, no "N/A")
+- promptForAgents: direct, imperative instructions another agent can run to verify AND implement the fix. Must be a usable fix recipe on its own. Do NOT reference the verdict, and do NOT tell the agent to skip or defer.`
     : ""
 
   const extraFields = [
@@ -173,14 +177,14 @@ export function buildTriagePrompt(
     ] : []),
     ...(flags?.enrichComments ? [
       `      "enrichment": {
-        "title": "short issue headline",
-        "context": "what is wrong + where + why it matters",
+        "title": "short imperative fix headline",
+        "context": "problem statement: what is wrong + where + why it matters (always phrased as if fixing)",
         "minimalFix": {
-          "summary": "single-line fix strategy",
+          "summary": "single-line fix strategy (imperative)",
           "language": "diff | ts | js | yaml | bash | text",
-          "patch": "small concrete patch/snippet"
+          "patch": "concrete minimal patch/snippet that implements the fix"
         },
-        "promptForAgents": "explicit instructions to validate + implement the fix"
+        "promptForAgents": "imperative instructions to validate + implement the fix, usable standalone regardless of verdict"
       }`,
     ] : []),
   ].join(",\n")
