@@ -1,33 +1,32 @@
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const configMocks = vi.hoisted(() => ({
-  findCrevDir: vi.fn(),
+// Shim-level tests. The list command is now a thin wrapper around
+// `listSchemasAction` + `listRuntimesAction` from src/actions/list.ts;
+// those are exercised in `src/actions/list.test.ts` against test layers.
+//
+// Here we only verify that the shim threads the right data through to
+// stdout in JSON and pretty modes. We do that by stubbing the action
+// modules via vi.mock — a small surface area kept intentionally narrow.
+
+const actionMocks = vi.hoisted(() => ({
+  listSchemasAction: { _tag: "Effect", mock: vi.fn() },
+  listRuntimesAction: { _tag: "Effect", mock: vi.fn() },
 }))
 
-const schemaMocks = vi.hoisted(() => ({
-  listAllSchemas: vi.fn(),
-  resolveSchemaPath: vi.fn(),
-  loadSchemaFile: vi.fn(),
-}))
-
-const valetMocks = vi.hoisted(() => ({
-  getAllRuntimes: vi.fn(),
-}))
-
-vi.mock("../core/config.js", () => ({
-  findCrevDir: configMocks.findCrevDir,
-}))
-
-vi.mock("../core/schema.js", () => ({
-  listAllSchemas: schemaMocks.listAllSchemas,
-  resolveSchemaPath: schemaMocks.resolveSchemaPath,
-  loadSchemaFile: schemaMocks.loadSchemaFile,
-}))
-
-vi.mock("@caiokf/valet", () => ({
-  getAllRuntimes: valetMocks.getAllRuntimes,
-}))
+vi.mock("../actions/list.js", async () => {
+  const { Effect } = await import("effect")
+  return {
+    listSchemasAction: Effect.suspend(() => {
+      const result = actionMocks.listSchemasAction.mock()
+      return Effect.succeed(result)
+    }),
+    listRuntimesAction: Effect.suspend(() => {
+      const result = actionMocks.listRuntimesAction.mock()
+      return Effect.succeed(result)
+    }),
+  }
+})
 
 import { registerListCommand } from "./list.js"
 
@@ -37,15 +36,12 @@ async function runList(args: string[]) {
   await program.parseAsync(["list", ...args], { from: "user" })
 }
 
-describe("registerListCommand", () => {
+describe("registerListCommand (shim)", () => {
   let logSpy: ReturnType<typeof vi.spyOn>
 
   beforeEach(() => {
-    configMocks.findCrevDir.mockReset()
-    schemaMocks.listAllSchemas.mockReset()
-    schemaMocks.resolveSchemaPath.mockReset()
-    schemaMocks.loadSchemaFile.mockReset()
-    valetMocks.getAllRuntimes.mockReset()
+    actionMocks.listSchemasAction.mock.mockReset()
+    actionMocks.listRuntimesAction.mock.mockReset()
     logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
   })
 
@@ -54,15 +50,11 @@ describe("registerListCommand", () => {
   })
 
   it("prints schemas and runtimes as JSON", async () => {
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    schemaMocks.listAllSchemas.mockReturnValue(["quick"])
-    schemaMocks.resolveSchemaPath.mockReturnValue("/repo/.crev/schemas/quick.yaml")
-    schemaMocks.loadSchemaFile.mockReturnValue({
-      description: "Quick review",
-      reviewers: [{}, {}],
-    })
-    valetMocks.getAllRuntimes.mockReturnValue([
-      { name: "claude", type: "native", models: new Set(["sonnet", "opus"]), defaultModel: "sonnet" },
+    actionMocks.listSchemasAction.mock.mockReturnValue([
+      { name: "quick", description: "Quick review", reviewers: 2 },
+    ])
+    actionMocks.listRuntimesAction.mock.mockReturnValue([
+      { name: "claude", type: "native", models: ["sonnet", "opus"], defaultModel: "sonnet" },
     ])
 
     await runList(["--json"])
@@ -77,14 +69,13 @@ describe("registerListCommand", () => {
   })
 
   it("shows only runtimes when --runtimes is used", async () => {
-    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
-    valetMocks.getAllRuntimes.mockReturnValue([
-      { name: "codex", type: "native", models: new Set(["gpt-5"]), defaultModel: "gpt-5" },
+    actionMocks.listRuntimesAction.mock.mockReturnValue([
+      { name: "codex", type: "native", models: ["gpt-5"], defaultModel: "gpt-5" },
     ])
 
     await runList(["--runtimes"])
 
-    expect(schemaMocks.listAllSchemas).not.toHaveBeenCalled()
+    expect(actionMocks.listSchemasAction.mock).not.toHaveBeenCalled()
     expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("Runtimes"))).toBe(true)
     expect(logSpy.mock.calls.some(([msg]) => String(msg).includes("codex"))).toBe(true)
   })
