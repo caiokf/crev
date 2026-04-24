@@ -253,7 +253,17 @@ export function listAllSchemas(crevDir: string): string[] {
  *   .crev/schemas/<name>.yaml > .crev/schemas/<name>.yml >
  *   ~/.crev/schemas/<name>.yaml > ~/.crev/schemas/<name>.yml
  */
+export const SCHEMA_NAME_RE = /^[a-zA-Z0-9._-]{1,100}$/
+
 export function resolveSchemaPath(schemaName: string, crevDir: string): string | null {
+  // Reject names that could escape the schemas directory. The same
+  // regex is enforced by `schema init` but not by callers like
+  // `run --schema` or `schema show`, so we enforce it centrally here.
+  if (!SCHEMA_NAME_RE.test(schemaName)) {
+    throw new Error(
+      `Invalid schema name "${schemaName}": must match ${SCHEMA_NAME_RE.source}`,
+    )
+  }
   const projectSchemasDir = path.join(crevDir, "schemas")
   const userSchemasDir = path.join(getUserCrevDir(), "schemas")
 
