@@ -24,6 +24,11 @@ const schemaMocks = vi.hoisted(() => ({
   loadSchemaFile: vi.fn(),
 }))
 
+const skillMocks = vi.hoisted(() => ({
+  getInstalledSkills: vi.fn(),
+  isSkillUpToDate: vi.fn(),
+}))
+
 vi.mock("@caiokf/valet", () => ({
   getAllRuntimes: valetMocks.getAllRuntimes,
 }))
@@ -44,6 +49,11 @@ vi.mock("../core/schema.js", () => ({
   listAllSchemas: schemaMocks.listAllSchemas,
   resolveSchemaPath: schemaMocks.resolveSchemaPath,
   loadSchemaFile: schemaMocks.loadSchemaFile,
+}))
+
+vi.mock("../util/skills.js", () => ({
+  getInstalledSkills: skillMocks.getInstalledSkills,
+  isSkillUpToDate: skillMocks.isSkillUpToDate,
 }))
 
 import { registerDoctorCommand } from "./doctor.js"
@@ -85,6 +95,8 @@ describe("registerDoctorCommand --ping", () => {
     })
     healthMocks.checkSchemaReadiness.mockReturnValue(schemaReadiness)
     healthMocks.checkProjectSetup.mockReturnValue(projectChecks)
+    skillMocks.getInstalledSkills.mockReturnValue([])
+    skillMocks.isSkillUpToDate.mockReturnValue(true)
   })
 
   afterEach(() => {
@@ -145,6 +157,7 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage,
       schemaReadiness,
       projectChecks,
+      skillChecks: [],
       includePing: false,
     })
 
@@ -158,6 +171,7 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage,
       schemaReadiness,
       projectChecks,
+      skillChecks: [],
       includePing: false,
     })
 
@@ -170,6 +184,7 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
+      skillChecks: [],
       includePing: false,
     })
 
@@ -182,6 +197,7 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
+      skillChecks: [],
       includePing: true,
     })
 
@@ -194,6 +210,7 @@ describe("buildDoctorJsonPayload", () => {
       runtimeUsage: new Map(),
       schemaReadiness,
       projectChecks,
+      skillChecks: [],
       includePing: true,
       pingResults: [
         {
@@ -213,6 +230,55 @@ describe("buildDoctorJsonPayload", () => {
         durationMs: 123,
       },
     ])
+  })
+})
+
+describe("doctor --json skill checks", () => {
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    vi.resetAllMocks()
+    logSpy = vi.spyOn(console, "log").mockImplementation(() => {})
+    configMocks.findCrevDir.mockReturnValue("/repo/.crev")
+    configMocks.loadLayeredConfig.mockReturnValue({ aliases: {}, runtimes: {} })
+    configMocks.getRuntimeConfig.mockReturnValue({ env: {}, args: [] })
+    configMocks.resolveModelAlias.mockImplementation((_config, model: string) => model)
+    schemaMocks.listAllSchemas.mockReturnValue([])
+    healthMocks.checkSchemaReadiness.mockReturnValue([])
+    healthMocks.checkProjectSetup.mockReturnValue([])
+    valetMocks.getAllRuntimes.mockReturnValue([])
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it("reports outdated skills in JSON output", async () => {
+    skillMocks.getInstalledSkills.mockReturnValue([
+      { name: "Claude Code", id: "claude", detected: true, detectionPath: ".claude", skillPath: ".claude/skills/crev" },
+      { name: "Cursor", id: "cursor", detected: true, detectionPath: ".cursor", skillPath: ".cursor/skills/crev" },
+    ])
+    skillMocks.isSkillUpToDate.mockImplementation((_root: string, tool: { id: string }) => tool.id === "claude")
+
+    const program = new Command()
+    registerDoctorCommand(program)
+    await program.parseAsync(["doctor", "--json"], { from: "user" })
+
+    const output = JSON.parse(logSpy.mock.calls[0][0] as string)
+    expect(output.skills).toHaveLength(2)
+    expect(output.skills[0]).toEqual({ tool: "Claude Code", id: "claude", upToDate: true })
+    expect(output.skills[1]).toEqual({ tool: "Cursor", id: "cursor", upToDate: false })
+  })
+
+  it("reports empty skills array when none installed", async () => {
+    skillMocks.getInstalledSkills.mockReturnValue([])
+
+    const program = new Command()
+    registerDoctorCommand(program)
+    await program.parseAsync(["doctor", "--json"], { from: "user" })
+
+    const output = JSON.parse(logSpy.mock.calls[0][0] as string)
+    expect(output.skills).toEqual([])
   })
 })
 

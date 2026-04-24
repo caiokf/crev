@@ -11,6 +11,7 @@ import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
 import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
 import { errorMessage } from "../util/cli-errors.js"
+import { getInstalledSkills, isSkillUpToDate } from "../util/skills.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 const ANSI_ESCAPE_REGEX = /\u001b\[[0-?]*[ -/]*[@-~]/g
@@ -95,6 +96,15 @@ export function registerDoctorCommand(program: Command): void {
       const projectChecks = checkProjectSetup(crevDir)
       const schemaReadiness = checkSchemaReadiness(crevDir, healthResults)
 
+      // Skill freshness
+      const projectRoot = path.dirname(crevDir)
+      const installedSkills = getInstalledSkills(projectRoot)
+      const skillChecks: SkillCheck[] = installedSkills.map((tool) => ({
+        tool: tool.name,
+        id: tool.id,
+        upToDate: isSkillUpToDate(projectRoot, tool),
+      }))
+
       let pingResults: PingResult[] | undefined
       if (opts.ping) {
         const readyRuntimes = runtimesToCheck.filter((rt) => {
@@ -115,6 +125,7 @@ export function registerDoctorCommand(program: Command): void {
           runtimeUsage,
           schemaReadiness,
           projectChecks,
+          skillChecks,
           includePing: opts.ping ?? false,
           pingResults,
         })
@@ -175,6 +186,20 @@ export function registerDoctorCommand(program: Command): void {
         console.log(`  ${check.name.padEnd(checkColWidth)} ${icon} ${check.detail}`)
       }
 
+      // Skills
+      if (skillChecks.length > 0) {
+        const skillColWidth = Math.max(...skillChecks.map((s) => s.tool.length)) + 2
+        console.log(`\n  ${chalk.bold("Skills")}`)
+        console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
+        for (const skill of skillChecks) {
+          if (skill.upToDate) {
+            console.log(`  ${skill.tool.padEnd(skillColWidth)} ${chalk.green("✓ up to date")}`)
+          } else {
+            console.log(`  ${skill.tool.padEnd(skillColWidth)} ${chalk.yellow("⚠ outdated")} ${chalk.dim("run `crev update`")}`)
+          }
+        }
+      }
+
       // Fix suggestions
       const brokenRuntimes = healthResults.filter((h) => h.authenticated === "no")
       if (brokenRuntimes.length > 0) {
@@ -204,10 +229,17 @@ export function registerDoctorCommand(program: Command): void {
     })
 }
 
+type SkillCheck = {
+  tool: string
+  id: string
+  upToDate: boolean
+}
+
 type DoctorJsonPayload = {
   runtimes: Array<RuntimeHealth & { usedIn: string[] }>
   schemas: SchemaReadiness[]
   project: ProjectCheck[]
+  skills: SkillCheck[]
   ping?: PingResult[]
 }
 
@@ -216,6 +248,7 @@ export function buildDoctorJsonPayload(input: {
   runtimeUsage: Map<string, string[]>
   schemaReadiness: SchemaReadiness[]
   projectChecks: ProjectCheck[]
+  skillChecks: SkillCheck[]
   includePing: boolean
   pingResults?: PingResult[]
 }): DoctorJsonPayload {
@@ -226,6 +259,7 @@ export function buildDoctorJsonPayload(input: {
     })),
     schemas: input.schemaReadiness,
     project: input.projectChecks,
+    skills: input.skillChecks,
   }
 
   if (input.includePing) payload.ping = input.pingResults ?? []
