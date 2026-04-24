@@ -46,6 +46,17 @@ export interface ReviewStoreService {
   ) => Effect.Effect<LoadedReview, ReviewNotFoundError | ReviewParseError | FileReadError>
 
   readonly write: (input: WriteInput) => Effect.Effect<OutputPaths, FileWriteError>
+
+  /**
+   * Persist a ReviewResult back to an existing file in place. Unlike
+   * `write`, this does NOT mint a new timestamped filename — it's the
+   * hook for mutations like the dash's verdict keybindings that need
+   * to update the same JSON the user is looking at.
+   */
+  readonly save: (
+    filePath: string,
+    result: ReviewResult,
+  ) => Effect.Effect<void, FileWriteError>
 }
 
 export class ReviewStore extends Context.Tag("crev/ReviewStore")<
@@ -115,7 +126,10 @@ export const ReviewStoreLive = Layer.effect(
         return { jsonPath }
       })
 
-    return ReviewStore.of({ list, load, latest, write })
+    const save: ReviewStoreService["save"] = (filePath, result) =>
+      fs.writeFile(filePath, JSON.stringify(result, null, 2))
+
+    return ReviewStore.of({ list, load, latest, write, save })
   }),
 )
 
@@ -187,6 +201,11 @@ export const makeTestReviewStore = (
             return { jsonPath, markdownPath: mdPath }
           }
           return { jsonPath }
+        }),
+
+      save: (filePath, result) =>
+        Effect.sync(() => {
+          files.set(filePath, result)
         }),
     }),
   )

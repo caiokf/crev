@@ -1,7 +1,8 @@
 import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import { showAction } from "../../actions/show.js"
-import type { ReviewIssue } from "../../core/types.js"
+import { setVerdictAction } from "../../actions/verdict.js"
+import type { ReviewIssue, TriageVerdict } from "../../core/types.js"
 import { copyToClipboard } from "../clipboard.js"
 import { runDashEffect } from "../runtime.js"
 import { BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
@@ -45,10 +46,47 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
         style: BOX_STYLE,
       })
       box.focus()
-      const baseStatus = "[↑/↓] or [j/k] scroll · [bksp] back · [q] quit"
-      const statusWithCopy = `[↑/↓] or [j/k] scroll · [c] copy prompt · [bksp] back · [q] quit`
+      // `[a]/[d]/[x]` triage shortcuts are always bound; `[c]` only
+      // appears in the statusline once we know an enrichment prompt
+      // exists (see the copy key handler below).
+      const triageHint = "[a]actionable [d]deferred [x]dismissed"
+      const baseStatus = `[↑/↓] or [j/k] scroll · ${triageHint} · [bksp] back · [q] quit`
+      const statusWithCopy = `[↑/↓] or [j/k] scroll · [c] copy prompt · ${triageHint} · [bksp] back · [q] quit`
       ctx.setStatus(baseStatus)
       ctx.screen.render()
+
+      const applyVerdict = (verdict: TriageVerdict["verdict"]): void => {
+        if (!currentIssue) return
+        const issueId = currentIssue.id
+        ctx.setStatus(`{gray-fg}setting verdict → ${verdict}…{/gray-fg}`)
+        ctx.screen.render()
+        void runDashEffect(setVerdictAction({ filePath, issueId, verdict })).then((result) => {
+          if (!box) return
+          if (result.kind === "error") {
+            ctx.setStatus(
+              `{${DASH_COLORS.danger}-fg}verdict update failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          currentIssue = result.value.issue
+          box.setContent(renderIssue(result.value.issue))
+          const verdictColor =
+            verdict === "actionable"
+              ? DASH_COLORS.ok
+              : verdict === "deferred"
+                ? DASH_COLORS.warn
+                : "gray"
+          ctx.setStatus(
+            `{${verdictColor}-fg}✓ verdict → ${verdict}{/${verdictColor}-fg}`,
+          )
+          ctx.screen.render()
+        })
+      }
+
+      box.key("a", () => applyVerdict("actionable"))
+      box.key("d", () => applyVerdict("deferred"))
+      box.key("x", () => applyVerdict("dismissed"))
 
       // `[c]` is only bound once we know the issue has an enrichment
       // prompt — hiding the shortcut otherwise keeps the status line

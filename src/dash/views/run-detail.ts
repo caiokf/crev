@@ -2,7 +2,8 @@ import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import path from "node:path"
 import { showAction } from "../../actions/show.js"
-import type { ReviewIssue, ReviewResult } from "../../core/types.js"
+import { setVerdictAction } from "../../actions/verdict.js"
+import type { ReviewIssue, ReviewResult, TriageVerdict } from "../../core/types.js"
 import { openInEditor } from "../editor.js"
 import { runDashEffect } from "../runtime.js"
 import { LIST_STYLE, BOX_STYLE, DASH_COLORS, escapeTags } from "../theme.js"
@@ -71,7 +72,9 @@ export function createRunDetailView(filePath: string): DashView {
         style: LIST_STYLE,
       })
       issueList.focus()
-      ctx.setStatus("[↑/↓] or [j/k] move · [enter] open · [e] editor · [bksp] back · [q] quit")
+      ctx.setStatus(
+        "[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [e] editor · [bksp] back · [q] quit",
+      )
       ctx.screen.render()
 
       issueList.on("select", (_item, index) => {
@@ -87,6 +90,48 @@ export function createRunDetailView(filePath: string): DashView {
           ctx.screen.render()
         })
       })
+
+      const applyVerdictToCursor = (verdict: TriageVerdict["verdict"]): void => {
+        if (!issueList || issues.length === 0) return
+        const selected = (issueList as unknown as { selected?: number }).selected ?? 0
+        const issue = issues[selected]
+        if (!issue) return
+        ctx.setStatus(`{gray-fg}setting verdict → ${verdict}…{/gray-fg}`)
+        ctx.screen.render()
+        void runDashEffect(
+          setVerdictAction({ filePath, issueId: issue.id, verdict }),
+        ).then((result) => {
+          if (!meta || !issueList) return
+          if (result.kind === "error") {
+            ctx.setStatus(
+              `{${DASH_COLORS.danger}-fg}verdict update failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          // Mutate in place so the dot prefix updates without us losing
+          // the cursor position or reflowing column widths.
+          issues[selected] = result.value.issue
+          const widths = computeIssueWidths(issues)
+          issueList.setItems(issues.map((i) => formatIssueRow(i, widths)))
+          issueList.select(selected)
+          meta.setContent(renderMeta(result.value.result))
+          const verdictColor =
+            verdict === "actionable"
+              ? DASH_COLORS.ok
+              : verdict === "deferred"
+                ? DASH_COLORS.warn
+                : "gray"
+          ctx.setStatus(
+            `{${verdictColor}-fg}✓ verdict → ${verdict}{/${verdictColor}-fg}`,
+          )
+          ctx.screen.render()
+        })
+      }
+
+      issueList.key("a", () => applyVerdictToCursor("actionable"))
+      issueList.key("d", () => applyVerdictToCursor("deferred"))
+      issueList.key("x", () => applyVerdictToCursor("dismissed"))
 
       void runDashEffect(showAction({ filePath })).then((result) => {
         if (!meta || !issueList) return

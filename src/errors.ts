@@ -64,6 +64,11 @@ export class ReviewNotFoundError extends Data.TaggedError("ReviewNotFoundError")
   readonly outputDir: string
 }> {}
 
+export class IssueNotFoundError extends Data.TaggedError("IssueNotFoundError")<{
+  readonly filePath: string
+  readonly issueId: string
+}> {}
+
 // ── Diff ──
 
 export class DiffResolutionError extends Data.TaggedError("DiffResolutionError")<{
