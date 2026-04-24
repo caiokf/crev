@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest"
 import { computeColumnWidths, formatRow as formatRunRow } from "./runs-list.js"
-import { computeIssueWidths, flattenIssues, formatIssueRow, renderMeta } from "./run-detail.js"
+import { actionableMarker, computeIssueWidths, flattenIssues, formatIssueRow, renderMeta, ISSUE_LIST_OPTIONS } from "./run-detail.js"
 import { buildCopyPrompt, findIssue, formatDiff, renderIssue } from "./issue-detail.js"
 import type { ReviewIssue, ReviewResult } from "../../core/types.js"
 
@@ -201,6 +201,35 @@ describe("run detail · flattenIssues / formatIssueRow", () => {
     expect(stripTags(actionable).indexOf("HIGH")).toBe(col)
     expect(stripTags(deferred).indexOf("HIGH")).toBe(col)
     expect(stripTags(dismissed).indexOf("HIGH")).toBe(col)
+  })
+
+  it("shows green checkmark for fixed issues", () => {
+    const fixedIssue: ReviewIssue = { ...issue, status: "fixed" }
+    const row = formatIssueRow(fixedIssue, computeIssueWidths([fixedIssue]))
+    expect(row).toContain("{green-fg}✓")
+    expect(row).not.toContain("●")
+  })
+
+  it("shows gray ✗ for wont-fix issues", () => {
+    const wontFix: ReviewIssue = { ...issue, status: "wont-fix" }
+    const row = formatIssueRow(wontFix, computeIssueWidths([wontFix]))
+    expect(row).toContain("{gray-fg}✗")
+    expect(row).not.toContain("●")
+  })
+
+  it("fixed status takes priority over triage verdict", () => {
+    const fixedActionable: ReviewIssue = {
+      ...issue,
+      status: "fixed",
+      triage: { verdict: "actionable", reasoning: "real bug" },
+    }
+    const marker = actionableMarker(fixedActionable)
+    expect(marker).toContain("✓")
+    expect(marker).not.toContain("●")
+  })
+
+  it("disables invertSelected so inline color tags survive on the selected row", () => {
+    expect(ISSUE_LIST_OPTIONS.invertSelected).toBe(false)
   })
 })
 

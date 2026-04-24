@@ -213,6 +213,51 @@ describe("buildPromptOnlyResult", () => {
       fs.rmSync(tmpDir, { recursive: true, force: true })
     }
   })
+
+  it("throws when no reviewers match the filter", () => {
+    expect(() =>
+      buildPromptOnlyResult({
+        schema: {
+          reviewers: [
+            { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review." },
+          ],
+        },
+        schemaName: "quick",
+        config: {} as any,
+        diff: { diffContent: "", diffFile: "/tmp/test.diff", type: "all" },
+        slug: "test",
+        crevDir: "/tmp",
+        reviewerFilter: ["Nonexistent"],
+        output: { kind: "prompt-only", format: "json" },
+        target: { kind: "fresh" },
+      }),
+    ).toThrow("No reviewers matched the filter")
+  })
+
+  it("sets diffType to analyze when analyze is true", () => {
+    const result = buildPromptOnlyResult({
+      schema: {
+        reviewers: [
+          { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "Review." },
+        ],
+      },
+      schemaName: "quick",
+      config: {} as any,
+      diff: {
+        diffContent: "diff --git a/src/app.ts b/src/app.ts",
+        diffFile: "/tmp/test.diff",
+        type: "all",
+      },
+      slug: "test",
+      crevDir: "/tmp",
+      analyze: true,
+      output: { kind: "prompt-only", format: "json" },
+      target: { kind: "fresh" },
+    })
+
+    expect(result.metadata.diffType).toBe("analyze")
+    expect(result.prompts[0].prompt).toContain("full codebase analysis")
+  })
 })
 
 describe("UNTRUSTED_INPUT_WARNING", () => {
@@ -375,7 +420,6 @@ describe("orchestrate", () => {
       model: "opus",
       deduplicate: false,
       recategorize: false,
-      enrichComments: false,
       prompt: "",
     },
   })
@@ -532,6 +576,64 @@ describe("orchestrate", () => {
 
     expect(result.reviews[0].issues[0].triage?.verdict).toBe("dismissed")
     expect(result.summary.triage?.dismissed).toBe(1)
+  })
+
+  it("invokes onProgress callback for run lifecycle events", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({ issues: [{ id: "1", title: "Bug", severity: "high", category: "bug", description: "d" }] }),
+        durationMs: 100,
+        exitCode: 0,
+      }),
+    })
+
+    const events: Array<{ kind: string }> = []
+    const onProgress = vi.fn((e: { kind: string }) => events.push(e))
+
+    await orchestrate(makeOpts({ onProgress }))
+
+    const kinds = events.map((e) => e.kind)
+    expect(kinds).toContain("run-started")
+    expect(kinds).toContain("reviewer-started")
+    expect(kinds).toContain("reviewer-completed")
+    expect(kinds).toContain("run-completed")
+  })
+
+  it("swallows errors thrown by the onProgress callback", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({ issues: [] }),
+        durationMs: 100,
+        exitCode: 0,
+      }),
+    })
+
+    const onProgress = vi.fn(() => { throw new Error("callback exploded") })
+
+    // Should not throw despite the callback exploding
+    const result = await orchestrate(makeOpts({ onProgress }))
+    expect(result.summary.totalIssues).toBe(0)
+    expect(onProgress).toHaveBeenCalled()
+  })
+
+  it("emits reviewer-failed progress event on reviewer failure", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      name: "claude",
+      defaultModel: "sonnet",
+      execute: vi.fn().mockRejectedValue(new Error("runtime exploded")),
+    })
+
+    const events: Array<{ kind: string; name?: string; error?: string }> = []
+    await orchestrate(makeOpts({ onProgress: (e: any) => events.push(e) }))
+
+    const failed = events.find((e) => e.kind === "reviewer-failed")
+    expect(failed).toBeDefined()
+    expect(failed!.name).toBe("Engineer")
+    expect(failed!.error).toContain("runtime exploded")
   })
 
   it("suppresses output in json mode", async () => {

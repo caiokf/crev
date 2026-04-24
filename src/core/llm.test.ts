@@ -70,4 +70,36 @@ describe("callLlm", () => {
       callLlm({ taskName: "Test", runtime: "claude", model: "opus", prompt: "" }),
     ).rejects.toThrow("boom")
   })
+
+  it("forwards extraArgs to the runtime overrides", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: "",
+      durationMs: 1,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    await callLlm({
+      taskName: "Test",
+      runtime: "claude",
+      model: "opus",
+      prompt: "hello",
+      extraArgs: ["--max-turns", "3"],
+    })
+
+    expect(execute.mock.calls[0][0].overrides).toEqual({ extraArgs: ["--max-turns", "3"] })
+  })
+
+  it("omits overrides when extraArgs is not provided", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: "",
+      durationMs: 1,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    await callLlm({ taskName: "Test", runtime: "claude", model: "opus", prompt: "" })
+
+    expect(execute.mock.calls[0][0].overrides).toBeUndefined()
+  })
 })

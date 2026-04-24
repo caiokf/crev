@@ -19,6 +19,19 @@ import type { AppContext, DashView } from "../types.js"
 const lastSelectedIndex = new Map<string, number>()
 
 /**
+ * Shared options for the issue list widget. Extracted as a constant
+ * so tests can assert critical settings (e.g. `invertSelected`)
+ * without spinning up a full blessed screen.
+ */
+export const ISSUE_LIST_OPTIONS = {
+  keys: true,
+  vi: true,
+  mouse: true,
+  tags: true,
+  invertSelected: false,
+} as const
+
+/**
  * Run detail view. Left pane shows run metadata + per-reviewer issue
  * counts; right pane is a scrollable list of every issue across the
  * run, grouped by reviewer. Selecting an issue navigates to the
@@ -65,13 +78,10 @@ export function createRunDetailView(filePath: string): DashView {
         bottom: 0,
         label: " issues ",
         border: "line",
-        keys: true,
-        vi: true,
-        mouse: true,
-        tags: true,
+        ...ISSUE_LIST_OPTIONS,
         items: ["  loading…"],
         style: LIST_STYLE,
-      })
+      } as Parameters<typeof blessed.list>[0])
       issueList.focus()
       ctx.setStatus(
         "[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [e] editor · [bksp] back · [q] quit",
@@ -258,11 +268,21 @@ export function formatIssueRow(issue: ReviewIssue, widths: IssueColumnWidths): s
 }
 
 /**
- * Coloured dot prefix that mirrors the sidebar's verdict palette:
- *   actionable → green · deferred → yellow · dismissed → gray.
+ * Coloured marker prefix for each issue row:
+ *   fixed     → green ✓
+ *   wont-fix  → gray ✗
+ *   actionable → green ●
+ *   deferred  → yellow ●
+ *   dismissed → gray ●
  * Untriaged issues get a blank so the severity column stays aligned.
  */
-function actionableMarker(issue: ReviewIssue): string {
+export function actionableMarker(issue: ReviewIssue): string {
+  if (issue.status === "fixed") {
+    return `{${DASH_COLORS.ok}-fg}✓{/${DASH_COLORS.ok}-fg}`
+  }
+  if (issue.status === "wont-fix") {
+    return `{gray-fg}✗{/gray-fg}`
+  }
   switch (issue.triage?.verdict) {
     case "actionable":
       return `{${DASH_COLORS.ok}-fg}●{/${DASH_COLORS.ok}-fg}`
