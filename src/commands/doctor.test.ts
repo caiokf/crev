@@ -1,6 +1,7 @@
 import { Command } from "commander"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { buildDoctorJsonPayload, sanitizeRuntimeHealth, selectRuntimesToCheck } from "./doctor.js"
+import { buildDoctorJsonPayload } from "./doctor.js"
+import { sanitizeRuntimeHealth, selectRuntimesToCheck } from "../core/runtimes.js"
 
 const valetMocks = vi.hoisted(() => ({
   getAllRuntimes: vi.fn(),

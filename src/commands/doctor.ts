@@ -3,19 +3,17 @@ import os from "node:os"
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { getAllRuntimes, type RuntimeHealth, type RuntimeAdapter } from "@caiokf/valet"
-import { findCrevDir, loadLayeredConfig, getRuntimeConfig, resolveModelAlias } from "../core/config.js"
+import { Effect } from "effect"
+import type { RuntimeAdapter, RuntimeHealth } from "@caiokf/valet"
+import { getRuntimeConfig, loadLayeredConfig, resolveModelAlias } from "../core/config.js"
 import type { Config } from "../core/config.js"
-import { checkSchemaReadiness, checkProjectSetup } from "../core/health.js"
-import type { SchemaReadiness, ProjectCheck } from "../core/health.js"
-import { listAllSchemas, resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
+import type { ProjectCheck, SchemaReadiness } from "../core/health.js"
+import { doctorAction } from "../actions/doctor.js"
+import type { SkillCheck } from "../actions/doctor.js"
+import { CliLive } from "../layers.js"
 import { visibleLength, padVisible, truncateVisible } from "../tui/ansi.js"
 import { errorMessage } from "../util/cli-errors.js"
-import { getInstalledSkills, isSkillUpToDate } from "../util/skills.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
-
-const ANSI_ESCAPE_REGEX = /\u001b\[[0-?]*[ -/]*[@-~]/g
-const ANSI_OSC_REGEX = /\u001b\][^\u0007]*(?:\u0007|\u001b\\)/g
 
 export function registerDoctorCommand(program: Command): void {
   program
@@ -24,108 +22,60 @@ export function registerDoctorCommand(program: Command): void {
     .option("--all", "Check all known runtimes, not just those in schemas")
     .option("--ping", "Send a test prompt through each runtime to verify end-to-end")
     .option("--json", COMMON_OPTION_DESCRIPTIONS.json)
-    .action(async (opts) => {
-      const crevDir = findCrevDir()
+    .action(async (opts: { all?: boolean; ping?: boolean; json?: boolean }) => {
       const jsonOutput = opts.json ?? false
       const cols = process.stdout.columns ?? 80
-
-      const schemas = listAllSchemas(crevDir)
-      const runtimeUsage = new Map<string, string[]>()
-      const referencedRuntimes = new Set<string>()
-      for (const name of schemas) {
-        try {
-          const schemaPath = resolveSchemaPath(name, crevDir)
-          if (!schemaPath) continue
-          const schema = loadSchemaFile(schemaPath)
-          for (const reviewer of schema.reviewers) {
-            referencedRuntimes.add(reviewer.runtime)
-            addRuntimeUsage(runtimeUsage, reviewer.runtime, name)
-          }
-          if (schema.triage?.enabled && schema.triage.runtime) {
-            referencedRuntimes.add(schema.triage.runtime)
-            addRuntimeUsage(runtimeUsage, schema.triage.runtime, name)
-          }
-        } catch {
-          // Skip schemas that cannot be loaded
-        }
-      }
-
-      const config = loadLayeredConfig(crevDir)
-
-      // By default, check only runtimes referenced by schemas. --all checks every runtime.
-      const allRuntimes = getAllRuntimes()
-      const runtimesToCheck = selectRuntimesToCheck(allRuntimes, referencedRuntimes, opts.all ?? false)
-      const allHealthResults: RuntimeHealth[] = new Array(runtimesToCheck.length)
-
       const isTTY = process.stdout.isTTY && !jsonOutput
-      let checked = 0
 
-      if (isTTY) {
-        process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${runtimesToCheck.length}`)}`)
-      }
-
-      await Promise.all(
-        runtimesToCheck.map(async (runtime, i) => {
-          try {
-            allHealthResults[i] = sanitizeRuntimeHealth(await runtime.healthCheck())
-          } catch (e) {
-            allHealthResults[i] = sanitizeRuntimeHealth({
-              name: runtime.name,
-              command: runtime.name,
-              installed: false,
-              version: null,
-              authenticated: "unknown",
-              authDetail: String(e),
-              error: String(e),
-            })
-          }
-          checked++
-          if (isTTY) {
-            process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${runtimesToCheck.length}`)}`)
-          }
-        }),
+      const snapshot = await Effect.runPromise(
+        doctorAction({
+          includeAll: opts.all ?? false,
+          onRuntimeProgress: isTTY
+            ? (checked, total) => {
+                if (checked === 1) {
+                  process.stdout.write(`  ${chalk.dim(`Checking runtimes... 0/${total}`)}`)
+                }
+                process.stdout.write(
+                  `\r\x1B[2K  ${chalk.dim(`Checking runtimes... ${checked}/${total}`)}`,
+                )
+                if (checked === total) {
+                  process.stdout.write("\r\x1B[2K")
+                }
+              }
+            : undefined,
+        }).pipe(Effect.provide(CliLive)),
       )
 
-      if (isTTY) {
-        process.stdout.write("\r\x1B[2K")
-      }
+      const { crevDir, runtimes, runtimeUsage, schemaReadiness, projectChecks, skills } = snapshot
 
-      const healthResults = allHealthResults
-      const healthByRuntime = new Map(allHealthResults.map((h) => [h.name, h] as const))
-
-      const projectChecks = checkProjectSetup(crevDir)
-      const schemaReadiness = checkSchemaReadiness(crevDir, healthResults)
-
-      // Skill freshness
-      const projectRoot = path.dirname(crevDir)
-      const installedSkills = getInstalledSkills(projectRoot)
-      const skillChecks: SkillCheck[] = installedSkills.map((tool) => ({
-        tool: tool.name,
-        id: tool.id,
-        upToDate: isSkillUpToDate(projectRoot, tool),
-      }))
-
+      // --- Ping runs in the CLI today; moves to RuntimeExec service later. ---
+      const config = loadLayeredConfig(crevDir)
       let pingResults: PingResult[] | undefined
       if (opts.ping) {
-        const readyRuntimes = runtimesToCheck.filter((rt) => {
+        const healthByRuntime = new Map(runtimes.map((h) => [h.name, h] as const))
+        const allRuntimes = (await import("@caiokf/valet")).getAllRuntimes()
+        const referenced = new Set(runtimes.map((r) => r.name))
+        const pingable = allRuntimes.filter(
+          (rt) => referenced.has(rt.name) || (opts.all ?? false),
+        )
+        const readyRuntimes = pingable.filter((rt) => {
           const health = healthByRuntime.get(rt.name)
           return health?.installed && health?.authenticated !== "no"
         })
 
-        if (readyRuntimes.length > 0) {
-          pingResults = await runPingTests(readyRuntimes, config, jsonOutput)
-        } else {
-          pingResults = []
-        }
+        pingResults =
+          readyRuntimes.length > 0
+            ? await runPingTests(readyRuntimes, config, jsonOutput)
+            : []
       }
 
       if (jsonOutput) {
         const payload = buildDoctorJsonPayload({
-          healthResults,
+          healthResults: runtimes,
           runtimeUsage,
           schemaReadiness,
           projectChecks,
-          skillChecks,
+          skillChecks: skills,
           includePing: opts.ping ?? false,
           pingResults,
         })
@@ -133,34 +83,32 @@ export function registerDoctorCommand(program: Command): void {
         return
       }
 
-      // --- Unified pretty print ---
+      // --- Pretty output ---
 
-      // Pre-compute name column width for alignment
-      const nameColWidth = Math.max(
-        14,
-        ...healthResults.map((h) => {
-          const rtConfig = getRuntimeConfig(config, h.name)
-          const cmd = rtConfig.command ?? h.command ?? h.name
-          return cmd !== h.name && cmd !== h.command
-            ? h.name.length + cmd.length + 3 // "name (cmd)"
-            : h.name.length
-        }),
-      ) + 2 // padding
+      const nameColWidth =
+        Math.max(
+          14,
+          ...runtimes.map((h) => {
+            const rtConfig = getRuntimeConfig(config, h.name)
+            const cmd = rtConfig.command ?? h.command ?? h.name
+            return cmd !== h.name && cmd !== h.command
+              ? h.name.length + cmd.length + 3
+              : h.name.length
+          }),
+        ) + 2
 
-      // Runtimes
       console.log(`\n  ${chalk.bold("Runtimes")}`)
       console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
 
-      for (const health of healthResults) {
+      for (const health of runtimes) {
         console.log(formatRuntimeLine(health, config, cols, nameColWidth))
       }
 
-      if (healthResults.length === 0) {
+      if (runtimes.length === 0) {
         console.log(`  ${chalk.dim("No runtimes to check (no schemas found)")}`)
       }
 
-      // Schema readiness
-      if (schemas.length > 0) {
+      if (schemaReadiness.length > 0) {
         const schemaColWidth = Math.max(...schemaReadiness.map((s) => s.name.length)) + 2
         console.log(`\n  ${chalk.bold("Schemas")}`)
         console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
@@ -177,7 +125,6 @@ export function registerDoctorCommand(program: Command): void {
         }
       }
 
-      // Project setup
       const checkColWidth = Math.max(...projectChecks.map((c) => c.name.length)) + 2
       console.log(`\n  ${chalk.bold("Project Setup")}`)
       console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
@@ -186,22 +133,22 @@ export function registerDoctorCommand(program: Command): void {
         console.log(`  ${check.name.padEnd(checkColWidth)} ${icon} ${check.detail}`)
       }
 
-      // Skills
-      if (skillChecks.length > 0) {
-        const skillColWidth = Math.max(...skillChecks.map((s) => s.tool.length)) + 2
+      if (skills.length > 0) {
+        const skillColWidth = Math.max(...skills.map((s) => s.tool.length)) + 2
         console.log(`\n  ${chalk.bold("Skills")}`)
         console.log(`  ${"─".repeat(Math.max(0, Math.min(60, cols - 4)))}`)
-        for (const skill of skillChecks) {
+        for (const skill of skills) {
           if (skill.upToDate) {
             console.log(`  ${skill.tool.padEnd(skillColWidth)} ${chalk.green("✓ up to date")}`)
           } else {
-            console.log(`  ${skill.tool.padEnd(skillColWidth)} ${chalk.yellow("⚠ outdated")} ${chalk.dim("run `crev update`")}`)
+            console.log(
+              `  ${skill.tool.padEnd(skillColWidth)} ${chalk.yellow("⚠ outdated")} ${chalk.dim("run `crev update`")}`,
+            )
           }
         }
       }
 
-      // Fix suggestions
-      const brokenRuntimes = healthResults.filter((h) => h.authenticated === "no")
+      const brokenRuntimes = runtimes.filter((h) => h.authenticated === "no")
       if (brokenRuntimes.length > 0) {
         console.log()
         for (const rt of brokenRuntimes) {
@@ -209,7 +156,6 @@ export function registerDoctorCommand(program: Command): void {
         }
       }
 
-      // Ping test
       if (opts.ping) {
         if (!pingResults || pingResults.length === 0) {
           console.log(`\n  ${chalk.dim("No runtimes available for ping test")}`)
@@ -227,12 +173,6 @@ export function registerDoctorCommand(program: Command): void {
 
       console.log()
     })
-}
-
-type SkillCheck = {
-  tool: string
-  id: string
-  upToDate: boolean
 }
 
 type DoctorJsonPayload = {
@@ -267,56 +207,15 @@ export function buildDoctorJsonPayload(input: {
   return payload
 }
 
-function addRuntimeUsage(runtimeUsage: Map<string, string[]>, runtime: string, schemaName: string): void {
-  const list = runtimeUsage.get(runtime) ?? []
-  if (!list.includes(schemaName)) list.push(schemaName)
-  runtimeUsage.set(runtime, list)
-}
-
-export function selectRuntimesToCheck<T extends { name: string }>(
-  allRuntimes: ReadonlyArray<T>,
-  referencedRuntimes: ReadonlySet<string>,
-  includeAll: boolean,
-): T[] {
-  if (includeAll) return [...allRuntimes]
-  if (referencedRuntimes.size === 0) return []
-  return allRuntimes.filter((runtime) => referencedRuntimes.has(runtime.name))
-}
-
-function sanitizeRuntimeText(value: string | null | undefined): string | null {
-  if (!value) return null
-  const stripped = value
-    .replace(ANSI_OSC_REGEX, "")
-    .replace(ANSI_ESCAPE_REGEX, "")
-    .replace(/[\u0000-\u001f\u007f]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim()
-
-  if (!stripped) return null
-  return stripped.slice(0, 240)
-}
-
-export function sanitizeRuntimeHealth(health: RuntimeHealth): RuntimeHealth {
-  return {
-    ...health,
-    version: sanitizeRuntimeText(health.version),
-    authDetail: sanitizeRuntimeText(health.authDetail) ?? health.authDetail,
-    error: sanitizeRuntimeText(health.error),
-  }
-}
-
-/**
- * Responsive runtime line — progressively adds detail based on terminal width.
- *
- * Narrow (< 60):  claude          ✓ installed  ✓ auth'd
- * Medium (60-90): claude          ✓ installed  2.1.81   ✓ auth'd
- * Wide   (> 90):  claude          ✓ installed  2.1.81   ✓ auth'd  env: ANTHROPIC_API_KEY
- */
-function formatRuntimeLine(health: RuntimeHealth, config: Config, cols: number, nameColWidth: number): string {
+function formatRuntimeLine(
+  health: RuntimeHealth,
+  config: Config,
+  cols: number,
+  nameColWidth: number,
+): string {
   const rtConfig = getRuntimeConfig(config, health.name)
   const commandName = rtConfig.command ?? health.command ?? health.name
 
-  // Name — show command override if different from runtime name
   const hasOverride = commandName !== health.name && commandName !== health.command
   const nameLabel = hasOverride
     ? `${chalk.cyan(health.name)} ${chalk.dim(`(${commandName})`)}`
@@ -333,12 +232,10 @@ function formatRuntimeLine(health: RuntimeHealth, config: Config, cols: number, 
         ? chalk.red("✗ no auth")
         : chalk.yellow("? unknown")
 
-  // Build progressively based on width
   const parts: string[] = []
   parts.push(`  ${padVisible(nameLabel, nameColWidth)}`)
   parts.push(installed)
 
-  // Version — add if medium width or wider
   if (cols >= 60 && health.installed) {
     const version = health.version ?? "–"
     parts.push(version.padEnd(10))
@@ -348,7 +245,6 @@ function formatRuntimeLine(health: RuntimeHealth, config: Config, cols: number, 
 
   const line = parts.join("  ")
 
-  // Auth detail — add if wide and there's room
   if (cols >= 90 && health.authDetail) {
     const used = visibleLength(line) + 2
     const remaining = cols - used
@@ -374,12 +270,11 @@ async function runPingTests(
   config: Config,
   jsonOutput: boolean,
 ): Promise<PingResult[]> {
-  const PING_PROMPT = 'Respond with exactly this text and nothing else: hello ping-test'
+  const PING_PROMPT = "Respond with exactly this text and nothing else: hello ping-test"
   const results: PingResult[] = []
 
   const isTTY = process.stdout.isTTY && !jsonOutput
 
-  // Run one model per runtime (the default model)
   const tasks = runtimes
     .filter((rt) => rt.supportsCustomPrompt)
     .map((rt) => ({
@@ -415,13 +310,18 @@ async function runPingTests(
         })
 
         const durationMs = performance.now() - start
-        const pass = result.exitCode === 0 && result.raw.toLowerCase().includes("hello ping-test")
+        const pass =
+          result.exitCode === 0 && result.raw.toLowerCase().includes("hello ping-test")
         results.push({
           runtime: runtime.name,
           model,
           pass,
           durationMs,
-          error: pass ? undefined : (result.exitCode !== 0 ? `exit code ${result.exitCode}` : "unexpected output"),
+          error: pass
+            ? undefined
+            : result.exitCode !== 0
+              ? `exit code ${result.exitCode}`
+              : "unexpected output",
         })
       } catch (err) {
         results.push({
@@ -432,10 +332,14 @@ async function runPingTests(
           error: errorMessage(err),
         })
       } finally {
-        try { fs.unlinkSync(promptFile) } catch {}
+        try {
+          fs.unlinkSync(promptFile)
+        } catch {}
         done++
         if (isTTY) {
-          process.stdout.write(`\r\x1B[2K  ${chalk.dim(`Running ping tests... ${done}/${tasks.length}`)}`)
+          process.stdout.write(
+            `\r\x1B[2K  ${chalk.dim(`Running ping tests... ${done}/${tasks.length}`)}`,
+          )
         }
       }
     }),
