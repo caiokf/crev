@@ -27,7 +27,11 @@ export function sanitizeRuntimeHealth(health: RuntimeHealth): RuntimeHealth {
   return {
     ...health,
     version: sanitizeRuntimeText(health.version),
-    authDetail: sanitizeRuntimeText(health.authDetail) ?? health.authDetail,
+    // authDetail is typed as string (not nullable) upstream, so we
+    // fall back to "" instead of the raw value when sanitization
+    // strips everything — otherwise we'd leak the pre-strip ANSI /
+    // control-char payload we just removed.
+    authDetail: sanitizeRuntimeText(health.authDetail) ?? "",
     error: sanitizeRuntimeText(health.error),
   }
 }
