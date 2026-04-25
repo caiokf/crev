@@ -17,6 +17,8 @@ type TriageInput = {
 type TriageResult = {
   triaged: ReviewIssue[]
   durationMs: number
+  /** Set when the LLM call failed or returned unparseable output. */
+  error?: string
   summary: {
     actionable: number
     deferred: number
@@ -52,17 +54,20 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   }
 
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
-  const verdicts = await callTriageAgent(prompt, config, signal)
+  const agentResult = await callTriageAgent(prompt, config, signal)
 
   // If triage failed (returned no verdicts), return issues unchanged rather than
   // marking everything as "actionable" which would silently inflate the count.
-  if (verdicts.length === 0) {
+  if (agentResult.verdicts.length === 0) {
     return {
       triaged: issues,
       durationMs: performance.now() - start,
+      error: agentResult.error ?? "triage returned no verdicts",
       summary: { actionable: 0, deferred: 0, dismissed: 0 },
     }
   }
+
+  const verdicts = agentResult.verdicts
 
   const triaged = applyTriageVerdicts(issues, verdicts, flags)
 
@@ -227,11 +232,16 @@ export type RawTriageVerdict = {
   enrichment?: TriageCommentEnrichment
 }
 
+type AgentResult = {
+  verdicts: RawTriageVerdict[]
+  error?: string
+}
+
 async function callTriageAgent(
   prompt: string,
   config: Config,
   signal?: AbortSignal,
-): Promise<RawTriageVerdict[]> {
+): Promise<AgentResult> {
   const runtime = config.triage.runtime
   const model = resolveModelAlias(config, config.triage.model)
   const rtConfig = getRuntimeConfig(config, runtime)
@@ -249,10 +259,15 @@ async function callTriageAgent(
         args: rtConfig.args,
       },
     })
-    return parseTriageResponse(raw)
+    const verdicts = parseTriageResponse(raw)
+    if (verdicts.length === 0) {
+      return { verdicts, error: `${runtime}/${model} returned no parseable verdicts` }
+    }
+    return { verdicts }
   } catch (err) {
-    console.error(`Warning: Triage failed (${runtime}/${model}): ${errorMessage(err)}`)
-    return []
+    const msg = `${runtime}/${model}: ${errorMessage(err)}`
+    console.error(`Warning: Triage failed (${msg})`)
+    return { verdicts: [], error: msg }
   }
 }
 

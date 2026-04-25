@@ -181,7 +181,7 @@ export function createRunDetailView(filePath: string): DashView {
             ctx.screen.render()
             return
           }
-          const { summary } = result.value
+          const { summary, error } = result.value
           const review = result.value.result
           meta.setContent(renderMeta(review))
           issues = flattenIssues(review)
@@ -189,9 +189,15 @@ export function createRunDetailView(filePath: string): DashView {
           issueList.setItems(issues.map((i) => formatIssueRow(i, widths)))
           const selected = (issueList as unknown as { selected?: number }).selected ?? 0
           if (selected < issues.length) issueList.select(selected)
-          ctx.setStatus(
-            `{${DASH_COLORS.ok}-fg}✓ triaged: ${summary.actionable} actionable, ${summary.deferred} deferred, ${summary.dismissed} dismissed{/${DASH_COLORS.ok}-fg}`,
-          )
+          if (error) {
+            ctx.setStatus(
+              `{${DASH_COLORS.danger}-fg}triage failed: ${escapeTags(error)}{/${DASH_COLORS.danger}-fg}`,
+            )
+          } else {
+            ctx.setStatus(
+              `{${DASH_COLORS.ok}-fg}✓ triaged: ${summary.actionable} actionable, ${summary.deferred} deferred, ${summary.dismissed} dismissed{/${DASH_COLORS.ok}-fg}`,
+            )
+          }
           ctx.screen.render()
         })
       })

@@ -33,6 +33,8 @@ export type TriageActionOutput = {
   readonly result: ReviewResult
   readonly summary: { actionable: number; deferred: number; dismissed: number }
   readonly durationMs: number
+  /** Set when the triage LLM call failed or returned unparseable output. */
+  readonly error?: string
 }
 
 export const triageAction = (
@@ -167,5 +169,6 @@ export const triageAction = (
       result,
       summary: triageResult.summary,
       durationMs: triageResult.durationMs,
+      error: triageResult.error,
     }
   })

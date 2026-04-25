@@ -59,6 +59,7 @@ export function registerTriageCommand(program: Command): void {
               filePath: result.filePath,
               durationMs: result.durationMs,
               summary: result.summary,
+              ...(result.error ? { error: result.error } : {}),
             },
             null,
             2,
@@ -74,11 +75,16 @@ export function registerTriageCommand(program: Command): void {
         `  ${chalk.dim(`${(result.durationMs / 1000).toFixed(1)}s`)}`,
       )
       console.log()
-      console.log(
-        `  ${chalk.green(`${result.summary.actionable} actionable`)} · ` +
-          `${chalk.yellow(`${result.summary.deferred} deferred`)} · ` +
-          `${chalk.dim(`${result.summary.dismissed} dismissed`)}`,
-      )
-      console.log()
+      if (result.error) {
+        console.log(`  ${chalk.red(`Error: ${result.error}`)}`)
+        console.log()
+      } else {
+        console.log(
+          `  ${chalk.green(`${result.summary.actionable} actionable`)} · ` +
+            `${chalk.yellow(`${result.summary.deferred} deferred`)} · ` +
+            `${chalk.dim(`${result.summary.dismissed} dismissed`)}`,
+        )
+        console.log()
+      }
     })
 }

@@ -431,16 +431,27 @@ async function runTriagePass(
   }
 
   const { actionable, deferred, dismissed } = result.summary
-  const resultText = `${actionable} actionable, ${deferred} deferred, ${dismissed} dismissed`
 
-  if (spinner) {
-    spinner.updateEntry("Triage", "done", {
-      elapsed: result.durationMs / 1000,
-      resultText,
-    })
-  } else if (!isQuiet) {
-    const elapsed = (result.durationMs / 1000).toFixed(1)
-    console.log(`Triage complete: ${resultText} (${elapsed}s)`)
+  if (result.error) {
+    if (spinner) {
+      spinner.updateEntry("Triage", "failed", {
+        elapsed: result.durationMs / 1000,
+        resultText: result.error,
+      })
+    } else if (!isQuiet) {
+      console.error(`Warning: Triage failed: ${result.error}`)
+    }
+  } else {
+    const resultText = `${actionable} actionable, ${deferred} deferred, ${dismissed} dismissed`
+    if (spinner) {
+      spinner.updateEntry("Triage", "done", {
+        elapsed: result.durationMs / 1000,
+        resultText,
+      })
+    } else if (!isQuiet) {
+      const elapsed = (result.durationMs / 1000).toFixed(1)
+      console.log(`Triage complete: ${resultText} (${elapsed}s)`)
+    }
   }
 
   emitProgress(opts, {
