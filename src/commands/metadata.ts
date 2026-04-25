@@ -22,6 +22,7 @@ export const COMMAND_DESCRIPTIONS = {
   dash: "Interactive dashboard (schemas, runs, reviews)",
   verify: "Check which review issues have been fixed in the current code",
   fix: "Auto-fix review issues using AI coding agents",
+  triage: "Run triage on an existing review",
 } as const
 
 export type CommandPath =
@@ -31,6 +32,7 @@ export type CommandPath =
   | "stats"
   | "verify"
   | "fix"
+  | "triage"
   | "config"
   | "doctor"
   | "list"
@@ -48,6 +50,7 @@ export const HELP_COMMAND_ORDER: readonly CommandPath[] = [
   "stats",
   "verify",
   "fix",
+  "triage",
   "config",
   "doctor",
   "list",
@@ -66,6 +69,7 @@ export const GENERAL_HELP_COMMANDS: ReadonlyArray<{ usage: string; description: 
   { usage: "crev stats", description: "Aggregate stats across reviews" },
   { usage: "crev verify [file.json]", description: COMMAND_DESCRIPTIONS.verify },
   { usage: "crev fix [file.json]", description: COMMAND_DESCRIPTIONS.fix },
+  { usage: "crev triage [file.json]", description: COMMAND_DESCRIPTIONS.triage },
   { usage: "crev config [--layers]", description: "Show resolved configuration" },
   { usage: "crev doctor [--all] [--json] [--ping]", description: "Health check" },
   { usage: "crev list [--schemas|--runtimes]", description: "Discover what's available" },

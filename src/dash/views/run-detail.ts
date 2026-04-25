@@ -1,8 +1,10 @@
 import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import path from "node:path"
+import { errorMessage } from "../../util/cli-errors.js"
 import { showAction } from "../../actions/show.js"
 import { setVerdictAction } from "../../actions/verdict.js"
+import { triageAction } from "../../actions/triage.js"
 import { verifyAction } from "../../actions/verify.js"
 import { fixAction } from "../../actions/fix.js"
 import { isFixConfigured } from "../../core/health.js"
@@ -103,7 +105,7 @@ export function createRunDetailView(filePath: string): DashView {
       issueList.focus()
       const fixHint = fixConfigured ? " · [f] fix" : ""
       ctx.setStatus(
-        `[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [v] verify${fixHint} · [e] editor · [bksp] back · [q] quit`,
+        `[↑/↓] or [j/k] move · [enter] open · [a]actionable [d]deferred [x]dismissed · [t] triage · [v] verify${fixHint} · [e] editor · [bksp] back · [q] quit`,
       )
       ctx.screen.render()
 
@@ -116,7 +118,7 @@ export function createRunDetailView(filePath: string): DashView {
 
       issueList.key("e", () => {
         void openInEditor(ctx.screen, filePath).catch((err) => {
-          ctx.setStatus(`editor failed: ${err instanceof Error ? err.message : String(err)}`)
+          ctx.setStatus(`editor failed: ${errorMessage(err)}`)
           ctx.screen.render()
         })
       })
@@ -162,6 +164,37 @@ export function createRunDetailView(filePath: string): DashView {
       issueList.key("a", () => applyVerdictToCursor("actionable"))
       issueList.key("d", () => applyVerdictToCursor("deferred"))
       issueList.key("x", () => applyVerdictToCursor("dismissed"))
+
+      let triaging = false
+      issueList.key("t", () => {
+        if (triaging || issues.length === 0) return
+        triaging = true
+        ctx.setStatus(`{${DASH_COLORS.accent}-fg}triaging ${issues.length} issues…{/${DASH_COLORS.accent}-fg}`)
+        ctx.screen.render()
+        void runDashEffect(triageAction({ filePath })).then((result) => {
+          triaging = false
+          if (!meta || !issueList) return
+          if (result.kind === "error") {
+            ctx.setStatus(
+              `{${DASH_COLORS.danger}-fg}triage failed: ${result.message}{/${DASH_COLORS.danger}-fg}`,
+            )
+            ctx.screen.render()
+            return
+          }
+          const { summary } = result.value
+          const review = result.value.result
+          meta.setContent(renderMeta(review))
+          issues = flattenIssues(review)
+          const widths = computeIssueWidths(issues)
+          issueList.setItems(issues.map((i) => formatIssueRow(i, widths)))
+          const selected = (issueList as unknown as { selected?: number }).selected ?? 0
+          if (selected < issues.length) issueList.select(selected)
+          ctx.setStatus(
+            `{${DASH_COLORS.ok}-fg}✓ triaged: ${summary.actionable} actionable, ${summary.deferred} deferred, ${summary.dismissed} dismissed{/${DASH_COLORS.ok}-fg}`,
+          )
+          ctx.screen.render()
+        })
+      })
 
       let verifying = false
       issueList.key("v", () => {
