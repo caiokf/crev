@@ -4,7 +4,7 @@ import { runFix, applyFixStatuses, type FixStatus } from "../core/fix.js"
 import { CrevConfig } from "../services/CrevConfig.js"
 import { ReviewStore } from "../services/ReviewStore.js"
 import { SchemaStore } from "../services/SchemaStore.js"
-import { getOutputDir } from "../core/config.js"
+import { getOutputDir, resolveModelAlias, getRuntimeConfig } from "../core/config.js"
 import { resolveSchemaPath, loadSchemaFile } from "../core/schema.js"
 import type { ReviewIssue, ReviewResult } from "../core/types.js"
 import type {
@@ -80,7 +80,7 @@ export const fixAction = (
     if (schemaName) {
       const schemaPath = yield* Effect.sync(() => resolveSchemaPath(schemaName, crevDir))
       if (schemaPath) {
-        const schema = yield* Effect.either(schemaStore.load(schemaPath))
+        const schema = yield* Effect.either(schemaStore.load(schemaPath, config.aliases))
         if (schema._tag === "Right" && schema.right.fix) {
           runtime = input.runtime ?? schema.right.fix.runtime ?? runtime
           model = input.model ?? schema.right.fix.model ?? model
@@ -109,12 +109,20 @@ export const fixAction = (
       })
     }
 
+    const resolvedModel = resolveModelAlias(config, model)
+    const rtConfig = getRuntimeConfig(config, runtime)
+
     const fixResult = yield* Effect.promise(() =>
       runFix({
         issues: eligible,
         runtime,
-        model,
+        model: resolvedModel,
         signal: input.signal,
+        runtimeConfig: {
+          command: rtConfig.command,
+          env: rtConfig.env,
+          args: rtConfig.args,
+        },
         onProgress: input.onProgress,
       }),
     )

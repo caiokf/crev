@@ -1,11 +1,20 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it, vi, beforeEach } from "vitest"
 import type { ReviewIssue, ReviewResult } from "./types.js"
 import {
   applyFixStatuses,
   buildFixPrompt,
   parseFixResponse,
+  runFix,
   type FixStatus,
 } from "./fix.js"
+
+const valetMocks = vi.hoisted(() => ({
+  getRuntime: vi.fn(),
+}))
+
+vi.mock("@caiokf/valet", () => ({
+  getRuntime: valetMocks.getRuntime,
+}))
 
 // ── parseFixResponse ──
 
@@ -252,5 +261,108 @@ describe("fix · applyFixStatuses", () => {
     ])
 
     expect(result.reviews[0].issues[0].status).toBeUndefined()
+  })
+})
+
+// ── runFix · runtime config forwarding ──
+
+describe("fix · runFix runtime config", () => {
+  beforeEach(() => {
+    vi.resetAllMocks()
+  })
+
+  const issueWithPrompt: ReviewIssue = {
+    id: "i-1",
+    reviewer: "E",
+    runtime: "claude",
+    model: "sonnet",
+    severity: "high",
+    category: "bug",
+    title: "Bug",
+    description: "desc",
+    triage: {
+      verdict: "actionable",
+      reasoning: "real",
+      enrichment: {
+        title: "Fix it",
+        context: "context",
+        minimalFix: { summary: "add check", patch: "+ if (x) {}" },
+        promptForAgents: "Add a null check",
+      },
+    },
+  }
+
+  it("forwards runtimeConfig to the LLM call", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({ fix: { id: "i-1", status: "fixed", reasoning: "done" } }),
+      durationMs: 10,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    await runFix({
+      issues: [issueWithPrompt],
+      runtime: "claude",
+      model: "claude-opus-4-6",
+      runtimeConfig: {
+        command: "/usr/local/bin/claude",
+        env: { KEY: "val" },
+        args: ["--timeout", "30"],
+      },
+    })
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(execute.mock.calls[0][0].model).toBe("claude-opus-4-6")
+    expect(execute.mock.calls[0][0].overrides).toEqual(
+      expect.objectContaining({
+        command: "/usr/local/bin/claude",
+        env: { KEY: "val" },
+        extraArgs: ["--timeout", "30"],
+      }),
+    )
+  })
+
+  it("works without runtimeConfig (backward compatible)", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({ fix: { id: "i-1", status: "fixed", reasoning: "done" } }),
+      durationMs: 10,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const result = await runFix({
+      issues: [issueWithPrompt],
+      runtime: "claude",
+      model: "sonnet",
+    })
+
+    expect(result.summary.fixed).toBe(1)
+    expect(execute.mock.calls[0][0].overrides).toBeUndefined()
+  })
+
+  it("skips issues without enrichment prompt", async () => {
+    const execute = vi.fn()
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const issueNoPrompt: ReviewIssue = {
+      id: "i-2",
+      reviewer: "E",
+      runtime: "claude",
+      model: "sonnet",
+      severity: "low",
+      category: "style",
+      title: "Style",
+      description: "d",
+    }
+
+    const result = await runFix({
+      issues: [issueNoPrompt],
+      runtime: "claude",
+      model: "sonnet",
+      runtimeConfig: { command: "/bin/claude" },
+    })
+
+    expect(result.summary.skipped).toBe(1)
+    expect(execute).not.toHaveBeenCalled()
   })
 })

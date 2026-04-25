@@ -13,6 +13,11 @@ export type FixInput = {
   runtime: string
   model: string
   signal?: AbortSignal
+  runtimeConfig?: {
+    command?: string
+    env?: Record<string, string>
+    args?: string[]
+  }
   /** Called after each issue finishes. */
   onProgress?: (completed: number, total: number, status: FixStatus) => void
 }
@@ -30,7 +35,7 @@ export type FixResult = {
  */
 export async function runFix(input: FixInput): Promise<FixResult> {
   const start = performance.now()
-  const { issues, runtime, model, signal, onProgress } = input
+  const { issues, runtime, model, signal, runtimeConfig, onProgress } = input
 
   const statuses: FixStatus[] = []
 
@@ -58,6 +63,7 @@ export async function runFix(input: FixInput): Promise<FixResult> {
         model,
         prompt: fixPrompt,
         signal,
+        runtimeConfig,
       })
       const status = parseFixResponse(raw, issue.id)
       statuses.push(status)

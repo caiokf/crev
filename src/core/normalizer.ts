@@ -1,5 +1,6 @@
 import crypto from "node:crypto"
 import type { Config } from "./config.js"
+import { resolveModelAlias, getRuntimeConfig } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
@@ -136,7 +137,8 @@ Raw review output:
 ${raw.slice(0, MAX_RAW_CHARS)}`
 
   const normalizerRuntime = config.normalizer.runtime
-  const normalizerModel = config.normalizer.model
+  const normalizerModel = resolveModelAlias(config, config.normalizer.model)
+  const rtConfig = getRuntimeConfig(config, normalizerRuntime)
 
   try {
     const raw = await callLlm({
@@ -145,6 +147,11 @@ ${raw.slice(0, MAX_RAW_CHARS)}`
       model: normalizerModel,
       prompt,
       signal,
+      runtimeConfig: {
+        command: rtConfig.command,
+        env: rtConfig.env,
+        args: rtConfig.args,
+      },
     })
     const parsed = tryParseIssues(raw, reviewer, runtime, model)
     return parsed.parsed ? parsed.issues : []

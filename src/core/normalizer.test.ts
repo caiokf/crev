@@ -176,7 +176,6 @@ describe("normalizeOutput", () => {
       model: "opus",
       deduplicate: false,
       recategorize: false,
-      enrichComments: false,
       prompt: "",
     },
   } as Config
@@ -220,6 +219,50 @@ describe("normalizeOutput", () => {
     expect(result.issues).toHaveLength(1)
     expect(result.issues[0].id).toBe(`${reviewerIdPrefix("Test")}--extracted-1`)
     expect(valetMocks.getRuntime).toHaveBeenCalledWith("claude")
+  })
+
+  it("resolves model alias before calling the normalizer LLM", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({ issues: [] }),
+      durationMs: 10,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const config = {
+      ...baseConfig,
+      aliases: { haiku: "claude-haiku-4-5-20251001" },
+    } as Config
+
+    await normalizeOutput("Test", "claude", "opus", "not json", 1000, 0, config)
+
+    expect(execute.mock.calls[0][0].model).toBe("claude-haiku-4-5-20251001")
+  })
+
+  it("forwards runtime config to the normalizer LLM call", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({ issues: [] }),
+      durationMs: 10,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const config = {
+      ...baseConfig,
+      runtimes: {
+        claude: { command: "/usr/local/bin/claude", env: { KEY: "val" }, args: ["--timeout", "30"] },
+      },
+    } as Config
+
+    await normalizeOutput("Test", "claude", "opus", "not json", 1000, 0, config)
+
+    expect(execute.mock.calls[0][0].overrides).toEqual(
+      expect.objectContaining({
+        command: "/usr/local/bin/claude",
+        env: { KEY: "val" },
+        extraArgs: ["--timeout", "30"],
+      }),
+    )
   })
 
   it("returns empty issues when normalizer is disabled and direct parse fails", async () => {
