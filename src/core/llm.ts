@@ -15,6 +15,14 @@ export type LlmCallOptions = {
    * after the user pressed [q].
    */
   signal?: AbortSignal
+  /** Extra CLI args forwarded to the runtime (e.g. --max-turns). */
+  extraArgs?: string[]
+  /** Runtime config overrides (command, env, args from config.runtimes). */
+  runtimeConfig?: {
+    command?: string
+    env?: Record<string, string>
+    args?: string[]
+  }
 }
 
 /**
@@ -24,6 +32,14 @@ export type LlmCallOptions = {
 export async function callLlm(opts: LlmCallOptions): Promise<string> {
   return withTempPromptFile(`crev-prompt-${opts.taskName.toLowerCase()}`, opts.prompt, async (promptFile) => {
     const rt = getRuntime(opts.runtime)
+    const mergedArgs = [
+      ...(opts.runtimeConfig?.args ?? []),
+      ...(opts.extraArgs ?? []),
+    ]
+    const hasOverrides =
+      opts.runtimeConfig?.command ||
+      (opts.runtimeConfig?.env && Object.keys(opts.runtimeConfig.env).length > 0) ||
+      mergedArgs.length > 0
     const result = await rt.execute({
       taskName: opts.taskName,
       model: opts.model,
@@ -32,6 +48,13 @@ export async function callLlm(opts: LlmCallOptions): Promise<string> {
       diff: { diffContent: "", diffFile: "", type: "all" },
       outputFormat: "",
       signal: opts.signal,
+      overrides: hasOverrides
+        ? {
+            command: opts.runtimeConfig?.command,
+            env: opts.runtimeConfig?.env,
+            extraArgs: mergedArgs.length > 0 ? mergedArgs : undefined,
+          }
+        : undefined,
     })
     return result.raw
   })

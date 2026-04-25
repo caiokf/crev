@@ -1,4 +1,5 @@
 import type { Config } from "./config.js"
+import { resolveModelAlias, getRuntimeConfig } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
 import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
@@ -47,7 +48,7 @@ export async function runTriage(input: TriageInput): Promise<TriageResult> {
   const flags: TriageFlags = {
     deduplicate: config.triage.deduplicate,
     recategorize: config.triage.recategorize,
-    enrichComments: config.triage.enrichComments ?? true,
+    enrichComments: true,
   }
 
   const prompt = buildTriagePrompt(issues, diffContent, config.triage.prompt, diffType, flags)
@@ -231,9 +232,23 @@ async function callTriageAgent(
   config: Config,
   signal?: AbortSignal,
 ): Promise<RawTriageVerdict[]> {
-  const { runtime, model } = config.triage
+  const runtime = config.triage.runtime
+  const model = resolveModelAlias(config, config.triage.model)
+  const rtConfig = getRuntimeConfig(config, runtime)
   try {
-    const raw = await callLlm({ taskName: "Triage", runtime, model, prompt, signal })
+    const raw = await callLlm({
+      taskName: "Triage",
+      runtime,
+      model,
+      prompt,
+      signal,
+      extraArgs: ["--max-turns", "1"],
+      runtimeConfig: {
+        command: rtConfig.command,
+        env: rtConfig.env,
+        args: rtConfig.args,
+      },
+    })
     return parseTriageResponse(raw)
   } catch (err) {
     console.error(`Warning: Triage failed (${runtime}/${model}): ${errorMessage(err)}`)

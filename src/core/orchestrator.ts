@@ -17,6 +17,7 @@ import { createMultiSpinner, formatIssueSummary, type MultiSpinnerAction, type M
 import type { DiffInput } from "@caiokf/valet"
 import { withTempPromptFile } from "./temp-prompt.js"
 import { slugify } from "../util/paths.js"
+import { errorMessage } from "../util/cli-errors.js"
 
 // Re-export extracted modules for public API
 export { buildDiffReference, buildAnalyzeReference, extractChangedFiles, UNTRUSTED_INPUT_WARNING } from "./prompt.js"
@@ -112,7 +113,7 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
     spinner?.stop()
     emitProgress(opts, {
       kind: "run-failed",
-      error: err instanceof Error ? err.message : String(err),
+      error: errorMessage(err),
     })
     throw err
   }
@@ -194,7 +195,7 @@ async function executeReviewers(
     // Surface the original TUI error before falling back. If the
     // fallback also fails we'd otherwise have no signal about what
     // went wrong inside the TUI path (e.g. stdin raw-mode crashes).
-    const msg = err instanceof Error ? err.message : String(err)
+    const msg = errorMessage(err)
     console.error(`Warning: TUI mode failed, falling back to plain output: ${msg}`)
     return { reviews: await executeReviewersPlain(reviewers, opts, outputFormat), spinner: null }
   }
@@ -244,7 +245,7 @@ async function executeReviewersPlain(
       emitProgress(opts, {
         kind: "reviewer-failed",
         name: reviewer.name,
-        error: err instanceof Error ? err.message : String(err),
+        error: errorMessage(err),
       })
       throw err
     }
@@ -319,7 +320,7 @@ async function executeReviewersWithTui(
           emitProgress(opts, {
             kind: "reviewer-failed",
             name: reviewer.name,
-            error: err instanceof Error ? err.message : String(err),
+            error: errorMessage(err),
           })
           throw err
         }
@@ -381,10 +382,9 @@ async function runTriagePass(
           ...opts.config.triage,
           enabled: true,
           runtime: schemaTriage.runtime ?? opts.config.triage.runtime,
-          model: schemaTriage.model ?? opts.config.triage.model,
+          model: schemaTriage.model ?? resolveModelAlias(opts.config, opts.config.triage.model),
           deduplicate: schemaTriage.deduplicate ?? opts.config.triage.deduplicate,
           recategorize: schemaTriage.recategorize ?? opts.config.triage.recategorize,
-          enrichComments: schemaTriage.enrichComments ?? opts.config.triage.enrichComments,
         },
       }
     : opts.config
