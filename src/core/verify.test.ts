@@ -322,7 +322,7 @@ describe("verify · runVerify runtime config", () => {
       expect.objectContaining({
         command: "/usr/local/bin/claude",
         env: { KEY: "val" },
-        extraArgs: ["--timeout", "30", "--max-turns", "1"],
+        extraArgs: ["--timeout", "30"],
       }),
     )
   })
@@ -356,8 +356,7 @@ describe("verify · runVerify runtime config", () => {
     })
 
     expect(result.summary.fixed).toBe(1)
-    expect(execute.mock.calls[0][0].overrides).toEqual(
-      expect.objectContaining({ extraArgs: ["--max-turns", "1"] }),
-    )
+    // No extraArgs or runtimeConfig means no overrides
+    expect(execute.mock.calls[0][0].overrides).toBeUndefined()
   })
 })

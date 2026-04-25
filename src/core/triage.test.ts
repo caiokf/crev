@@ -537,4 +537,173 @@ describe("runTriage", () => {
     expect(result.triaged[0].triage).toBeUndefined()
     expect(result.summary).toEqual({ actionable: 0, deferred: 0, dismissed: 0 })
   })
+
+  it("returns no error on success", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({
+          triage: [{ id: "security--xss-1", verdict: "actionable", reasoning: "Real" }],
+        }),
+        durationMs: 100,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toBeUndefined()
+  })
+
+  it("returns error when runtime throws", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockRejectedValue(new Error("network timeout")),
+    })
+    vi.spyOn(console, "error").mockImplementation(() => {})
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toContain("network timeout")
+    expect(result.error).toContain("claude/")
+  })
+
+  it("returns error with diagnostics when response has no parseable verdicts", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: "I cannot produce triage verdicts right now.",
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toContain("no parseable verdicts")
+    expect(result.error).toContain("triage key: false")
+    expect(result.error).toMatch(/\d+ chars/)
+  })
+
+  it("includes triage key presence in error diagnostics", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: JSON.stringify({ triage: [] }),
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toContain("triage key: true")
+  })
+
+  it("truncates long responses in error diagnostics", async () => {
+    const longResponse = "x".repeat(500)
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: longResponse,
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toContain("500 chars")
+    expect(result.error).toContain("…")
+    // Should not contain the full 500-char string
+    expect(result.error!.length).toBeLessThan(400)
+  })
+
+  it("includes full response when short in error diagnostics", async () => {
+    valetMocks.getRuntime.mockReturnValue({
+      execute: vi.fn().mockResolvedValue({
+        raw: "short reply",
+        durationMs: 50,
+        exitCode: 0,
+      }),
+    })
+
+    const result = await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: baseConfig,
+    })
+
+    expect(result.error).toContain("short reply")
+    expect(result.error).not.toContain("…")
+  })
+
+  it("resolves model aliases before calling the runtime", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({
+        triage: [{ id: "security--xss-1", verdict: "actionable", reasoning: "ok" }],
+      }),
+      durationMs: 100,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const configWithAliases = {
+      ...baseConfig,
+      aliases: { opus: "claude-opus-4-6" },
+    } as Config
+
+    await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: configWithAliases,
+    })
+
+    expect(execute).toHaveBeenCalledTimes(1)
+    expect(execute.mock.calls[0][0].model).toBe("claude-opus-4-6")
+  })
+
+  it("forwards runtime config to callLlm", async () => {
+    const execute = vi.fn().mockResolvedValue({
+      raw: JSON.stringify({
+        triage: [{ id: "security--xss-1", verdict: "actionable", reasoning: "ok" }],
+      }),
+      durationMs: 100,
+      exitCode: 0,
+    })
+    valetMocks.getRuntime.mockReturnValue({ execute })
+
+    const configWithRuntime = {
+      ...baseConfig,
+      runtimes: {
+        claude: { command: "/opt/claude", env: { KEY: "val" }, args: ["--verbose"] },
+      },
+    } as Config
+
+    await runTriage({
+      issues: [sampleIssue],
+      diffContent: "some diff",
+      config: configWithRuntime,
+    })
+
+    const overrides = execute.mock.calls[0][0].overrides
+    expect(overrides.command).toBe("/opt/claude")
+    expect(overrides.env).toEqual({ KEY: "val" })
+    expect(overrides.extraArgs).toEqual(["--verbose"])
+  })
 })

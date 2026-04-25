@@ -252,7 +252,6 @@ async function callTriageAgent(
       model,
       prompt,
       signal,
-      extraArgs: ["--max-turns", "1"],
       runtimeConfig: {
         command: rtConfig.command,
         env: rtConfig.env,

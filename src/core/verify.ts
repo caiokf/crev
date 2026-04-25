@@ -204,7 +204,6 @@ async function callVerifyAgent(
       model,
       prompt,
       signal,
-      extraArgs: ["--max-turns", "1"],
       runtimeConfig,
     })
     return parseVerifyResponse(raw)
