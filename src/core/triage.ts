@@ -261,7 +261,12 @@ async function callTriageAgent(
     })
     const verdicts = parseTriageResponse(raw)
     if (verdicts.length === 0) {
-      return { verdicts, error: `${runtime}/${model} returned no parseable verdicts` }
+      const hasTriageKey = raw.includes('"triage"')
+      const truncated = raw.length > 200 ? `${raw.slice(0, 100)}…[${raw.length} chars]…${raw.slice(-100)}` : raw
+      return {
+        verdicts,
+        error: `${runtime}/${model} returned no parseable verdicts (${raw.length} chars, triage key: ${hasTriageKey}). Response: ${truncated}`,
+      }
     }
     return { verdicts }
   } catch (err) {
