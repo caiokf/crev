@@ -451,6 +451,32 @@ crev list --runtimes</code></pre>
             <span class="prop-desc">Not a real issue. False positive or acceptable trade-off.</span>
           </div>
         </div>
+
+        <h2>Standalone triage</h2>
+        <p>
+          Run triage on an existing review that was generated without triage,
+          or re-run triage with different settings:
+        </p>
+        <div class="code-block">
+          <pre><code><span class="c-dim"># Triage the latest review</span>
+crev triage
+
+<span class="c-dim"># Triage a specific review file</span>
+crev triage .crev/reviews/my-review.json
+
+<span class="c-dim"># Override the triage model</span>
+crev triage --model claude/opus
+
+<span class="c-dim"># JSON output</span>
+crev triage --json</code></pre>
+        </div>
+        <p>
+          The diff is re-generated from the review's stored metadata.
+          If the original branch was deleted, triage proceeds without diff
+          context &mdash; the agent can still reason about issues from their
+          descriptions. In the dashboard, press <code>[t]</code> on the run
+          detail view to trigger triage.
+        </p>
       </section>
 
       <!-- Fix -->
@@ -588,6 +614,10 @@ crev fix --model claude/opus</code></pre>
           <div class="prop-row">
             <code class="prop-name">crev fix [file]</code>
             <span class="prop-desc">Auto-fix review issues using AI coding agents.</span>
+          </div>
+          <div class="prop-row">
+            <code class="prop-name">crev triage [file]</code>
+            <span class="prop-desc">Run triage on an existing review.</span>
           </div>
           <div class="prop-row">
             <code class="prop-name">crev verify [file]</code>
@@ -787,6 +817,8 @@ against a diff, normalizes findings, and optionally triages them.
 | Health check                | `crev doctor`                                     |
 | Scaffold new schema         | `crev schema init &lt;name&gt;`                         |
 | Full setup                  | `crev init`                                       |
+| Triage an existing review   | `crev triage`                                     |
+| Triage with model override  | `crev triage --model claude/opus`                 |
 | Review stats                | `crev stats --schema &lt;name&gt;`                      |
 | Stats across versions       | `crev stats --schema &lt;name&gt; --history`            |
 

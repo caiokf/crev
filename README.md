@@ -153,6 +153,7 @@ Run `crev doctor` to check which runtimes are available. Add `--ping` to verify 
 | `crev list` | List schemas and runtimes |
 | `crev show [file]` | Pretty-print a review file (default: latest) |
 | `crev fix [file]` | Auto-fix review issues using AI agents |
+| `crev triage [file]` | Run triage on an existing review |
 | `crev diff` | Preview diff that would be reviewed |
 | `crev schema show <name>` | Display schema details |
 | `crev schema validate` | Validate schemas |

@@ -32,6 +32,9 @@ Multi-AI code review CLI. Runs multiple AI reviewers in parallel against a diff,
 | Show config layers          | `crev config --layers`                                   |
 | Review stats (latest)       | `crev stats --schema <name>`                             |
 | Review stats (all versions) | `crev stats --schema <name> --history`                   |
+| Triage an existing review   | `crev triage`                                            |
+| Triage a specific review    | `crev triage .crev/reviews/<slug>.json`                  |
+| Triage with model override  | `crev triage --model claude/opus`                        |
 | Fix actionable issues       | `crev fix`                                               |
 | Fix a single issue          | `crev fix --issue <issue-id>`                             |
 | Fix with model override     | `crev fix --model claude/opus`                           |
@@ -171,6 +174,29 @@ Run `crev doctor` to check if fix is configured.
 In the dashboard, use `[f]` on the run detail view to fix all actionable issues,
 or `[f]` on an individual issue detail view to fix just that issue. Fixes run in
 the background — you can navigate to other issues while a fix is in progress.
+
+### Triaging an Existing Review
+
+Run triage as a standalone pass on a review that was generated without triage,
+or re-run triage with different settings:
+
+```bash
+# Triage the latest review
+crev triage
+
+# Triage a specific review
+crev triage .crev/reviews/<slug>.json
+
+# Override the triage model
+crev triage --model claude/opus
+
+# JSON output
+crev triage --json
+```
+
+This re-generates the diff from the review's stored metadata and runs the triage
+agent against all issues. Verdicts, enrichments, and summary counts are updated
+in place. In the dashboard, use `[t]` on the run detail view to trigger triage.
 
 ### Overriding Models at Runtime
 
