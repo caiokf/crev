@@ -84,6 +84,6 @@ reviewers:
 triage:
   enabled: true
   runtime: claude
-  model: opus
+  model: sonnet
   deduplicate: true
   recategorize: true

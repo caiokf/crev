@@ -34,3 +34,7 @@ triage:
   enabled: false
   runtime: claude
   model: opus
+
+fix:
+  runtime: claude
+  model: sonnet
