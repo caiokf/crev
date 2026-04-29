@@ -3,6 +3,7 @@ import type { Widgets } from "blessed"
 import fs from "node:fs"
 import path from "node:path"
 import { showSchemaAction, type SchemaDetail } from "../../actions/schema.js"
+import { statsAction, type RevisionGroup, type ReviewerStats } from "../../actions/stats.js"
 import { resolveAgentPath } from "../../core/agent-path.js"
 import { runDashEffect } from "../runtime.js"
 import { BOX_STYLE, DASH_COLORS, LIST_STYLE, escapeTags } from "../theme.js"
@@ -59,7 +60,7 @@ export function createSchemaDetailView(name: string): DashView {
         width: "40%",
         height: 1,
         tags: true,
-        padding: { left: 1, right: 1, top: 0, bottom: 0 },
+        padding: { left: 1, right: 1, top: 1, bottom: 0 },
         content: "loading…",
       })
 
@@ -99,7 +100,12 @@ export function createSchemaDetailView(name: string): DashView {
       })
 
       reviewerList.focus()
-      ctx.setStatus("[↑/↓] or [j/k] move · [bksp] back · [q] quit")
+      ctx.setStatus("[↑/↓] or [j/k] move · [n] new review · [bksp] back · [q] quit")
+
+      reviewerList.key("n", () => {
+        ctx.router.navigate({ kind: "run-wizard", schema: name })
+      })
+
       ctx.screen.render()
 
       const refreshPrompt = (index: number): void => {
@@ -120,6 +126,16 @@ export function createSchemaDetailView(name: string): DashView {
         refreshPrompt(index)
       })
 
+      const updateMeta = (statsRevision?: RevisionGroup | null): void => {
+        if (!metaBox || !reviewerList || !detail) return
+        const metaContent = renderSchemaMeta(detail, ctx.crevDir, statsRevision)
+        const metaHeight = metaContent.split("\n").length
+        metaBox.height = metaHeight + 2
+        metaBox.setContent(metaContent)
+        reviewerList.top = metaHeight + 2
+        ctx.screen.render()
+      }
+
       void runDashEffect(showSchemaAction(name)).then((result) => {
         if (!metaBox || !reviewerList || !promptBox) return
         if (result.kind === "error") {
@@ -133,14 +149,7 @@ export function createSchemaDetailView(name: string): DashView {
         }
 
         detail = result.value
-        const metaContent = renderSchemaMeta(detail, ctx.crevDir)
-        const metaHeight = metaContent.split("\n").length
-        // Pad the meta box with a trailing blank line so the reviewer
-        // list below gets a breathing gap instead of butting straight
-        // up against the last line of metadata.
-        metaBox.height = metaHeight + 1
-        metaBox.setContent(metaContent)
-        reviewerList.top = metaHeight + 1
+        updateMeta()
 
         if (detail.reviewers.length === 0) {
           reviewerList.setItems(["  {gray-fg}(no reviewers){/gray-fg}"])
@@ -154,6 +163,14 @@ export function createSchemaDetailView(name: string): DashView {
           refreshPrompt(0)
         }
         ctx.screen.render()
+
+        // Load stats in background — non-blocking, appends to meta when ready
+        void runDashEffect(statsAction({ schema: name })).then((statsResult) => {
+          if (statsResult.kind !== "ok" || !detail) return
+          const schemaStats = statsResult.value.bySchema[name]
+          const latest = schemaStats?.revisions[schemaStats.revisions.length - 1]
+          updateMeta(latest ?? null)
+        })
       })
     },
     unmount() {
@@ -172,11 +189,15 @@ export function createSchemaDetailView(name: string): DashView {
 }
 
 /**
- * Left-pane header text: schema identity + triage summary. Kept
- * intentionally compact so the reviewer list below gets the bulk of
- * the vertical space.
+ * Left-pane header text: schema identity + triage summary + optional
+ * stats from the latest revision. Kept intentionally compact so the
+ * reviewer list below gets the bulk of the vertical space.
  */
-export function renderSchemaMeta(detail: SchemaDetail, crevDir: string): string {
+export function renderSchemaMeta(
+  detail: SchemaDetail,
+  crevDir: string,
+  stats?: RevisionGroup | null,
+): string {
   const lines: string[] = []
   const relPath = path.relative(crevDir, detail.path) || detail.path
 
@@ -199,7 +220,70 @@ export function renderSchemaMeta(detail: SchemaDetail, crevDir: string): string 
     }
   }
 
+  if (stats !== undefined) {
+    lines.push("")
+    if (stats) {
+      lines.push(renderStats(stats))
+    } else {
+      lines.push(`{bold}stats{/bold} {gray-fg}no runs yet{/gray-fg}`)
+    }
+    lines.push("")
+  }
+
   return lines.join("\n")
+}
+
+export function renderStats(rev: RevisionGroup): string {
+  const lines: string[] = []
+  const dateRange = formatDateRange(rev.firstDate, rev.lastDate)
+  lines.push(
+    `{bold}stats{/bold} {gray-fg}${rev.runs} run${rev.runs !== 1 ? "s" : ""} · ${dateRange}{/gray-fg}`,
+  )
+
+  if (rev.reviewerStats.length > 0) {
+    const nameW = Math.max(6, ...rev.reviewerStats.map((s) => s.reviewer.length))
+
+    for (const s of rev.reviewerStats) {
+      const name = escapeTags(s.reviewer.padEnd(nameW))
+      if (rev.hasTriage) {
+        const triaged = s.actionable + s.deferred + s.dismissed
+        const actPct = triaged > 0 ? `${Math.round((s.actionable / triaged) * 100)}%` : "—"
+        const disPct = triaged > 0 ? `${Math.round((s.dismissed / triaged) * 100)}%` : "—"
+        const avgTime = `${(s.avgDurationMs / 1000).toFixed(0)}s`
+        lines.push(
+          `  {${DASH_COLORS.accent}-fg}${name}{/${DASH_COLORS.accent}-fg} ` +
+            `{gray-fg}${String(s.totalIssues).padStart(3)} issues{/gray-fg}  ` +
+            `{${DASH_COLORS.ok}-fg}${actPct.padStart(3)} act{/${DASH_COLORS.ok}-fg}  ` +
+            `{gray-fg}${disPct.padStart(3)} dis{/gray-fg}  ` +
+            `{gray-fg}${avgTime}{/gray-fg}`,
+        )
+      } else {
+        const avgIssues = (s.totalIssues / s.runs).toFixed(1)
+        const avgTime = `${(s.avgDurationMs / 1000).toFixed(0)}s`
+        lines.push(
+          `  {${DASH_COLORS.accent}-fg}${name}{/${DASH_COLORS.accent}-fg} ` +
+            `{gray-fg}${String(s.totalIssues).padStart(3)} issues  ${avgIssues}/run  ${avgTime}{/gray-fg}`,
+        )
+      }
+    }
+  }
+
+  return lines.join("\n")
+}
+
+function formatDateRange(first: string, last: string): string {
+  const f = formatShortDate(first)
+  const l = formatShortDate(last)
+  return f === l ? f : `${f} → ${l}`
+}
+
+function formatShortDate(iso: string): string {
+  const d = new Date(iso)
+  const months = [
+    "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  ]
+  return `${months[d.getMonth()]} ${d.getDate()}`
 }
 
 export function formatReviewerRow(reviewer: Reviewer): string {

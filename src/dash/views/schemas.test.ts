@@ -8,8 +8,10 @@ import {
   loadReviewerPrompt,
   renderReviewerPrompt,
   renderSchemaMeta,
+  renderStats,
 } from "./schema-detail.js"
 import type { SchemaDetail } from "../../actions/schema.js"
+import type { RevisionGroup } from "../../actions/stats.js"
 
 describe("schemas list · formatRow", () => {
   it("shows name, reviewer count, and description", () => {
@@ -65,6 +67,112 @@ describe("schema detail · renderSchemaMeta", () => {
   it("omits triage when not configured", () => {
     const out = renderSchemaMeta(detail, "/repo/.crev")
     expect(out).not.toContain("triage")
+  })
+})
+
+describe("schema detail · renderStats", () => {
+  const makeRev = (overrides: Partial<RevisionGroup> = {}): RevisionGroup => ({
+    schemaHash: "abc123",
+    runs: 3,
+    firstDate: "2026-04-10T10:00:00Z",
+    lastDate: "2026-04-20T10:00:00Z",
+    reviewerStats: [],
+    recurringDismissed: [],
+    hasTriage: true,
+    ...overrides,
+  })
+
+  const makeReviewerStat = (overrides: Partial<import("../../actions/stats.js").ReviewerStats> = {}): import("../../actions/stats.js").ReviewerStats => ({
+    reviewer: "Engineer",
+    runtime: "claude",
+    model: "sonnet",
+    runs: 3,
+    totalIssues: 12,
+    avgDurationMs: 45000,
+    actionable: 4,
+    deferred: 3,
+    dismissed: 5,
+    untriaged: 0,
+    byCategory: { bug: 6, style: 6 },
+    bySeverity: { medium: 8, low: 4 },
+    ...overrides,
+  })
+
+  it("shows run count and date range", () => {
+    const out = renderStats(makeRev())
+    expect(out).toContain("stats")
+    expect(out).toContain("3 runs")
+    expect(out).toContain("Apr 10")
+    expect(out).toContain("Apr 20")
+  })
+
+  it("singularises 1 run", () => {
+    const out = renderStats(makeRev({ runs: 1, firstDate: "2026-04-10T10:00:00Z", lastDate: "2026-04-10T10:00:00Z" }))
+    expect(out).toContain("1 run")
+    expect(out).not.toContain("1 runs")
+  })
+
+  it("shows same date when first and last match", () => {
+    const out = renderStats(makeRev({ firstDate: "2026-04-10T10:00:00Z", lastDate: "2026-04-10T10:00:00Z" }))
+    expect(out).toContain("Apr 10")
+    expect(out).not.toContain("→")
+  })
+
+  it("renders reviewer stats with triage percentages", () => {
+    const out = renderStats(makeRev({ reviewerStats: [makeReviewerStat()] }))
+    expect(out).toContain("Engineer")
+    expect(out).toContain("12 issues")
+    expect(out).toContain("33% act")
+    expect(out).toContain("42% dis")
+    expect(out).toContain("45s")
+  })
+
+  it("renders reviewer stats without triage when hasTriage is false", () => {
+    const stat = makeReviewerStat({ runs: 2, totalIssues: 10, avgDurationMs: 30000 })
+    const out = renderStats(makeRev({ hasTriage: false, reviewerStats: [stat] }))
+    expect(out).toContain("Engineer")
+    expect(out).toContain("10 issues")
+    expect(out).toContain("5.0/run")
+    expect(out).toContain("30s")
+    expect(out).not.toContain("act")
+    expect(out).not.toContain("dis")
+  })
+})
+
+describe("schema detail · renderSchemaMeta with stats", () => {
+  const detail: SchemaDetail = {
+    name: "quick",
+    path: "/repo/.crev/schemas/quick.yaml",
+    description: "fast check",
+    reviewers: [
+      { name: "Engineer", runtime: "claude", model: "sonnet", prompt: "review" },
+    ],
+  }
+
+  it("appends stats section when revision is provided", () => {
+    const rev: RevisionGroup = {
+      schemaHash: "abc",
+      runs: 2,
+      firstDate: "2026-04-15T10:00:00Z",
+      lastDate: "2026-04-15T10:00:00Z",
+      reviewerStats: [],
+      recurringDismissed: [],
+      hasTriage: false,
+    }
+    const out = renderSchemaMeta(detail, "/repo/.crev", rev)
+    expect(out).toContain("stats")
+    expect(out).toContain("2 runs")
+  })
+
+  it("does not show stats section before stats are loaded", () => {
+    const out = renderSchemaMeta(detail, "/repo/.crev")
+    expect(out).not.toContain("stats")
+  })
+
+  it("shows 'no runs yet' when stats loaded but no reviews exist", () => {
+    const out = renderSchemaMeta(detail, "/repo/.crev", null)
+    expect(out).toContain("stats")
+    expect(out).toContain("no runs yet")
   })
 })
 
