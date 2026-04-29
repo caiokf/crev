@@ -308,7 +308,7 @@ export async function validateAgentRefs(
         issues.push({
           severity: "error",
           reviewer: reviewer.name,
-          message: err instanceof Error ? err.message : String(err),
+          message: errorMessage(err),
         })
         continue
       }

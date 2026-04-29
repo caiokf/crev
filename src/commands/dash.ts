@@ -1,7 +1,7 @@
 import path from "node:path"
 import type { Command } from "commander"
 import chalk from "chalk"
-import { exitWithError } from "../util/cli-errors.js"
+import { exitWithError, errorMessage } from "../util/cli-errors.js"
 import type { DashRoute } from "../dash/types.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
@@ -63,7 +63,7 @@ export function registerDashCommand(program: Command): void {
       try {
         initialRoute = buildInitialStack(file, opts)
       } catch (err) {
-        exitWithError(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`))
+        exitWithError(chalk.red(`Error: ${errorMessage(err)}`))
         return
       }
       try {
@@ -73,7 +73,7 @@ export function registerDashCommand(program: Command): void {
         const { runDash } = await import("../dash/index.js")
         await runDash({ initialRoute })
       } catch (err) {
-        exitWithError(chalk.red(`Error: ${err instanceof Error ? err.message : String(err)}`))
+        exitWithError(chalk.red(`Error: ${errorMessage(err)}`))
       }
     })
 }

@@ -2,6 +2,7 @@ import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
 import fs from "node:fs"
 import path from "node:path"
+import { errorMessage } from "../../util/cli-errors.js"
 import type { RuntimeHealth } from "@caiokf/valet"
 import { doctorAction, type DoctorSnapshot, type SkillCheck } from "../../actions/doctor.js"
 import { sanitizeDetail, sanitizeVersion } from "../../util/sanitize.js"
@@ -95,7 +96,7 @@ export function createDoctorView(): DashView {
           }
           ctx.setStatus(`{${DASH_COLORS.ok}-fg}✓ ${result}{/${DASH_COLORS.ok}-fg}`)
         } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err)
+          const msg = errorMessage(err)
           ctx.setStatus(`{${DASH_COLORS.danger}-fg}fix failed: ${msg}{/${DASH_COLORS.danger}-fg}`)
         }
         ctx.screen.render()

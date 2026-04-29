@@ -4,7 +4,7 @@ import path from "node:path"
 import { Effect } from "effect"
 import { fixAction } from "../actions/fix.js"
 import { CliLive } from "../layers.js"
-import { exitWithError } from "../util/cli-errors.js"
+import { exitWithError, errorMessage } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 type FixOptions = {
@@ -64,7 +64,7 @@ export function registerFixCommand(program: Command): void {
       ).catch((err) => {
         exitWithError(
           chalk.red(
-            `Fix failed: ${err instanceof Error ? err.message : String(err)}`,
+            `Fix failed: ${errorMessage(err)}`,
           ),
         )
       })

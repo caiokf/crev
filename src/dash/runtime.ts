@@ -1,5 +1,6 @@
 import { Effect } from "effect"
 import { TuiLive } from "../layers.js"
+import { errorMessage } from "../util/cli-errors.js"
 import type { CrevConfig } from "../services/CrevConfig.js"
 import type { SchemaStore } from "../services/SchemaStore.js"
 import type { ReviewStore } from "../services/ReviewStore.js"
@@ -28,7 +29,7 @@ export async function runDashEffect<A, E>(
   } catch (err) {
     return {
       kind: "error",
-      message: err instanceof Error ? err.message : String(err),
+      message: errorMessage(err),
     }
   }
 }

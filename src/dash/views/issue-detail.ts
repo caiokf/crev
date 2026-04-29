@@ -1,5 +1,6 @@
 import blessed from "../blessed-widgets-shim.js"
 import type { Widgets } from "blessed"
+import { errorMessage } from "../../util/cli-errors.js"
 import { showAction } from "../../actions/show.js"
 import { setVerdictAction } from "../../actions/verdict.js"
 import { fixAction } from "../../actions/fix.js"
@@ -116,7 +117,7 @@ export function createIssueDetailView(filePath: string, issueId: string): DashVi
             ctx.screen.render()
           })
           .catch((err: unknown) => {
-            const msg = err instanceof Error ? err.message : String(err)
+            const msg = errorMessage(err)
             ctx.setStatus(`{${DASH_COLORS.danger}-fg}copy failed: ${msg}{/${DASH_COLORS.danger}-fg}`)
             ctx.screen.render()
           })
