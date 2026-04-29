@@ -6,6 +6,7 @@ import { listReviewsAction, showAction } from "./show.js"
 import { makeTestCrevConfig } from "../services/CrevConfig.js"
 import { makeTestReviewStore } from "../services/ReviewStore.js"
 import type { ReviewResult } from "../core/types.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 const fixture = (slug: string, timestamp: string): ReviewResult => ({
   metadata: { slug, timestamp, schema: "quick", diffType: "all" },
@@ -58,7 +59,7 @@ describe("showAction", () => {
       const exit = yield* Effect.exit(showAction({}))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("ReviewNotFoundError")
       }
     }).pipe(Effect.provide(Layer.mergeAll(cfg, store)))

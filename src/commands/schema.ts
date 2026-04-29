@@ -7,7 +7,7 @@ import { findCrevDir } from "../core/config.js"
 import { showSchemaAction, validateSchemaAction } from "../actions/schema.js"
 import { CliLive } from "../layers.js"
 import { getSchemasDir } from "../util/paths.js"
-import { exitWithCode, exitWithError } from "../util/cli-errors.js"
+import { exitWithCode, exitWithError, extractFailError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 const TEMPLATE = `description: ""
@@ -57,7 +57,7 @@ export function registerSchemaCommand(program: Command): void {
       )
 
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        const err = extractFailError(exit)
         if (err?._tag === "SchemaNotFoundError") {
           exitWithError(chalk.red(`Error: Schema "${schemaName}" not found`))
         }

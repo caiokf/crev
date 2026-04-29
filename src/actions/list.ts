@@ -3,6 +3,7 @@ import { getAllRuntimes } from "@caiokf/valet"
 import { CrevConfig } from "../services/CrevConfig.js"
 import { SchemaStore } from "../services/SchemaStore.js"
 import type { ConfigParseError, SchemaInvalidError } from "../errors.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 export type SchemaSummary = {
   readonly name: string
@@ -55,7 +56,7 @@ export const listSchemasAction: Effect.Effect<
         name,
         description: "error loading",
         reviewers: 0,
-        error: schemaInvalidReason(exit.cause._tag === "Fail" ? exit.cause.error : undefined),
+        error: schemaInvalidReason(extractFailError(exit)),
       })
     }
   }

@@ -2,6 +2,7 @@ import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Exit } from "effect"
 import { Git, makeTestGit } from "./Git.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 describe("Git test layer", () => {
   it.effect("diffBranch routes 'all' to `git diff <base>`", () => {
@@ -77,7 +78,7 @@ describe("Git test layer", () => {
       const exit = yield* Effect.exit(git.verifyHead())
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("GitError")
       }
     }).pipe(Effect.provide(layer))

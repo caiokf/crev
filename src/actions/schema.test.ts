@@ -8,6 +8,7 @@ import { makeTestCrevConfig } from "../services/CrevConfig.js"
 import { makeTestSchemaStore } from "../services/SchemaStore.js"
 import { withTempDir } from "../services/test-helpers.js"
 import type { SchemaFileType } from "../core/schema.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 const fixtureSchema = (): SchemaFileType => ({
   description: "Quick checks",
@@ -44,7 +45,7 @@ describe("showSchemaAction", () => {
       const exit = yield* Effect.exit(showSchemaAction("missing"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("SchemaNotFoundError")
       }
     }).pipe(Effect.provide(Layer.mergeAll(cfg, store)))

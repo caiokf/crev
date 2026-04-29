@@ -14,6 +14,7 @@ vi.mock("../core/diff.js", () => ({
 
 import { diffAction } from "./diff.js"
 import { makeTestCrevConfig } from "../services/CrevConfig.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 describe("diffAction", () => {
   it.effect("resolves a diff and returns it with a cleanup callback", () => {
@@ -56,7 +57,7 @@ describe("diffAction", () => {
       )
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("DiffResolutionError")
       }
     }).pipe(Effect.provide(layer))

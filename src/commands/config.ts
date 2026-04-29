@@ -5,7 +5,7 @@ import { Effect, Exit } from "effect"
 import { listConfigLayersAction, showConfigAction } from "../actions/config.js"
 import type { ConfigLayerInfo } from "../actions/config.js"
 import { CliLive } from "../layers.js"
-import { errorMessage, exitWithError } from "../util/cli-errors.js"
+import { errorMessage, exitWithError, extractFailError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 type ConfigOptions = {
@@ -33,7 +33,7 @@ export function registerConfigCommand(program: Command): void {
       )
 
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        const err = extractFailError(exit)
         const reason =
           err?._tag === "ConfigParseError"
             ? errorMessage(err.cause)

@@ -2,6 +2,7 @@ import { describe, expect } from "vitest"
 import { it } from "@effect/vitest"
 import { Effect, Exit } from "effect"
 import { makeTestRuntimeExec, RuntimeExec } from "./RuntimeExec.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 describe("RuntimeExec test layer", () => {
   it.effect("runs the handler and returns its RawExecutionOutput", () => {
@@ -47,7 +48,7 @@ describe("RuntimeExec test layer", () => {
       )
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("RuntimeExecError")
       }
     }).pipe(Effect.provide(layer))
@@ -61,7 +62,7 @@ describe("RuntimeExec test layer", () => {
       const exit = yield* Effect.exit(svc.getAdapter("nope"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("RuntimeNotFoundError")
       }
     }).pipe(Effect.provide(layer))

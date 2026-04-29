@@ -9,6 +9,7 @@ import {
   SchemaStoreLive,
   makeTestSchemaStore,
 } from "./SchemaStore.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 const fixtureSchema = (name: string) => `
 description: test schema ${name}
@@ -60,7 +61,7 @@ describe("SchemaStore service — test layer", () => {
       const exit = yield* Effect.exit(store.resolveOrFail("missing", "/test/.crev"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("SchemaNotFoundError")
       }
     }).pipe(Effect.provide(layer))
@@ -127,7 +128,7 @@ describe("SchemaStore service — Live layer", () => {
         const exit = yield* Effect.exit(store.load(bad))
         expect(Exit.isFailure(exit)).toBe(true)
         if (Exit.isFailure(exit)) {
-          const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+          const err = extractFailError(exit)
           expect(err?._tag).toBe("SchemaInvalidError")
         }
       }).pipe(Effect.provide(SchemaStoreLive)),

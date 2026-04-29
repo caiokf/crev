@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest"
 import { setVerdictAction } from "./verdict.js"
 import { makeTestReviewStore } from "../services/ReviewStore.js"
 import type { ReviewIssue, ReviewResult } from "../core/types.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 function makeIssue(overrides: Partial<ReviewIssue> = {}): ReviewIssue {
   return {
@@ -117,7 +118,7 @@ describe("setVerdictAction", () => {
 
     expect(Exit.isFailure(exit)).toBe(true)
     if (Exit.isFailure(exit)) {
-      const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+      const err = extractFailError(exit)
       expect(err?._tag).toBe("IssueNotFoundError")
     }
   })

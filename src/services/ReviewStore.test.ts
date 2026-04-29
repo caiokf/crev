@@ -11,6 +11,7 @@ import {
   makeTestReviewStore,
 } from "./ReviewStore.js"
 import type { ReviewResult } from "../core/types.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 const fixtureReview = (slug: string, timestamp: string): ReviewResult => ({
   metadata: {
@@ -77,7 +78,7 @@ describe("ReviewStore service — test layer", () => {
       const exit = yield* Effect.exit(store.latest("/out"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("ReviewNotFoundError")
       }
     }).pipe(Effect.provide(layer))

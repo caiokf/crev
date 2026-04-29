@@ -6,7 +6,7 @@ import { showAction } from "../actions/show.js"
 import type { ReviewResult } from "../core/types.js"
 import { CliLive } from "../layers.js"
 import { SEVERITY_COLORS } from "../tui/theme.js"
-import { exitWithError } from "../util/cli-errors.js"
+import { exitWithError, extractFailError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 type ShowOptions = {
@@ -24,7 +24,7 @@ export function registerShowCommand(program: Command): void {
       )
 
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        const err = extractFailError(exit)
         if (err?._tag === "ReviewNotFoundError") {
           exitWithError(
             chalk.red("No review files found. Run a review first with: crev run --schema <name>"),

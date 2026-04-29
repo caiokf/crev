@@ -4,7 +4,7 @@ import { Effect, Exit } from "effect"
 import { diffAction } from "../actions/diff.js"
 import { RawDiffFlags } from "../core/types.js"
 import { CliLive } from "../layers.js"
-import { exitWithError } from "../util/cli-errors.js"
+import { exitWithError, extractFailError } from "../util/cli-errors.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
 
 type DiffOptions = {
@@ -38,7 +38,7 @@ export function registerDiffCommand(program: Command): void {
       )
 
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : undefined
+        const err = extractFailError(exit)
         if (err?._tag === "DiffResolutionError") {
           exitWithError(chalk.red(`Error: failed to generate diff: ${err.reason}`))
         }

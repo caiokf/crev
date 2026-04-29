@@ -63,6 +63,7 @@ import { runAction } from "./run.js"
 import { makeTestCrevConfig } from "../services/CrevConfig.js"
 import { UserCancelledError as InternalUserCancelledError } from "../core/types.js"
 import type { RunCommand } from "../core/types.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 const baseCommand: RunCommand = {
   schema: "quick",
@@ -148,7 +149,7 @@ describe("runAction", () => {
       const exit = yield* Effect.exit(runAction({ command: baseCommand }))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("SchemaNotFoundError")
       }
     }).pipe(Effect.provide(layer))
@@ -197,7 +198,7 @@ describe("runAction", () => {
       const exit = yield* Effect.exit(runAction({ command: baseCommand }))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("RunCancelledError")
       }
     }).pipe(Effect.provide(layer))
@@ -219,7 +220,7 @@ describe("runAction", () => {
       )
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("RunValidationError")
       }
     }).pipe(Effect.provide(layer))

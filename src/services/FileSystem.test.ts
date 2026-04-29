@@ -4,6 +4,7 @@ import { Effect, Exit } from "effect"
 import path from "node:path"
 import { FileSystem, FileSystemLive, makeTestFileSystem } from "./FileSystem.js"
 import { FileNotFoundError, FileReadError } from "../errors.js"
+import { extractFailError } from "../util/cli-errors.js"
 
 describe("FileSystem service — in-memory test layer", () => {
   it.effect("readFile returns seeded contents", () => {
@@ -23,7 +24,7 @@ describe("FileSystem service — in-memory test layer", () => {
       const exit = yield* Effect.exit(fs.readFile("/missing"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("FileNotFoundError")
       }
     }).pipe(Effect.provide(makeTestFileSystem({}).layer)),
@@ -93,7 +94,7 @@ describe("FileSystem service — Live layer", () => {
       const exit = yield* Effect.exit(fs.readFile("/definitely/does/not/exist.xyz"))
       expect(Exit.isFailure(exit)).toBe(true)
       if (Exit.isFailure(exit)) {
-        const err = exit.cause._tag === "Fail" ? exit.cause.error : null
+        const err = extractFailError(exit)
         expect(err?._tag).toBe("FileNotFoundError")
       }
     }).pipe(Effect.provide(FileSystemLive)),
