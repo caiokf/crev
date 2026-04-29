@@ -13,7 +13,7 @@ describe("wizard · DIFF_CHOICES", () => {
   })
 
   it("exposes a full-repo analysis choice", () => {
-    const choice = DIFF_CHOICES.find((c) => c.label.includes("analyze"))
+    const choice = DIFF_CHOICES.find((c) => c.label.includes("Full repo"))
     expect(choice).toBeDefined()
     expect(choice!.build("main").analyze).toBe(true)
   })

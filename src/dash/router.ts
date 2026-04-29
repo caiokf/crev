@@ -72,7 +72,7 @@ export const defaultResolver: ViewResolver = (route) => {
     case "issue-detail":
       return createIssueDetailView(route.filePath, route.issueId)
     case "run-wizard":
-      return createRunWizardView()
+      return createRunWizardView(route.schema)
     case "doctor":
       return createDoctorView()
   }

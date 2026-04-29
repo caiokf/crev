@@ -67,29 +67,34 @@ const SPINNER_FRAMES = ["⣾", "⣽", "⣻", "⢿", "⡿", "⣟", "⣯", "⣷"] 
 
 type DiffChoice = {
   readonly label: string
+  readonly hint: string
   readonly build: (defaultBase: string) => { diff: DiffSource; analyze: boolean }
 }
 
 export const DIFF_CHOICES: ReadonlyArray<DiffChoice> = [
   {
     label: "Uncommitted changes",
+    hint: "",
     build: () => ({ diff: { kind: "local", type: "uncommitted" }, analyze: false }),
   },
   {
-    label: "All local changes (committed + uncommitted)",
+    label: "All local changes",
+    hint: "committed + uncommitted",
     build: () => ({ diff: { kind: "local", type: "all" }, analyze: false }),
   },
   {
-    label: "Branch vs base (from config defaults.base)",
+    label: "Branch vs base",
+    hint: "from config defaults.base",
     build: (base) => ({ diff: { kind: "branch", base, type: "all" }, analyze: false }),
   },
   {
-    label: "Full repo analysis (--analyze, no diff)",
+    label: "Full repo analysis",
+    hint: "--analyze, no diff",
     build: () => ({ diff: { kind: "local", type: "all" }, analyze: true }),
   },
 ]
 
-export function createRunWizardView(): DashView {
+export function createRunWizardView(preselectedSchema?: string): DashView {
   let phase: WizardPhase = { kind: "loading" }
   let root: Widgets.BoxElement | null = null
   let tickTimer: NodeJS.Timeout | null = null
@@ -101,7 +106,7 @@ export function createRunWizardView(): DashView {
   }
 
   return {
-    route: { kind: "run-wizard" },
+    route: { kind: "run-wizard", schema: preselectedSchema },
     mount(ctx: AppContext) {
       root = blessed.box({
         parent: ctx.body,
@@ -176,7 +181,11 @@ export function createRunWizardView(): DashView {
               mouse: true,
               tags: true,
               style: LIST_STYLE,
-              items: DIFF_CHOICES.map((c) => `  ${c.label}`),
+              items: DIFF_CHOICES.map((c) =>
+                c.hint
+                  ? `  ${c.label}  {gray-fg}(${c.hint}){/gray-fg}`
+                  : `  ${c.label}`,
+              ),
             })
             list.focus()
             ctx.setStatus("[↑/↓] or [j/k] move · [enter] start · [bksp] back · [q] quit")
@@ -289,16 +298,21 @@ export function createRunWizardView(): DashView {
         })
       }
 
-      // ── Kick off: load schema list ──
+      // ── Kick off: load schema list (or skip to diff picker) ──
       render()
-      void runDashEffect(listSchemasAction).then((result) => {
-        if (result.kind === "error") {
-          phase = { kind: "error", message: result.message }
-        } else {
-          phase = { kind: "pick-schema", schemas: result.value }
-        }
+      if (preselectedSchema) {
+        phase = { kind: "pick-diff", schema: preselectedSchema }
         render()
-      })
+      } else {
+        void runDashEffect(listSchemasAction).then((result) => {
+          if (result.kind === "error") {
+            phase = { kind: "error", message: result.message }
+          } else {
+            phase = { kind: "pick-schema", schemas: result.value }
+          }
+          render()
+        })
+      }
     },
     unmount() {
       if (tickTimer) {
