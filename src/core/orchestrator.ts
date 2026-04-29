@@ -83,10 +83,10 @@ export async function orchestrate(opts: OrchestrateOptions): Promise<ReviewResul
     reviewerCount: reviewers.length,
   })
 
-  const { reviews, spinner } = await executeReviewers(reviewers, opts, outputFormat)
+  const { reviews, spinner, signal } = await executeReviewers(reviewers, opts, outputFormat)
 
   try {
-    await runTriagePass(reviews, opts, spinner)
+    await runTriagePass(reviews, opts, spinner, signal)
 
     spinner?.stop()
 
@@ -178,6 +178,7 @@ export function buildPromptOnlyResult(opts: OrchestrateOptions): PromptOnlyResul
 type ReviewersResult = {
   reviews: NormalizedReview[]
   spinner: MultiSpinnerHandle | null
+  signal?: AbortSignal
 }
 
 async function executeReviewers(
@@ -358,7 +359,10 @@ async function executeReviewersWithTui(
     }
   }
 
-  return { reviews: results, spinner: action ? null : spinner }
+  // Only forward the signal if it hasn't already been aborted by a "finalize"
+  // action — an aborted signal would immediately cancel the triage LLM call.
+  const triageSignal = abort.signal.aborted ? undefined : abort.signal
+  return { reviews: results, spinner: action ? null : spinner, signal: triageSignal }
 }
 
 // ── Triage pass ──
@@ -367,6 +371,7 @@ async function runTriagePass(
   reviews: NormalizedReview[],
   opts: OrchestrateOptions,
   spinner: MultiSpinnerHandle | null,
+  signal?: AbortSignal,
 ): Promise<void> {
   const schemaTriage = opts.schema.triage
   const enabled = schemaTriage?.enabled ?? opts.config.triage.enabled
@@ -414,6 +419,7 @@ async function runTriagePass(
     diffContent: opts.diff.diffContent,
     diffType: opts.analyze ? "analyze" : opts.diff.type,
     config: effectiveConfig,
+    signal,
   })
 
   const triagedMap = new Map(result.triaged.map((t) => [t.id, t]))
