@@ -2,7 +2,7 @@ import { Effect, Exit, Layer } from "effect"
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { triageAction } from "./triage.js"
 import { makeTestReviewStore } from "../services/ReviewStore.js"
-import { makeTestSchemaStore } from "../services/SchemaStore.js"
+import { makeTestSchemaStore, SchemaStore } from "../services/SchemaStore.js"
 import { makeTestCrevConfig } from "../services/CrevConfig.js"
 import type { ReviewIssue, ReviewResult } from "../core/types.js"
 
@@ -269,6 +269,124 @@ describe("triageAction", () => {
         }),
       }),
     )
+  })
+
+  it("returns no error when triage succeeds", async () => {
+    const issue = makeIssue({ id: "i-1" })
+    const review = makeReview([issue])
+    const { layer: storeLayer } = makeTestReviewStore({ "/repo/review.json": review })
+    const { layer: schemaLayer } = makeTestSchemaStore({})
+    const { layer: cfgLayer } = makeTestCrevConfig(baseCfg)
+    schemaMocks.resolveSchemaPath.mockReturnValue(null)
+
+    diffMocks.resolveDiff.mockResolvedValue({
+      diffContent: "diff --git a/foo b/foo",
+      diffFile: "/tmp/diff",
+      type: "all",
+    })
+
+    triageMocks.runTriage.mockResolvedValue({
+      triaged: [
+        { ...issue, triage: { verdict: "actionable", reasoning: "Real bug" } },
+      ],
+      durationMs: 500,
+      summary: { actionable: 1, deferred: 0, dismissed: 0 },
+    })
+
+    const exit = await Effect.runPromiseExit(
+      triageAction({ filePath: "/repo/review.json" }).pipe(
+        Effect.provide(Layer.mergeAll(storeLayer, schemaLayer, cfgLayer)),
+      ),
+    )
+
+    expect(Exit.isSuccess(exit)).toBe(true)
+    if (!Exit.isSuccess(exit)) return
+    expect(exit.value.error).toBeUndefined()
+  })
+
+  it("returns error from triage result when present", async () => {
+    const issue = makeIssue({ id: "i-1" })
+    const review = makeReview([issue])
+    const { layer: storeLayer } = makeTestReviewStore({ "/repo/review.json": review })
+    const { layer: schemaLayer } = makeTestSchemaStore({})
+    const { layer: cfgLayer } = makeTestCrevConfig(baseCfg)
+    schemaMocks.resolveSchemaPath.mockReturnValue(null)
+
+    diffMocks.resolveDiff.mockResolvedValue({
+      diffContent: "",
+      diffFile: "/tmp/diff",
+      type: "all",
+    })
+
+    triageMocks.runTriage.mockResolvedValue({
+      triaged: [issue],
+      durationMs: 100,
+      error: "claude/opus: parse failure",
+      summary: { actionable: 0, deferred: 0, dismissed: 0 },
+    })
+
+    const exit = await Effect.runPromiseExit(
+      triageAction({ filePath: "/repo/review.json" }).pipe(
+        Effect.provide(Layer.mergeAll(storeLayer, schemaLayer, cfgLayer)),
+      ),
+    )
+
+    expect(Exit.isSuccess(exit)).toBe(true)
+    if (!Exit.isSuccess(exit)) return
+    expect(exit.value.error).toBe("claude/opus: parse failure")
+  })
+
+  it("passes config.aliases to schemaStore.load", async () => {
+    const issue = makeIssue({ id: "i-1" })
+    const review = makeReview([issue])
+    const { layer: storeLayer } = makeTestReviewStore({ "/repo/review.json": review })
+    const { layer: cfgLayer } = makeTestCrevConfig({
+      crevDir: "/repo/.crev",
+      config: {
+        aliases: { opus: "claude-opus-4-6" },
+        triage: { runtime: "claude", model: "opus" },
+      },
+    })
+    schemaMocks.resolveSchemaPath.mockReturnValue("/repo/.crev/schemas/quick.yaml")
+
+    diffMocks.resolveDiff.mockResolvedValue({
+      diffContent: "",
+      diffFile: "/tmp/diff",
+      type: "all",
+    })
+
+    triageMocks.runTriage.mockResolvedValue({
+      triaged: [],
+      durationMs: 100,
+      summary: { actionable: 0, deferred: 0, dismissed: 0 },
+    })
+
+    // Create a custom SchemaStore that captures the aliases parameter
+    let capturedAliases: Record<string, string> | undefined
+    const loadFn = (_path: string, aliases?: Record<string, string>) => {
+      capturedAliases = aliases
+      return Effect.succeed({
+        reviewers: [{ name: "Engineer", runtime: "claude" as const, model: "sonnet" }],
+        triage: { enabled: true, runtime: "claude" as const, model: "opus" },
+      })
+    }
+    const schemaLayer = Layer.succeed(
+      SchemaStore,
+      SchemaStore.of({
+        listAll: () => Effect.succeed([]),
+        resolvePath: () => Effect.succeed(null),
+        resolveOrFail: () => Effect.succeed(""),
+        load: loadFn as any,
+      }),
+    )
+
+    await Effect.runPromiseExit(
+      triageAction({ filePath: "/repo/review.json" }).pipe(
+        Effect.provide(Layer.mergeAll(storeLayer, schemaLayer, cfgLayer)),
+      ),
+    )
+
+    expect(capturedAliases).toEqual({ opus: "claude-opus-4-6" })
   })
 
   it("applies schema-level triage overrides when no CLI override", async () => {
