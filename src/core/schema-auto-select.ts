@@ -3,6 +3,7 @@ import fs from "node:fs"
 import { promisify } from "node:util"
 import YAML from "yaml"
 import type { Config } from "./config.js"
+import { assertSafeRef } from "./diff.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
 import { listAllSchemas, resolveSchemaPath } from "./schema.js"
@@ -93,14 +94,17 @@ export async function getDiffStats(source: DiffSource): Promise<DiffStats> {
         // For PRs, use gh to get the diff and count with git
         return getDiffStatsFromPr(String(source.pr))
       case "commit":
+        assertSafeRef(source.baseCommit, "base commit")
         args = ["diff", "--shortstat", `${source.baseCommit}...HEAD`]
         break
       case "branch":
         if (source.type === "uncommitted") {
           args = ["diff", "--shortstat"]
         } else if (source.type === "committed") {
+          assertSafeRef(source.base, "base")
           args = ["diff", "--shortstat", `${source.base}...HEAD`]
         } else {
+          assertSafeRef(source.base, "base")
           args = ["diff", "--shortstat", source.base]
         }
         break

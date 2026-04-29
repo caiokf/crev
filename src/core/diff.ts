@@ -75,7 +75,7 @@ async function getPrDiff(pr: string): Promise<string> {
 // check-ref-format forbids refs starting with `-`, so rejecting them
 // here is a narrow, correct defense against flag injection from
 // user-supplied --base / --base-commit values.
-function assertSafeRef(ref: string, label: string): void {
+export function assertSafeRef(ref: string, label: string): void {
   if (ref.startsWith("-")) {
     throw new Error(`Invalid ${label} "${ref}": must not start with "-"`)
   }
