@@ -6,6 +6,7 @@ import { statsAction } from "../actions/stats.js"
 import type { ReviewerStats, RevisionGroup } from "../actions/stats.js"
 import { CliLive } from "../layers.js"
 import { exitWithError } from "../util/cli-errors.js"
+import { separator } from "../util/terminal.js"
 import { COMMAND_DESCRIPTIONS, COMMON_OPTION_DESCRIPTIONS } from "./metadata.js"
 
 // Re-exported so existing imports (e.g. stats.test.ts) keep working.
@@ -93,7 +94,7 @@ function printHistory(schema: string, revisions: RevisionGroup[]): void {
     )
 
     const cols = process.stdout.columns ?? 80
-    console.log(`  ${chalk.dim("─".repeat(Math.max(0, Math.min(60, cols - 4))))}`)
+    console.log(`  ${chalk.dim(separator(cols))}`)
 
     if (!rev.hasTriage) {
       console.log(`  ${chalk.dim("Note: no triage configured")}`)

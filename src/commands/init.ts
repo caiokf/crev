@@ -3,6 +3,7 @@ import type { Command } from "commander"
 import chalk from "chalk"
 import { Effect } from "effect"
 import { detectAITools, type AITool } from "../util/detect-tools.js"
+import { separator } from "../util/terminal.js"
 import { initAction, SCHEMA_TEMPLATES } from "../actions/init.js"
 import { Prompter, PrompterLive } from "../services/Prompter.js"
 import { COMMAND_DESCRIPTIONS } from "./metadata.js"
@@ -50,7 +51,7 @@ type Selections = { tools: AITool[]; schemaNames: string[] }
 
 async function resolveInteractive(projectRoot: string): Promise<Selections> {
   console.log(BANNER)
-  console.log(chalk.dim("─".repeat(Math.max(0, Math.min(60, (process.stdout.columns || 80) - 4)))))
+  console.log(chalk.dim(separator()))
   console.log()
 
   const tools = detectAITools(projectRoot)
@@ -159,7 +160,7 @@ function renderPostInit(output: {
   }
 
   console.log()
-  console.log(chalk.dim("─".repeat(Math.max(0, Math.min(60, (process.stdout.columns || 80) - 4)))))
+  console.log(chalk.dim(separator()))
   console.log()
   console.log(`  Run ${chalk.cyan("crev run --schema quick")} to start your first review.`)
   console.log()
