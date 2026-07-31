@@ -2,7 +2,7 @@ import fs from "node:fs"
 import os from "node:os"
 import path from "node:path"
 import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import { findCrevDir, getOutputDir, loadAgentPrompt, loadAnnotatedConfig, loadConfig, loadLayeredConfig, resolveModelAlias, resolveClaudeModelId } from "./config.js"
+import { findCrevDir, getOutputDir, loadAgentPrompt, loadAnnotatedConfig, loadConfig, loadLayeredConfig, resolveModelAlias, resolveModelRef } from "./config.js"
 
 describe("loadConfig", () => {
   let tmpDir: string
@@ -69,42 +69,37 @@ describe("resolveModelAlias", () => {
   })
 })
 
-describe("resolveClaudeModelId", () => {
-  it("resolves 'opus' to full Claude model ID", () => {
+describe("resolveModelRef", () => {
+  it("expands a runtime/model alias, overriding the passed runtime", () => {
     const config = loadConfig("/nonexistent")
-    expect(resolveClaudeModelId(config, "opus")).toBe("claude-opus-4-6")
+    ;(config.aliases as Record<string, string>)["sol"] = "codex/gpt-5.6-sol"
+    expect(resolveModelRef(config, "pi", "sol")).toEqual({ runtime: "codex", model: "gpt-5.6-sol" })
   })
 
-  it("resolves 'sonnet' to full Claude model ID", () => {
+  it("keeps the passed runtime for a bare model alias", () => {
     const config = loadConfig("/nonexistent")
-    expect(resolveClaudeModelId(config, "sonnet")).toBe("claude-sonnet-4-6")
+    ;(config.aliases as Record<string, string>)["luna"] = "gpt-5.6-luna"
+    expect(resolveModelRef(config, "codex", "luna")).toEqual({
+      runtime: "codex",
+      model: "gpt-5.6-luna",
+    })
   })
 
-  it("resolves 'haiku' to full Claude model ID", () => {
+  it("splits on the first slash so slashed model ids survive", () => {
     const config = loadConfig("/nonexistent")
-    expect(resolveClaudeModelId(config, "haiku")).toBe("claude-haiku-4-5-20251001")
+    ;(config.aliases as Record<string, string>)["claude"] = "pi/anthropic/claude-sonnet-4-6"
+    expect(resolveModelRef(config, "codex", "claude")).toEqual({
+      runtime: "pi",
+      model: "anthropic/claude-sonnet-4-6",
+    })
   })
 
-  it("passes through full model IDs unchanged", () => {
+  it("passes through a non-alias model unchanged", () => {
     const config = loadConfig("/nonexistent")
-    expect(resolveClaudeModelId(config, "claude-opus-4-6")).toBe("claude-opus-4-6")
-  })
-
-  it("passes through unknown model names unchanged", () => {
-    const config = loadConfig("/nonexistent")
-    expect(resolveClaudeModelId(config, "gpt-5.4")).toBe("gpt-5.4")
-  })
-
-  it("applies user aliases before Claude shorthands", () => {
-    const config = loadConfig("/nonexistent")
-    ;(config.aliases as Record<string, string>)["fast"] = "haiku"
-    expect(resolveClaudeModelId(config, "fast")).toBe("claude-haiku-4-5-20251001")
-  })
-
-  it("user alias to full ID bypasses shorthands", () => {
-    const config = loadConfig("/nonexistent")
-    ;(config.aliases as Record<string, string>)["default"] = "claude-sonnet-4-6"
-    expect(resolveClaudeModelId(config, "default")).toBe("claude-sonnet-4-6")
+    expect(resolveModelRef(config, "codex", "gpt-5.6-terra")).toEqual({
+      runtime: "codex",
+      model: "gpt-5.6-terra",
+    })
   })
 })
 

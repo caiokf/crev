@@ -1,6 +1,6 @@
 import crypto from "node:crypto"
 import type { Config } from "./config.js"
-import { resolveModelAlias, getRuntimeConfig } from "./config.js"
+import { resolveModelRef, getRuntimeConfig } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
 import type { NormalizedReview, ReviewIssue } from "./types.js"
@@ -136,8 +136,9 @@ If there are no issues, return: { "issues": [] }
 Raw review output:
 ${raw.slice(0, MAX_RAW_CHARS)}`
 
-  const normalizerRuntime = config.normalizer.runtime
-  const normalizerModel = resolveModelAlias(config, config.normalizer.model)
+  const resolved = resolveModelRef(config, config.normalizer.runtime, config.normalizer.model)
+  const normalizerRuntime = resolved.runtime ?? config.normalizer.runtime
+  const normalizerModel = resolved.model
   const rtConfig = getRuntimeConfig(config, normalizerRuntime)
 
   try {

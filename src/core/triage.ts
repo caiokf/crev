@@ -1,5 +1,5 @@
 import type { Config } from "./config.js"
-import { resolveModelAlias, getRuntimeConfig } from "./config.js"
+import { resolveModelRef, getRuntimeConfig } from "./config.js"
 import { extractAndParse } from "./json-extract.js"
 import { callLlm } from "./llm.js"
 import type { ReviewIssue, TriageCommentEnrichment } from "./types.js"
@@ -242,8 +242,9 @@ async function callTriageAgent(
   config: Config,
   signal?: AbortSignal,
 ): Promise<AgentResult> {
-  const runtime = config.triage.runtime
-  const model = resolveModelAlias(config, config.triage.model)
+  const resolved = resolveModelRef(config, config.triage.runtime, config.triage.model)
+  const runtime = resolved.runtime ?? config.triage.runtime
+  const model = resolved.model
   const rtConfig = getRuntimeConfig(config, runtime)
   try {
     const raw = await callLlm({

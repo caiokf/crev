@@ -176,19 +176,40 @@ export function loadAnnotatedConfig(crevDir: string): { config: Config; provenan
   return { config: configSchema.parse(merged), provenance }
 }
 
+export type ResolvedModelRef = { runtime: string | undefined; model: string }
+
+/**
+ * Expand a `runtime/model` alias found in `model` against an aliases map.
+ * When the alias carries a runtime (the "runtime/model" form, split on the
+ * first slash so slashed model ids survive), that runtime wins over `runtime`;
+ * a bare alias keeps the passed `runtime`. Non-alias models pass through.
+ */
+export function expandModelRef(
+  aliases: Record<string, string>,
+  runtime: string | undefined,
+  model: string,
+): ResolvedModelRef {
+  const alias = aliases[model]
+  if (alias === undefined) return { runtime, model }
+  const slash = alias.indexOf("/")
+  if (slash > 0 && slash < alias.length - 1) {
+    return { runtime: alias.slice(0, slash), model: alias.slice(slash + 1) }
+  }
+  return { runtime, model: alias }
+}
+
+/** Resolve a runtime+model pair, expanding a runtime/model alias in `model`. */
+export function resolveModelRef(
+  config: Config,
+  runtime: string | undefined,
+  model: string,
+): ResolvedModelRef {
+  return expandModelRef(config.aliases, runtime, model)
+}
+
+/** Resolve just the model string of an alias (any runtime prefix dropped). */
 export function resolveModelAlias(config: Config, model: string): string {
-  return config.aliases[model] ?? model
-}
-
-const CLAUDE_MODEL_SHORTHANDS: Record<string, string> = {
-  opus: "claude-opus-4-6",
-  sonnet: "claude-sonnet-4-6",
-  haiku: "claude-haiku-4-5-20251001",
-}
-
-export function resolveClaudeModelId(config: Config, model: string): string {
-  const aliased = resolveModelAlias(config, model)
-  return CLAUDE_MODEL_SHORTHANDS[aliased] ?? aliased
+  return expandModelRef(config.aliases, undefined, model).model
 }
 
 export function getOutputDir(config: Config, crevDir: string): string {
