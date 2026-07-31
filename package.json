@@ -1,6 +1,6 @@
 {
   "name": "@caiokf/crev",
-  "version": "0.9.0",
+  "version": "0.10.0",
   "type": "module",
   "bin": {
     "crev": "./dist/bin.js"
@@ -26,7 +26,7 @@
     "crev": "tsup --silent && node dist/bin.js"
   },
   "dependencies": {
-    "@caiokf/valet": "^0.1.1",
+    "@caiokf/valet": "^0.2.0",
     "@inquirer/prompts": "^7.5.0",
     "blessed": "0.1.81",
     "chalk": "^5.4.1",

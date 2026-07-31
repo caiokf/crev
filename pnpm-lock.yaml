@@ -9,8 +9,8 @@ importers:
   .:
     dependencies:
       '@caiokf/valet':
-        specifier: ^0.1.1
-        version: 0.1.1
+        specifier: ^0.2.0
+        version: 0.2.0
       '@inquirer/prompts':
         specifier: ^7.5.0
         version: 7.10.1(@types/node@25.5.2)
@@ -60,8 +60,8 @@ importers:
 
 packages:
 
-  '@caiokf/valet@0.1.1':
-    resolution: {integrity: sha512-DoXFIpk5Nhy8UmrLJrSEJfBkPGgT+k4uQXQfoCIkX7/Chc/CtHJkHhp97SlVA+eLP1g8oKR7a6LsCNlM1W7MHg==}
+  '@caiokf/valet@0.2.0':
+    resolution: {integrity: sha512-pbqjJ5AQ2vfLTqRZ0XU+x7CS+JaaBga3ZL0q4sFgHtYA44UyTNr8d5wtOa8hkdPuh0qXASA9YvTtQEIFarSehw==}
     engines: {node: '>=20'}
 
   '@effect/vitest@0.29.0':
@@ -1034,7 +1034,7 @@ packages:
 
 snapshots:
 
-  '@caiokf/valet@0.1.1': {}
+  '@caiokf/valet@0.2.0': {}
 
   '@effect/vitest@0.29.0(effect@3.21.2)(vitest@3.2.4(@types/node@25.5.2)(tsx@4.21.0)(yaml@2.8.3))':
     dependencies:
