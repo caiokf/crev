@@ -72,7 +72,7 @@ export const doctorAction = (
     for (const name of schemaNames) {
       const resolved = yield* store.resolvePath(name, crevDir)
       if (!resolved) continue
-      const schema = yield* Effect.either(store.load(resolved))
+      const schema = yield* Effect.either(store.load(resolved, config.aliases))
       if (schema._tag === "Left") continue
 
       for (const reviewer of schema.right.reviewers) {
