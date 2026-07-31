@@ -3,13 +3,15 @@ import path from "node:path"
 import { z } from "zod"
 import YAML from "yaml"
 import { getAllRuntimes, getRuntimeNames } from "@caiokf/valet"
-import { getUserCrevDir } from "./config.js"
+import { getUserCrevDir, expandModelRef } from "./config.js"
 import { resolveAgentPath, type AgentPathContext } from "./agent-path.js"
 import { errorMessage } from "../util/cli-errors.js"
 
-// Single source of truth: derived from runtime adapters
+// Known models per runtime, for display/autocomplete only — no longer a
+// validation gate. Uses each adapter's live discovery (e.g. pi's models
+// store) when available, falling back to its static seed.
 export const VALID_MODELS: Record<string, readonly string[]> = Object.fromEntries(
-  getAllRuntimes().map((r) => [r.name, r.models]),
+  getAllRuntimes().map((r) => [r.name, r.discoverModels?.() ?? r.models]),
 )
 
 // Derived from runtime registry — adding a runtime auto-registers it here
@@ -55,18 +57,10 @@ export const SchemaFile = z.object({
   fix: FixSchema.optional(),
 })
 
-export const ValidatedSchemaFile = SchemaFile.superRefine((schema, ctx) => {
-  for (const [i, reviewer] of schema.reviewers.entries()) {
-    const validModels = VALID_MODELS[reviewer.runtime]
-    if (validModels && !validModels.includes(reviewer.model)) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["reviewers", i, "model"],
-        message: `Invalid model "${reviewer.model}" for runtime "${reviewer.runtime}". Valid: ${validModels.join(", ")}`,
-      })
-    }
-  }
-})
+// Models are no longer validated statically against a hard-coded catalog —
+// the underlying runtime CLI is the authority and fails clearly on a bad
+// model. Runtimes are still validated (the enum on each schema field).
+export const ValidatedSchemaFile = SchemaFile
 
 export type SchemaFileType = z.infer<typeof ValidatedSchemaFile>
 export type ReviewerConfig = z.input<typeof ReviewerSchema>
@@ -115,25 +109,39 @@ export function loadSchemaFile(schemaPath: string, aliases?: Record<string, stri
   }
 }
 
+function assertKnownRuntime(runtime: string, label: string): void {
+  const known = getRuntimeNames()
+  if (!known.includes(runtime)) {
+    throw new Error(`${label}: alias resolves to unknown runtime "${runtime}". Valid: ${known.join(", ")}`)
+  }
+}
+
+/**
+ * Expand a runtime/model alias in a field's `model`. A `runtime/model` alias
+ * overrides the field's runtime; a bare alias just swaps the model. When an
+ * alias introduces a new runtime, it is validated against the registry.
+ */
+function expandField<T extends { runtime?: string; model?: string }>(
+  field: T,
+  aliases: Record<string, string>,
+  label: string,
+): T {
+  if (!field.model) return field
+  const expanded = expandModelRef(aliases, field.runtime, field.model)
+  if (expanded.runtime && expanded.runtime !== field.runtime) {
+    assertKnownRuntime(expanded.runtime, label)
+  }
+  return { ...field, runtime: expanded.runtime as T["runtime"], model: expanded.model }
+}
+
 function applyModelAliases(schema: SchemaFileType, aliases: Record<string, string>): SchemaFileType {
   return {
     ...schema,
-    reviewers: schema.reviewers.map((reviewer) => ({
-      ...reviewer,
-      model: aliases[reviewer.model] ?? reviewer.model,
-    })),
-    triage: schema.triage
-      ? {
-          ...schema.triage,
-          model: schema.triage.model ? (aliases[schema.triage.model] ?? schema.triage.model) : schema.triage.model,
-        }
-      : schema.triage,
-    fix: schema.fix
-      ? {
-          ...schema.fix,
-          model: schema.fix.model ? (aliases[schema.fix.model] ?? schema.fix.model) : schema.fix.model,
-        }
-      : schema.fix,
+    reviewers: schema.reviewers.map((reviewer) =>
+      expandField(reviewer, aliases, `Reviewer "${reviewer.name}"`),
+    ),
+    triage: schema.triage ? expandField(schema.triage, aliases, "Triage") : schema.triage,
+    fix: schema.fix ? expandField(schema.fix, aliases, "Fix") : schema.fix,
   }
 }
 
@@ -200,9 +208,7 @@ export function getModelOverrideFormatError(overrides: ModelOverrides): string |
       const validRuntimes = Object.keys(VALID_MODELS).join(", ")
       return `${label}: unknown runtime "${override.runtime}". Valid runtimes: ${validRuntimes}`
     }
-    if (!validModels.includes(override.model)) {
-      return `${label}: invalid model "${override.model}" for runtime "${override.runtime}". Valid: ${validModels.join(", ")}`
-    }
+    // Model is not validated statically — the runtime CLI is the authority.
     return null
   }
 

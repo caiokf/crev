@@ -68,7 +68,9 @@ export const listRuntimesAction: Effect.Effect<RuntimeSummary[]> = Effect.sync((
   getAllRuntimes().map((rt) => ({
     name: rt.name,
     type: rt.type,
-    models: [...rt.models],
+    // Prefer the runtime's live catalog (e.g. pi's models store) over the
+    // static seed so `crev list` reflects currently available models.
+    models: rt.discoverModels?.() ?? [...rt.models],
     defaultModel: rt.defaultModel,
   })),
 )

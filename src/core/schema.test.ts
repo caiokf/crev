@@ -34,14 +34,11 @@ describe("schema validation", () => {
     expect(result.success).toBe(false)
   })
 
-  it("rejects invalid model for runtime", () => {
+  it("accepts unknown models — the runtime CLI is the authority", () => {
     const result = ValidatedSchemaFile.safeParse({
-      reviewers: [{ name: "Test", runtime: "claude", model: "gpt-5" }],
+      reviewers: [{ name: "Test", runtime: "codex", model: "gpt-5.6-sol" }],
     })
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.issues.some((i) => i.message.includes("Invalid model"))).toBe(true)
-    }
+    expect(result.success).toBe(true)
   })
 
   it("rejects prompt and agent together", () => {
@@ -140,15 +137,40 @@ describe("loadSchemaFile", () => {
     fs.rmSync(tmpDir, { recursive: true })
   })
 
-  it("rejects invalid model values", () => {
-    const schemaPath = path.join(tmpDir, "invalid-model.yaml")
+  it("accepts unknown model values without static validation", () => {
+    const schemaPath = path.join(tmpDir, "unknown-model.yaml")
     fs.writeFileSync(schemaPath, `
 reviewers:
   - name: Engineer
-    runtime: claude
-    model: definitely-not-real
+    runtime: codex
+    model: gpt-5.6-sol
 `)
-    expect(() => loadSchemaFile(schemaPath)).toThrow(/Invalid model/)
+    const schema = loadSchemaFile(schemaPath)
+    expect(schema.reviewers[0].model).toBe("gpt-5.6-sol")
+  })
+
+  it("expands a runtime/model alias in a reviewer's model field", () => {
+    const schemaPath = path.join(tmpDir, "aliased.yaml")
+    fs.writeFileSync(schemaPath, `
+reviewers:
+  - name: Engineer
+    runtime: codex
+    model: sol
+`)
+    const schema = loadSchemaFile(schemaPath, { sol: "pi/gpt-5.6-sol" })
+    expect(schema.reviewers[0].runtime).toBe("pi")
+    expect(schema.reviewers[0].model).toBe("gpt-5.6-sol")
+  })
+
+  it("rejects an alias that resolves to an unknown runtime", () => {
+    const schemaPath = path.join(tmpDir, "bad-alias.yaml")
+    fs.writeFileSync(schemaPath, `
+reviewers:
+  - name: Engineer
+    runtime: codex
+    model: sol
+`)
+    expect(() => loadSchemaFile(schemaPath, { sol: "fakert/whatever" })).toThrow(/unknown runtime/)
   })
 
   it("throws friendly error for malformed YAML", () => {
@@ -416,11 +438,9 @@ describe("getModelOverrideFormatError", () => {
     expect(err).toContain("fakert")
   })
 
-  it("returns error for blanket with valid runtime but invalid model", () => {
-    const overrides = parseModelOverrides(["claude/nonexistent-model"])
-    const err = getModelOverrideFormatError(overrides)
-    expect(err).toContain("invalid model")
-    expect(err).toContain("nonexistent-model")
+  it("accepts an unknown model on a valid runtime (no static model check)", () => {
+    const overrides = parseModelOverrides(["codex/gpt-5.6-sol"])
+    expect(getModelOverrideFormatError(overrides)).toBeNull()
   })
 
   it("returns error for targeted with unknown runtime", () => {
@@ -430,17 +450,9 @@ describe("getModelOverrideFormatError", () => {
     expect(err).toContain("fakert")
   })
 
-  it("returns error for targeted with valid runtime but invalid model", () => {
-    const overrides = parseModelOverrides(["Engineer=claude/nonexistent"])
-    const err = getModelOverrideFormatError(overrides)
-    expect(err).toContain("invalid model")
-    expect(err).toContain("nonexistent")
-  })
-
-  it("includes valid options in error message", () => {
-    const overrides = parseModelOverrides(["claude/nonexistent"])
-    const err = getModelOverrideFormatError(overrides)
-    expect(err).toContain("Valid:")
+  it("accepts a targeted unknown model on a valid runtime", () => {
+    const overrides = parseModelOverrides(["Engineer=codex/gpt-5.6-terra"])
+    expect(getModelOverrideFormatError(overrides)).toBeNull()
   })
 })
 
