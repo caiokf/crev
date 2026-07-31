@@ -33,7 +33,7 @@ export const listSchemasAction: Effect.Effect<
 > = Effect.gen(function* () {
   const cfg = yield* CrevConfig
   const store = yield* SchemaStore
-  const { crevDir } = yield* cfg.load()
+  const { crevDir, config } = yield* cfg.load()
   const names = yield* store.listAll(crevDir)
 
   const summaries: SchemaSummary[] = []
@@ -43,7 +43,7 @@ export const listSchemasAction: Effect.Effect<
       summaries.push({ name, description: "not found", reviewers: 0, error: "unresolved path" })
       continue
     }
-    const exit = yield* Effect.exit(store.load(resolved))
+    const exit = yield* Effect.exit(store.load(resolved, config.aliases))
     if (Exit.isSuccess(exit)) {
       const schema = exit.value
       summaries.push({

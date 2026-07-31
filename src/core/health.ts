@@ -59,12 +59,18 @@ export function checkSchemaReadiness(
   healthResults: RuntimeHealth[],
 ): SchemaReadiness[] {
   const schemas = listAllSchemas(crevDir)
+  let aliases: Record<string, string> = {}
+  try {
+    aliases = loadLayeredConfig(crevDir).aliases
+  } catch {
+    /* schemas may still be checkable without a config */
+  }
 
   return schemas.map((name) => {
     try {
       const resolved = resolveSchemaPath(name, crevDir)
       if (!resolved) return { name, ready: false, issues: ["Schema file not found"] }
-      const schema = loadSchemaFile(resolved)
+      const schema = loadSchemaFile(resolved, aliases)
       const issues: string[] = []
 
       for (const reviewer of schema.reviewers) {
@@ -112,11 +118,17 @@ export function isFixConfigured(crevDir: string): boolean {
   } catch { /* no config at all */ }
 
   const schemas = listAllSchemas(crevDir)
+  let aliases: Record<string, string> = {}
+  try {
+    aliases = loadLayeredConfig(crevDir).aliases
+  } catch {
+    /* fall back to no aliases */
+  }
   for (const name of schemas) {
     try {
       const resolved = resolveSchemaPath(name, crevDir)
       if (!resolved) continue
-      const schema = loadSchemaFile(resolved)
+      const schema = loadSchemaFile(resolved, aliases)
       if (schema.fix?.runtime && schema.fix?.model) return true
     } catch { /* skip broken schemas */ }
   }

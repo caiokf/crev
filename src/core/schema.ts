@@ -86,10 +86,38 @@ function invalidSchemaParseResult(
   }
 }
 
-export function parseSchemaFile(content: string): z.SafeParseReturnType<unknown, z.infer<typeof ValidatedSchemaFile>> {
+/**
+ * Expand runtime/model aliases on the raw parsed schema, before validation, so
+ * a reviewer/triage/fix entry may omit `runtime` and let the alias supply it. A
+ * `runtime/model` alias overrides the entry's runtime; a bare alias only swaps
+ * the model. The injected runtime is then validated by the normal runtime enum.
+ */
+function expandRawAliases(raw: unknown, aliases: Record<string, string>): unknown {
+  if (!raw || typeof raw !== "object") return raw
+  const schema = raw as Record<string, unknown>
+  const expandEntry = (entry: unknown): void => {
+    if (!entry || typeof entry !== "object") return
+    const field = entry as { runtime?: unknown; model?: unknown }
+    if (typeof field.model !== "string") return
+    const runtime = typeof field.runtime === "string" ? field.runtime : undefined
+    const resolved = expandModelRef(aliases, runtime, field.model)
+    if (resolved.runtime !== undefined) field.runtime = resolved.runtime
+    field.model = resolved.model
+  }
+  if (Array.isArray(schema.reviewers)) schema.reviewers.forEach(expandEntry)
+  expandEntry(schema.triage)
+  expandEntry(schema.fix)
+  return schema
+}
+
+export function parseSchemaFile(
+  content: string,
+  aliases?: Record<string, string>,
+): z.SafeParseReturnType<unknown, z.infer<typeof ValidatedSchemaFile>> {
   try {
     const parsed = YAML.parse(content)
-    return ValidatedSchemaFile.safeParse(parsed)
+    const expanded = aliases ? expandRawAliases(parsed, aliases) : parsed
+    return ValidatedSchemaFile.safeParse(expanded)
   } catch (err) {
     const reason = errorMessage(err)
     return invalidSchemaParseResult(`Invalid YAML: ${reason}`)
@@ -100,48 +128,11 @@ export function loadSchemaFile(schemaPath: string, aliases?: Record<string, stri
   const content = fs.readFileSync(schemaPath, "utf-8")
   try {
     const parsed = YAML.parse(content)
-    const validated = ValidatedSchemaFile.parse(parsed)
-    if (!aliases) return validated
-    return applyModelAliases(validated, aliases)
+    const expanded = aliases ? expandRawAliases(parsed, aliases) : parsed
+    return ValidatedSchemaFile.parse(expanded)
   } catch (err) {
     const reason = errorMessage(err)
     throw new Error(`Invalid schema file "${schemaPath}": ${reason}`)
-  }
-}
-
-function assertKnownRuntime(runtime: string, label: string): void {
-  const known = getRuntimeNames()
-  if (!known.includes(runtime)) {
-    throw new Error(`${label}: alias resolves to unknown runtime "${runtime}". Valid: ${known.join(", ")}`)
-  }
-}
-
-/**
- * Expand a runtime/model alias in a field's `model`. A `runtime/model` alias
- * overrides the field's runtime; a bare alias just swaps the model. When an
- * alias introduces a new runtime, it is validated against the registry.
- */
-function expandField<T extends { runtime?: string; model?: string }>(
-  field: T,
-  aliases: Record<string, string>,
-  label: string,
-): T {
-  if (!field.model) return field
-  const expanded = expandModelRef(aliases, field.runtime, field.model)
-  if (expanded.runtime && expanded.runtime !== field.runtime) {
-    assertKnownRuntime(expanded.runtime, label)
-  }
-  return { ...field, runtime: expanded.runtime as T["runtime"], model: expanded.model }
-}
-
-function applyModelAliases(schema: SchemaFileType, aliases: Record<string, string>): SchemaFileType {
-  return {
-    ...schema,
-    reviewers: schema.reviewers.map((reviewer) =>
-      expandField(reviewer, aliases, `Reviewer "${reviewer.name}"`),
-    ),
-    triage: schema.triage ? expandField(schema.triage, aliases, "Triage") : schema.triage,
-    fix: schema.fix ? expandField(schema.fix, aliases, "Fix") : schema.fix,
   }
 }
 

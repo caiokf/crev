@@ -162,15 +162,26 @@ reviewers:
     expect(schema.reviewers[0].model).toBe("gpt-5.6-sol")
   })
 
+  it("lets a reviewer omit runtime when a runtime/model alias supplies it", () => {
+    const schemaPath = path.join(tmpDir, "runtimeless.yaml")
+    fs.writeFileSync(schemaPath, `
+reviewers:
+  - name: Engineer
+    model: luna
+`)
+    const schema = loadSchemaFile(schemaPath, { luna: "codex/gpt-5.6-luna" })
+    expect(schema.reviewers[0].runtime).toBe("codex")
+    expect(schema.reviewers[0].model).toBe("gpt-5.6-luna")
+  })
+
   it("rejects an alias that resolves to an unknown runtime", () => {
     const schemaPath = path.join(tmpDir, "bad-alias.yaml")
     fs.writeFileSync(schemaPath, `
 reviewers:
   - name: Engineer
-    runtime: codex
     model: sol
 `)
-    expect(() => loadSchemaFile(schemaPath, { sol: "fakert/whatever" })).toThrow(/unknown runtime/)
+    expect(() => loadSchemaFile(schemaPath, { sol: "fakert/whatever" })).toThrow(/fakert/)
   })
 
   it("throws friendly error for malformed YAML", () => {

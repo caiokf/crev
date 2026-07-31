@@ -4,6 +4,7 @@ import path from "node:path"
 import { CrevConfig } from "../services/CrevConfig.js"
 import { SchemaStore } from "../services/SchemaStore.js"
 import { parseSchemaFile, validateAgentRefs } from "../core/schema.js"
+import { loadLayeredConfig } from "../core/config.js"
 import type { SchemaFileType } from "../core/schema.js"
 import type { ConfigParseError, SchemaInvalidError, SchemaNotFoundError } from "../errors.js"
 
@@ -27,9 +28,9 @@ export const showSchemaAction = (
   Effect.gen(function* () {
     const cfg = yield* CrevConfig
     const store = yield* SchemaStore
-    const { crevDir } = yield* cfg.load()
+    const { crevDir, config } = yield* cfg.load()
     const schemaPath = yield* store.resolveOrFail(name, crevDir)
-    const schema = yield* store.load(schemaPath)
+    const schema = yield* store.load(schemaPath, config.aliases)
     return { name, path: schemaPath, ...schema }
   })
 
@@ -87,7 +88,13 @@ const validatePath = (
 
     try {
       const content = fs.readFileSync(schemaPath, "utf-8")
-      const parseResult = parseSchemaFile(content)
+      let aliases: Record<string, string> = {}
+      try {
+        aliases = loadLayeredConfig(crevDir).aliases
+      } catch {
+        /* validate schema shape even without a config */
+      }
+      const parseResult = parseSchemaFile(content, aliases)
 
       if (!parseResult.success) {
         for (const issue of parseResult.error.issues) {
