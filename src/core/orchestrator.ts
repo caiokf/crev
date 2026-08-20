@@ -527,6 +527,7 @@ async function executeReviewer(
       diff: opts.diff,
       outputFormat: "",
       signal,
+      timeoutMs: reviewer.timeoutMs ?? opts.config.reviewers.timeoutMs,
       overrides: {
         command: rtConfig.command,
         env: rtConfig.env,

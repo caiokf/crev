@@ -422,6 +422,7 @@ describe("runTriage", () => {
     defaults: { schema: "quick", type: "all", base: "main" },
     runtimes: {},
     aliases: {},
+    reviewers: {},
     diff: { exclude: [] },
     output: { dir: ".crev/reviews", format: "json" },
     normalizer: { enabled: true, runtime: "claude", model: "haiku" },

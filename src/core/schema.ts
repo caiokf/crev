@@ -25,6 +25,8 @@ export const ReviewerSchema = z
     model: z.string().min(1, "Model is required"),
     prompt: z.string().optional(),
     agent: z.string().optional(),
+    /** Overrides `reviewers.timeoutMs` for this lens alone. */
+    timeoutMs: z.number().int().positive().optional(),
   })
   .refine((r) => !(r.prompt && r.agent), {
     message: "Specify either prompt or agent, not both",

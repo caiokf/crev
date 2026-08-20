@@ -8,6 +8,7 @@ function makeConfig(failback: Record<string, string> = {}): Config {
     defaults: { schema: "quick", type: "all" as const, base: "main" },
     runtimes: {},
     aliases: {},
+    reviewers: {},
     diff: { exclude: [] },
     output: { dir: ".crev/reviews", format: "json" },
     normalizer: { enabled: true, runtime: "claude", model: "haiku" },

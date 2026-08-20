@@ -359,7 +359,38 @@ triage:
 
 Per-reviewer fields:
 - `prompt` / `agent`: mutually exclusive. CodeRabbit accepts neither.
+- `timeoutMs`: wall for this lens alone, overriding `reviewers.timeoutMs` in config.
 - Reviewers have full filesystem access and can read any file in the repository during review.
+
+### Reviewer Timeouts
+
+Each runtime kills a reviewer that overruns its default wall, which is sized for a diff.
+A whole-codebase pass (`--analyze`) carries a far larger prompt and routinely overruns it.
+When that happens the process is killed before writing anything, so the review records the
+reviewer with `exitCode: 143` and zero issues — indistinguishable, downstream, from a
+reviewer that looked and found nothing.
+
+Set a wall that matches the job:
+
+```yaml
+# .crev/config.yaml — applies to every reviewer
+reviewers:
+  timeoutMs: 1800000        # 30 minutes
+```
+
+```yaml
+# .crev/schemas/<name>.yaml — one slow lens
+reviewers:
+  - name: Guardian
+    runtime: claude
+    model: opus
+    agent: guardian.md
+    timeoutMs: 2700000      # 45 minutes
+```
+
+Precedence is per-reviewer, then config, then the runtime's own default. After a run, read
+`durationMs` and `exitCode` per reviewer in the review JSON and tune from what they show:
+an `exitCode` of 143 next to a duration that lands on the wall is a timeout, not a result.
 
 ### Schema Authoring: Black-Box Approach
 

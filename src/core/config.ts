@@ -25,6 +25,17 @@ export const configSchema = z.object({
     .default({}),
   runtimes: z.record(z.string(), runtimeConfigSchema).default({}),
   aliases: z.record(z.string(), z.string()).default({}),
+  reviewers: z
+    .object({
+      /**
+       * Wall clock a reviewer gets, in milliseconds. Unset leaves the
+       * runtime's own default, which suits a diff. A whole-codebase pass
+       * needs more: a reviewer killed part way through returns nothing and
+       * an empty result is read as "found no problems".
+       */
+      timeoutMs: z.number().int().positive().optional(),
+    })
+    .default({}),
   diff: z
     .object({
       exclude: z.array(z.string()).default([]),

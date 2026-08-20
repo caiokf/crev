@@ -14,6 +14,13 @@ aliases:
   sonnet: claude-sonnet-4-6
   haiku: claude-haiku-4-5-20251001
 
+# reviewers:
+#   # Wall a reviewer gets, in milliseconds. Unset leaves each runtime's own
+#   # default, which is sized for a diff. A whole-codebase pass (--analyze)
+#   # needs more: a reviewer killed part way through returns nothing, and an
+#   # empty result reads as "found no problems".
+#   timeoutMs: 1800000
+
 diff:
   exclude:
     - "package-lock.json"

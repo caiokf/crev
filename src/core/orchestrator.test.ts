@@ -410,6 +410,7 @@ describe("orchestrate", () => {
     defaults: { schema: "quick", type: "all" as const, base: "main" },
     runtimes: {},
     aliases: {},
+    reviewers: {},
     diff: { exclude: [] },
     output: { dir: "", format: "json" as const },
     normalizer: { enabled: false, runtime: "claude", model: "haiku" },
@@ -654,5 +655,45 @@ describe("orchestrate", () => {
     // In json/silent mode, the orchestrator should not write the "Running N reviewers" header
     const calls = stdoutSpy.mock.calls.map(([arg]) => String(arg))
     expect(calls.some((c) => c.includes("Running"))).toBe(false)
+  })
+  it("passes the configured reviewer timeout down to the runtime", async () => {
+    const execute = vi.fn().mockResolvedValue({ raw: '{"issues":[]}', durationMs: 1, exitCode: 0 })
+    valetMocks.getRuntime.mockReturnValue({ name: "claude", defaultModel: "sonnet", execute })
+
+    const opts = makeOpts()
+    opts.config.reviewers = { timeoutMs: 30 * 60 * 1000 }
+
+    await orchestrate(opts)
+
+    expect(execute).toHaveBeenCalledWith(
+      expect.objectContaining({ timeoutMs: 30 * 60 * 1000 }),
+    )
+  })
+
+  it("lets a single reviewer override the configured timeout", async () => {
+    const execute = vi.fn().mockResolvedValue({ raw: '{"issues":[]}', durationMs: 1, exitCode: 0 })
+    valetMocks.getRuntime.mockReturnValue({ name: "claude", defaultModel: "sonnet", execute })
+
+    const opts = makeOpts({
+      schema: {
+        reviewers: [
+          { name: "Slow", runtime: "claude", model: "opus", prompt: "Review.", timeoutMs: 60_000 },
+        ],
+      },
+    })
+    opts.config.reviewers = { timeoutMs: 30 * 60 * 1000 }
+
+    await orchestrate(opts)
+
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: 60_000 }))
+  })
+
+  it("leaves the timeout unset when nothing configures one, so the runtime keeps its own", async () => {
+    const execute = vi.fn().mockResolvedValue({ raw: '{"issues":[]}', durationMs: 1, exitCode: 0 })
+    valetMocks.getRuntime.mockReturnValue({ name: "claude", defaultModel: "sonnet", execute })
+
+    await orchestrate(makeOpts())
+
+    expect(execute).toHaveBeenCalledWith(expect.objectContaining({ timeoutMs: undefined }))
   })
 })

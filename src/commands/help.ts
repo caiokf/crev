@@ -81,6 +81,7 @@ Schemas define which AI reviewers to run and how. Place them in .crev/schemas/
   Optional fields per reviewer:
     prompt: string        # Inline prompt text
     agent: string         # Path to an external agent file (any path)
+    timeoutMs: number     # Wall for this lens, overriding reviewers.timeoutMs
 
   Optional top-level fields:
     description: string   # What this schema reviews for
